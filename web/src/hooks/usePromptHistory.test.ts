@@ -13,7 +13,6 @@ function mockSession(partial: Partial<SessionSummary> & Pick<SessionSummary, 'id
   return {
     projectId: 'proj-1',
     workdir: '/tmp',
-    mode: 'builder',
     phase: 'build',
     isRunning: false,
     createdAt: '2026-03-24T10:00:00Z',

@@ -295,11 +295,6 @@ export async function createTestClient(options: TestClientOptions = {}): Promise
         const payload = msg.payload as { criteria: Session['criteria'] }
         currentSession = { ...currentSession, criteria: payload.criteria }
       }
-      // Update mode from mode.changed events
-      if (msg.type === 'mode.changed' && currentSession) {
-        const payload = msg.payload as { mode: Session['mode'] }
-        currentSession = { ...currentSession, mode: payload.mode }
-      }
       // Update phase from phase.changed events
       if (msg.type === 'phase.changed' && currentSession) {
         const payload = msg.payload as { phase: Session['phase'] }

@@ -13,7 +13,7 @@ import {
   assertNoErrors,
   createProject,
   createSession,
-  setSessionMode,
+  
   type TestClient, 
   type TestProject,
   type TestServerHandle 
@@ -49,28 +49,34 @@ describe('Mode Switching', () => {
   describe('Manual Mode Switch', () => {
     it('switches from planner to builder', async () => {
       const sessionId = client.getSession()!.id
-      await setSessionMode(server.url, sessionId, 'builder', server.wsUrl)
+      await client.send('chat.send', { content: 'Ready', agentId: 'builder' })
+      await client.waitForChatDone()
 
       const session = client.getSession()!
-      expect(session.mode).toBe('builder')
+      // Mode is per-message via agentId, not stored on session
+      expect(session.phase).toBe('plan')
     })
 
     it('switches from builder back to planner', async () => {
       const sessionId = client.getSession()!.id
       
       // First switch to builder
-      await setSessionMode(server.url, sessionId, 'builder', server.wsUrl)
+      await client.send('chat.send', { content: 'Ready', agentId: 'builder' })
+      await client.waitForChatDone()
       
       // Then back to planner
-      await setSessionMode(server.url, sessionId, 'planner', server.wsUrl)
+      await client.send('chat.send', { content: 'Ready' })
+      await client.waitForChatDone()
 
       const session = client.getSession()!
-      expect(session.mode).toBe('planner')
+      // Mode is per-message via agentId, not stored on session
+      expect(session.phase).toBe('plan')
     })
 
     it('does not inject the builder kickoff prompt into manual builder chats', async () => {
       const sessionId = client.getSession()!.id
-      await setSessionMode(server.url, sessionId, 'builder', server.wsUrl)
+      await client.send('chat.send', { content: 'Ready', agentId: 'builder' })
+      await client.waitForChatDone()
       client.clearEvents()
 
       await client.send('chat.send', {
@@ -112,13 +118,7 @@ describe('Mode Switching', () => {
       const response = await client.send('mode.accept', {})
       expect(response.type).toBe('ack')
       
-      // Should receive mode.changed event
-      const modeEvent = await client.waitFor('mode.changed')
-      const modePayload = modeEvent.payload as { mode: string; auto: boolean }
-      expect(modePayload.mode).toBe('builder')
-      expect(modePayload.auto).toBe(false)
-      
-      // Should receive phase.changed event
+      // Should receive phase.changed event (mode.changed no longer exists)
       const phaseEvent = await client.waitFor('phase.changed')
       const phasePayload = phaseEvent.payload as { phase: string }
       expect(phasePayload.phase).toBe('build')
@@ -134,13 +134,15 @@ describe('Mode Switching', () => {
       await client.waitForChatDone()
       
       // Switch to builder mode (this triggers summary generation)
-      await setSessionMode(server.url, sessionId, 'builder', server.wsUrl)
+      await client.send('chat.send', { content: 'Ready', agentId: 'builder' })
+      await client.waitForChatDone()
       
       // Wait for session state update (summary should be populated)
       await client.waitFor('session.state')
 
       const session = client.getSession()!
-      expect(session.mode).toBe('builder')
+      // Mode is per-message via agentId, not stored on session
+      expect(session.phase).toBe('plan')
     })
 
     it.skip('generates summary when using mode.accept (Start Building button)', async () => {
@@ -241,7 +243,8 @@ describe('Mode Switching', () => {
   describe('Phase from Session State', () => {
     it('includes phase in session state', async () => {
       const sessionId = client.getSession()!.id
-      await setSessionMode(server.url, sessionId, 'builder', server.wsUrl)
+      await client.send('chat.send', { content: 'Ready', agentId: 'builder' })
+      await client.waitForChatDone()
       
       const session = client.getSession()!
       expect(session.phase).toBe('plan') // Phase doesn't auto-change on manual mode switch
@@ -253,7 +256,8 @@ describe('Mode Switching', () => {
       const sessionId = client.getSession()!.id
       
       // Fresh session with no messages - switch to builder mode
-      await setSessionMode(server.url, sessionId, 'builder', server.wsUrl)
+      await client.send('chat.send', { content: 'Ready', agentId: 'builder' })
+      await client.waitForChatDone()
       
       // Wait for session state update
       await client.waitFor('session.state')

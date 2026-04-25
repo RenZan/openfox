@@ -11,7 +11,6 @@
 import type {
   Session,
   SessionSummary,
-  SessionMode,
   SessionPhase,
   Criterion,
   ContextState,
@@ -40,7 +39,6 @@ import { getEventStore } from '../events/store.js'
 import {
   getSessionState,
   emitSessionInitialized,
-  emitModeChanged,
   emitPhaseChanged,
   emitRunningChanged,
   emitUserMessage,
@@ -58,6 +56,33 @@ import { isInDangerZone, canCompact } from '../context/tokenizer.js'
 import { getRuntimeConfig } from '../runtime-config.js'
 
 // ============================================================================
+// Message Mapping
+// ============================================================================
+
+function mapSnapshotMessage(m: import('../events/types.js').SnapshotMessage): Message {
+  const msg: Message = {
+    id: m.id,
+    role: m.role,
+    content: m.content,
+    timestamp: new Date(m.timestamp).toISOString(),
+  }
+  if (m.thinkingContent !== undefined) msg.thinkingContent = m.thinkingContent
+  if (m.toolCalls !== undefined) msg.toolCalls = m.toolCalls
+  if (m.segments !== undefined) msg.segments = m.segments
+  if (m.stats !== undefined) msg.stats = m.stats
+  if (m.partial !== undefined) msg.partial = m.partial
+  if (m.isStreaming !== undefined) msg.isStreaming = m.isStreaming
+  if (m.subAgentId !== undefined) msg.subAgentId = m.subAgentId
+  if (m.subAgentType !== undefined) msg.subAgentType = m.subAgentType
+  if (m.isSystemGenerated !== undefined) msg.isSystemGenerated = m.isSystemGenerated
+  if (m.messageKind !== undefined) msg.messageKind = m.messageKind
+  if (m.contextWindowId !== undefined) msg.contextWindowId = m.contextWindowId
+  if (m.isCompactionSummary !== undefined) msg.isCompactionSummary = m.isCompactionSummary
+  if (m.promptContext !== undefined) msg.promptContext = m.promptContext
+  return msg
+}
+
+// ============================================================================
 // Event Types (for backward compatibility with existing subscribers)
 // ============================================================================
 
@@ -65,7 +90,6 @@ export type SessionEvent =
   | { type: 'session_created'; session: Session }
   | { type: 'session_updated'; session: Session }
   | { type: 'session_deleted'; sessionId: string }
-  | { type: 'mode_changed'; sessionId: string; from: SessionMode; to: SessionMode }
   | { type: 'phase_changed'; sessionId: string; phase: SessionPhase }
   | { type: 'running_changed'; sessionId: string; isRunning: boolean }
   | { type: 'criteria_updated'; sessionId: string; criteria: Criterion[] }
@@ -228,29 +252,6 @@ export class SessionManager {
   // ============================================================================
   // State Changes (emit events + notify subscribers)
   // ============================================================================
-
-  /**
-   * Change session mode. Emits mode.changed event.
-   */
-  setMode(sessionId: string, toMode: SessionMode): Session {
-    const session = this.requireSession(sessionId)
-    const fromMode = session.mode
-
-    if (fromMode === toMode) {
-      return session
-    }
-
-    logger.debug('Changing session mode', { sessionId, from: fromMode, to: toMode })
-
-    emitModeChanged(sessionId, toMode, false)
-
-    const updatedSession = this.requireSession(sessionId)
-
-    this.emit({ type: 'mode_changed', sessionId, from: fromMode, to: toMode })
-    this.emit({ type: 'session_updated', session: updatedSession })
-
-    return updatedSession
-  }
 
   /**
    * Change session phase. Emits phase.changed event.
@@ -492,26 +493,7 @@ export class SessionManager {
 
     return state.messages
       .filter((m) => m.contextWindowId === state.currentContextWindowId)
-      .map((m) => {
-        const msg: Message = {
-          id: m.id,
-          role: m.role,
-          content: m.content,
-          timestamp: new Date(m.timestamp).toISOString(),
-        }
-        if (m.thinkingContent !== undefined) msg.thinkingContent = m.thinkingContent
-        if (m.toolCalls !== undefined) msg.toolCalls = m.toolCalls
-        if (m.segments !== undefined) msg.segments = m.segments
-        if (m.stats !== undefined) msg.stats = m.stats
-        if (m.partial !== undefined) msg.partial = m.partial
-        if (m.isStreaming !== undefined) msg.isStreaming = m.isStreaming
-        if (m.contextWindowId !== undefined) msg.contextWindowId = m.contextWindowId
-        if (m.isSystemGenerated !== undefined) msg.isSystemGenerated = m.isSystemGenerated
-        if (m.messageKind !== undefined) msg.messageKind = m.messageKind
-        if (m.isCompactionSummary !== undefined) msg.isCompactionSummary = m.isCompactionSummary
-        if (m.promptContext !== undefined) msg.promptContext = m.promptContext
-        return msg
-      })
+      .map(mapSnapshotMessage)
   }
 
   /**
@@ -700,7 +682,7 @@ export class SessionManager {
 
   private messageQueues = new Map<string, QueuedMessage[]>()
 
-  queueMessage(sessionId: string, mode: 'asap' | 'completion', content: string, attachments?: Attachment[], messageKind?: string): QueuedMessage {
+  queueMessage(sessionId: string, mode: 'asap' | 'completion', content: string, attachments?: Attachment[], messageKind?: string, agentId?: string): QueuedMessage {
     const queue = this.messageQueues.get(sessionId) ?? []
     const msg: QueuedMessage = {
       queueId: crypto.randomUUID(),
@@ -708,6 +690,7 @@ export class SessionManager {
       content,
       ...(attachments ? { attachments } : {}),
       ...(messageKind ? { messageKind } : {}),
+      ...(agentId ? { agentId } : {}),
       queuedAt: new Date().toISOString(),
     }
     queue.push(msg)
@@ -960,7 +943,6 @@ export class SessionManager {
       // No events yet - return defaults
       return {
         ...dbSession,
-        mode: 'planner',
         phase: 'plan',
         isRunning: false,
         messages: [],
@@ -996,13 +978,12 @@ export class SessionManager {
 
     return {
       ...dbSession,
-      mode: eventState.mode,
       phase: eventState.phase,
       isRunning: eventState.isRunning,
       messages,
       criteria: eventState.criteria,
       contextWindows: [], // Derived from events, not stored separately
-      executionState: eventState.lastModeWithReminder ? { lastModeWithReminder: eventState.lastModeWithReminder } as any : null,
+      executionState: null,
     }
   }
 }

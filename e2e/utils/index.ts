@@ -23,7 +23,6 @@ export {
   listSessions,
   getSetting,
   setSetting,
-  setSessionMode,
   setSessionCriteria,
   stopSessionChat,
   continueSessionChat,

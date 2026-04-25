@@ -108,7 +108,6 @@ describe('WebSocket Protocol', () => {
       
       const session = client.getSession()
       expect(session).not.toBeNull()
-      expect(session!.mode).toBe('planner')
       expect(session!.phase).toBe('plan')
       expect(session!.isRunning).toBe(false)
     })

@@ -296,7 +296,7 @@ export function PlanPanel({ criteriaSidebarOpen: externalCriteriaSidebarOpen, on
       const agent = topLevelAgents[agentIndex]
       if (agent) {
         e.preventDefault()
-        useSessionStore.getState().switchMode(agent.id)
+        useSessionStore.getState().setCurrentAgent(agent.id)
       }
       return
     }
@@ -404,8 +404,9 @@ export function PlanPanel({ criteriaSidebarOpen: externalCriteriaSidebarOpen, on
     fileInputRef.current?.click()
   }, [])
 
-  const isPlanning = session?.mode === 'planner'
-  const isBuilding = session?.mode === 'builder'
+  const currentAgent = useSessionStore(state => state.currentAgent)
+  const isPlanning = currentAgent !== 'builder'
+  const isBuilding = currentAgent === 'builder'
   const hasCriteria = (session?.criteria.length ?? 0) > 0
   const isDone = session?.phase === 'done'
 
@@ -704,8 +705,8 @@ export function PlanPanel({ criteriaSidebarOpen: externalCriteriaSidebarOpen, on
                 </button>
                 <MoreMenu
                   onSendCommand={(content, agentMode, textareaContent, attachments) => {
-                    if (agentMode && session?.mode !== agentMode) {
-                      useSessionStore.getState().switchMode(agentMode)
+                    if (agentMode) {
+                      useSessionStore.getState().setCurrentAgent(agentMode)
                     }
                     const combinedContent = textareaContent && textareaContent.trim()
                       ? `${textareaContent.trim()}\n\n${content}`
@@ -756,7 +757,7 @@ export function PlanPanel({ criteriaSidebarOpen: externalCriteriaSidebarOpen, on
               ? `${textareaContent.trim()}\n\n${full.prompt}`
               : full.prompt
             if (full.metadata.agentMode) {
-              useSessionStore.getState().switchMode(full.metadata.agentMode)
+              useSessionStore.getState().setCurrentAgent(full.metadata.agentMode)
             }
             sendMessage(combinedContent, attachments?.length ? attachments : undefined, {
               messageKind: 'command',
@@ -768,7 +769,7 @@ export function PlanPanel({ criteriaSidebarOpen: externalCriteriaSidebarOpen, on
         onSelectWorkflow={(workflowId) => {
           const content = input.trim() || undefined
           const atts = attachments.length > 0 ? attachments : undefined
-          if (session?.mode === 'planner') {
+          if (currentAgent === 'planner') {
             useSessionStore.getState().acceptAndBuild(workflowId, content, atts)
           } else {
             useSessionStore.getState().launchRunner(content, atts, workflowId)

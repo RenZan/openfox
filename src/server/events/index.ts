@@ -14,7 +14,6 @@
  *
  * // Emit events (preferred API)
  * const messageId = emitUserMessage(sessionId, 'Hello')
- * emitModeChanged(sessionId, 'builder', false)
  *
  * // Get current session state
  * const state = getSessionState(sessionId)
@@ -55,7 +54,6 @@ export {
   foldSessionState,
   foldCriteria,
   foldTodos,
-  foldMode,
   foldPhase,
   foldIsRunning,
   foldContextState,
@@ -83,7 +81,6 @@ export {
   emitToolCall,
   emitToolOutput,
   emitToolResult,
-  emitModeChanged,
   emitPhaseChanged,
   emitRunningChanged,
   emitCriteriaSet,

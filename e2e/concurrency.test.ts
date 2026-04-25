@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
-import { createTestClient, createTestProject, createTestServer, createProject, createSession, setSessionMode, stopSessionChat, type TestClient, type TestProject, type TestServerHandle } from './utils/index.js'
+import { createTestClient, createTestProject, createTestServer, createProject, createSession, stopSessionChat, type TestClient, type TestProject, type TestServerHandle } from './utils/index.js'
 
 describe('Concurrency Guards', () => {
   let server: TestServerHandle
@@ -70,7 +70,8 @@ describe('Concurrency Guards', () => {
       })
       
       // Switch to builder mode
-      await setSessionMode(server.url, sessionId, 'builder', server.wsUrl)
+      await client.send('chat.send', { content: 'Ready for builder tasks', agentId: 'builder' })
+      await client.waitForChatDone()
       
       // Start a chat to make session running
       client.send('chat.send', { content: 'Write a very long and detailed explanation of TypeScript.' })

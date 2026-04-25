@@ -14,7 +14,6 @@ import {
   assertNoErrors,
   createProject,
   createSession,
-  setSessionMode,
   type TestClient, 
   type TestProject,
   type TestServerHandle 
@@ -40,7 +39,8 @@ describe('Ask User Tool', () => {
     const restProject = await createProject(server.url, { name: 'Ask User Test', workdir: testDir.path })
     const restSession = await createSession(server.url, { projectId: restProject.id })
     await client.send('session.load', { sessionId: restSession.id })
-    await setSessionMode(server.url, restSession.id, 'builder', server.wsUrl)
+    await client.send('chat.send', { content: 'Ready for builder tasks', agentId: 'builder' })
+    await client.waitForChatDone()
   })
 
   afterEach(async () => {

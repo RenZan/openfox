@@ -13,7 +13,6 @@ import {
   emitAssistantMessageStart,
   emitMessageDelta,
   emitMessageDone,
-  emitModeChanged,
   emitPhaseChanged,
   emitRunningChanged,
   emitCriteriaSet,
@@ -188,23 +187,6 @@ describe('emitAssistantMessageStart / emitMessageDelta / emitMessageDone', () =>
   })
 })
 
-describe('emitModeChanged', () => {
-  it('should update session mode', () => {
-    initSession('s1')
-    emitModeChanged('s1', 'builder', false, 'User switched')
-
-    const state = getSessionState('s1')
-    expect(state!.mode).toBe('builder')
-  })
-
-  it('should support auto mode changes', () => {
-    initSession('s1')
-    emitModeChanged('s1', 'chat', true, 'Auto switch')
-
-    const state = getSessionState('s1')
-    expect(state!.mode).toBe('chat')
-  })
-})
 
 describe('emitPhaseChanged', () => {
   it('should update session phase', () => {

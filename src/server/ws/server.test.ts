@@ -858,11 +858,6 @@ describe('createWebSocketServer', () => {
 
     sessionState.isRunning = false
 
-    sessionState.mode = 'planner'
-    harness.send({ id: 'runner-invalid-mode', type: 'runner.launch', payload: {} })
-    expect(await harness.nextMessage((message) => message.id === 'runner-invalid-mode')).toMatchObject({ payload: { code: 'INVALID_MODE' } })
-
-    sessionState.mode = 'builder'
     sessionState.criteria = [{ id: 'tests-pass', description: 'Tests pass', status: { type: 'passed', verifiedAt: '2024-01-01T00:00:00.000Z' }, attempts: [] }]
     harness.send({ id: 'runner-no-work', type: 'runner.launch', payload: {} })
     expect(await harness.nextMessage((message) => message.id === 'runner-no-work')).toMatchObject({ payload: { code: 'NO_WORK' } })

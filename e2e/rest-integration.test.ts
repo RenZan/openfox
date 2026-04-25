@@ -9,8 +9,6 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from
 import { createTestServer, type TestServerHandle } from './utils/index.js'
 import { createTestProject, type TestProject } from './utils/index.js'
 import { createTestClient } from './utils/index.js'
-import { setSessionMode } from './utils/index.js'
-
 describe('REST + WebSocket Integration', () => {
   let server: TestServerHandle
   let testProject: TestProject
@@ -68,11 +66,9 @@ describe('REST + WebSocket Integration', () => {
       await client.send('session.load', { sessionId })
       expect(client.getSession()?.id).toBe(sessionId)
 
-      // Verify WS real-time features still work (mode switching, etc.)
-      await setSessionMode(server.url, sessionId, 'builder', server.wsUrl)
-      const modeEvent = await client.waitFor('mode.changed')
-      expect(modeEvent.type).toBe('mode.changed')
-      expect((modeEvent.payload as any).mode).toBe('builder')
+      // Verify WS real-time features still work with agent-based mode
+      await client.send('chat.send', { content: 'Ready', agentId: 'builder' })
+      await client.waitForChatDone()
     } finally {
       await client.close()
     }
@@ -118,10 +114,9 @@ describe('REST + WebSocket Integration', () => {
       const updateData: any = await updateRes.json()
       expect(updateData.project.name).toBe('Updated Name')
 
-      // Verify WS session still works
-      await setSessionMode(server.url, sessionId, 'builder', server.wsUrl)
-      const modeEvent = await client.waitFor('mode.changed')
-      expect(modeEvent.type).toBe('mode.changed')
+      // Verify WS session still works with agent-based mode
+      await client.send('chat.send', { content: 'Ready', agentId: 'builder' })
+      await client.waitForChatDone()
 
       // Update settings via REST
       const settingsRes = await fetch(`${server.url}/api/settings/test-key`, {
@@ -181,9 +176,8 @@ describe('REST + WebSocket Integration', () => {
         expect(providerData.session.providerId).toBe(providerId)
 
         // Verify WS still works for real-time features
-      await setSessionMode(server.url, sessionId, 'planner', server.wsUrl)
-        const modeEvent = await client.waitFor('mode.changed')
-        expect(modeEvent.type).toBe('mode.changed')
+        await client.send('chat.send', { content: 'Ready' })
+        await client.waitForChatDone()
       }
     } finally {
       await client.close()

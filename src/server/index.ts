@@ -385,34 +385,6 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
     res.json({ success: true })
   })
 
-  // Session mode (REST)
-  app.put('/api/sessions/:id/mode', async (req, res) => {
-    const { getEventStore } = await import('./events/index.js')
-    const { buildMessagesFromStoredEvents } = await import('./events/folding.js')
-
-    const sessionId = req.params.id
-    const session = sessionManager.getSession(sessionId)
-    if (!session) {
-      return res.status(404).json({ error: 'Session not found' })
-    }
-
-    const { mode } = req.body
-    if (!mode || !['planner', 'builder'].includes(mode)) {
-      return res.status(400).json({ error: 'mode is required and must be "planner" or "builder"' })
-    }
-
-    sessionManager.setMode(sessionId, mode)
-
-    const eventStore = getEventStore()
-    eventStore.append(sessionId, { type: 'mode.changed', data: { mode, auto: false } })
-
-    const events = eventStore.getEvents(sessionId)
-    const messages = buildMessagesFromStoredEvents(events)
-    const updatedSession = sessionManager.getSession(sessionId)
-
-    res.json({ session: updatedSession, messages })
-  })
-
   // Danger level (REST)
   app.put('/api/sessions/:id/danger-level', async (req, res) => {
     const sessionId = req.params.id
@@ -492,12 +464,12 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
       return res.status(404).json({ error: 'Session not found' })
     }
 
-    const { content, attachments, messageKind } = req.body
+    const { content, attachments, messageKind, agentId } = req.body
     if (!content?.trim()) {
       return res.status(400).json({ error: 'content is required' })
     }
 
-    sessionManager.queueMessage(sessionId, 'asap', content, attachments, messageKind)
+    sessionManager.queueMessage(sessionId, 'asap', content, attachments, messageKind, agentId)
 
     res.json({ success: true, queueState: sessionManager.getQueueState(sessionId) })
   })

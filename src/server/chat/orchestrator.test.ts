@@ -268,7 +268,7 @@ describe('chat orchestrator', () => {
     expect(sessionManager.setCurrentContextSize).toHaveBeenCalledWith('session-1', 30)
     expect(eventStore.append.mock.calls.find(([, event]) => event.type === 'turn.snapshot')?.[1]).toMatchObject({
       type: 'turn.snapshot',
-      data: expect.objectContaining({ mode: 'planner', phase: 'plan', snapshotSeq: expect.any(Number) }),
+      data: expect.objectContaining({ phase: 'plan', snapshotSeq: expect.any(Number) }),
     })
   })
 

@@ -50,6 +50,8 @@ export interface OrchestratorOptions {
   injectBuilderKickoff?: boolean
   /** Optional callback for WebSocket forwarding (temporary, until WS layer is refactored) */
   onMessage?: (msg: ServerMessage) => void
+  /** Agent ID for this turn (derived from trigger message) */
+  agentId?: string
 }
 
 function resolveStatsIdentity(options: OrchestratorOptions): StatsIdentity {
@@ -83,24 +85,23 @@ export async function runChatTurn(options: OrchestratorOptions): Promise<void> {
   const eventStore = getEventStore()
   const statsIdentity = resolveStatsIdentity(options)
 
-  const session = sessionManager.requireSession(sessionId)
-  const mode = session.mode
+  const agentId = options.agentId ?? 'planner'
 
-  logger.debug('Starting chat turn', { sessionId, mode })
+  logger.debug('Starting chat turn', { sessionId, agentId })
 
   // Track metrics across the turn
   const turnMetrics = new TurnMetrics()
 
   try {
-    // Run the appropriate handler based on mode (agent ID)
-    if (mode === 'builder') {
+    // Run the appropriate handler based on agent ID
+    if (agentId === 'builder') {
       await runBuilderTurn(options, turnMetrics)
     } else {
-      await runGenericAgentTurn(options, turnMetrics, mode)
+      await runGenericAgentTurn(options, turnMetrics, agentId)
     }
 
     // Create end-of-turn snapshot
-    const snapshot = buildSnapshot(sessionManager, sessionId, turnMetrics.buildStats(statsIdentity, mode))
+    const snapshot = buildSnapshot(sessionManager, sessionId, turnMetrics.buildStats(statsIdentity, agentId))
     const snapshotEvent = eventStore.append(sessionId, { type: 'turn.snapshot', data: snapshot })
 
     const deletedCount = eventStore.cleanupOldEvents(sessionId)
@@ -136,7 +137,7 @@ export async function runChatTurn(options: OrchestratorOptions): Promise<void> {
       return
     }
 
-    logger.error('Chat turn error', { sessionId, mode, error })
+    logger.error('Chat turn error', { sessionId, agentId, error })
     const errorMsgId = crypto.randomUUID()
     eventStore.append(sessionId, {
       type: 'chat.error',
@@ -161,38 +162,74 @@ export async function runChatTurn(options: OrchestratorOptions): Promise<void> {
 // ============================================================================
 
 /**
- * Inject system reminder only on mode switch.
- * Tracks last mode in session state to avoid re-injecting on subsequent turns.
- * This ensures the reminder is preserved across context compaction and session reloads.
+ * Scan current context window events for an existing agent reminder.
+ * Returns true if a reminder with the given keyword (e.g. "Plan Mode") exists
+ * in the current window, false otherwise.
  */
-function injectModeReminderIfNeeded(
-  sessionManager: SessionManager,
+export function hasReminderInCurrentWindow(
+  events: Array<{ type: string; data: any }>,
+  currentWindowId: string | undefined,
+  keyword: string,
+): boolean {
+  for (let i = events.length - 1; i >= 0; i--) {
+    const event = events[i]
+    if (event?.type !== 'message.start') continue
+
+    const data = event.data
+    if (data?.role !== 'user') continue
+    if (data?.messageKind !== 'auto-prompt') continue
+    if (!data?.content?.includes('<system-reminder>')) continue
+    if (!data.content.includes(keyword)) continue
+
+    // Check window match
+    if (currentWindowId && data.contextWindowId && data.contextWindowId !== currentWindowId) {
+      continue
+    }
+
+    // If no current window, accept events without contextWindowId too
+    if (currentWindowId && !data.contextWindowId) {
+      continue
+    }
+
+    return true
+  }
+  return false
+}
+
+/**
+ * Inject system reminder using history scan (no state tracking).
+ * Scans current context window for existing reminder. If none found, injects one.
+ */
+export function injectModeReminderIfNeeded(
+  _sessionManager: SessionManager,
   sessionId: string,
   agentId: string,
   allAgents: AgentDefinition[],
-  onMessage?: (msg: ServerMessage) => void
+  _onMessage?: (msg: ServerMessage) => void
 ): void {
   const eventStore = getEventStore()
-  const session = sessionManager.requireSession(sessionId)
-  
-  // Check if we already injected this mode's reminder
-  const lastModeReminder = session.executionState?.lastModeWithReminder
-  
-  // Only inject if mode changed or this is the first time
-  if (lastModeReminder === agentId) {
-    return
-  }
-  
-  // Inject reminder for new mode
+  const currentWindowId = getCurrentContextWindowId(sessionId)
+
   const agentDef = findAgentById(agentId, allAgents)
   if (!agentDef) return
-  
+
+  // Extract the mode keyword from the agent prompt (e.g. "Plan Mode" from "# Plan Mode")
+  const modeKeywordMatch = agentDef.prompt.match(/#\s*(.+Mode)/)
+  const keyword = modeKeywordMatch ? (modeKeywordMatch[1] ?? agentId) : agentId
+
+  // Scan current window for existing reminder
+  const events = eventStore.getEvents(sessionId)
+  if (hasReminderInCurrentWindow(events as Array<{ type: string; data: any }>, currentWindowId, keyword)) {
+    return
+  }
+
+  // Inject reminder
   const reminderContent = buildAgentReminder(agentDef)
   const reminderMsgId = crypto.randomUUID()
-  const currentWindowMessageOptions = getCurrentContextWindowId(sessionId)
-    ? { contextWindowId: getCurrentContextWindowId(sessionId)! }
+  const currentWindowMessageOptions = currentWindowId
+    ? { contextWindowId: currentWindowId }
     : undefined
-  
+
   eventStore.append(sessionId, {
     type: 'message.start',
     data: {
@@ -212,11 +249,6 @@ function injectModeReminderIfNeeded(
   eventStore.append(sessionId, {
     type: 'message.done',
     data: { messageId: reminderMsgId },
-  })
-  
-  // Update execution state to track which mode we injected the reminder for
-  sessionManager.updateExecutionState(sessionId, {
-    lastModeWithReminder: agentId,
   })
 }
 

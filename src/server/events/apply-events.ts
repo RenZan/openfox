@@ -219,7 +219,6 @@ export function applyEvents<T extends { id: string; role: string; content: strin
       case 'session.initialized':
       case 'turn.snapshot':
       case 'phase.changed':
-      case 'mode.changed':
       case 'running.changed':
       case 'criteria.set':
       case 'criterion.updated':

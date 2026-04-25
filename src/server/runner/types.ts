@@ -38,6 +38,8 @@ export interface OrchestratorOptions {
   userMessage?: { content: string; attachments?: Attachment[] }
   /** For path confirmation dialogs (sent directly, not through EventStore) */
   onMessage?: (msg: ServerMessage) => void
+  /** Agent ID for this run (defaults to 'builder') */
+  agentId?: string
 }
 
 export interface OrchestratorResult {

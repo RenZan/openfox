@@ -1,14 +1,14 @@
 /**
  * System Reminder Tests
  * 
- * Tests for mode reminder injection behavior:
+ * Tests for mode reminder injection behavior (history-scan based):
  * - Reminder sent exactly once when mode is first activated
  * - No reminder on subsequent messages in same mode
  * - New reminder sent when switching modes
  * - Reminder preserved across session reloads
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { getEventStore } from '../events/store.js'
 import { runChatTurn } from './orchestrator.js'
 import type { SessionManager } from '../session/index.js'
@@ -27,9 +27,14 @@ vi.mock('../agents/registry.js', () => ({
 }))
 
 function createEventStore() {
+  const _events: any[] = []
   return {
-    append: vi.fn(),
-    getEvents: vi.fn().mockReturnValue([]),
+    _events,
+    append: vi.fn((_: string, event: any) => {
+      _events.push(event)
+      return { seq: _events.length }
+    }),
+    getEvents: vi.fn().mockReturnValue(_events),
     getLatestSnapshot: vi.fn().mockReturnValue(undefined),
     cleanupOldEvents: vi.fn(),
     getLatestSeq: vi.fn().mockReturnValue(0),
@@ -52,9 +57,7 @@ function createSessionManager(state: any) {
     addTokensUsed: vi.fn(),
     compactContext: vi.fn(),
     getLspManager: vi.fn(() => ({ name: 'lsp' })),
-    updateExecutionState: vi.fn((_: string, updates: Record<string, unknown>) => {
-      state['current'].executionState = { ...(state['current'].executionState ?? {}), ...updates }
-    }),
+    updateExecutionState: vi.fn(),
     addMessage: vi.fn(),
     addAssistantMessage: vi.fn(),
     updateMessage: vi.fn(),
@@ -78,7 +81,6 @@ describe('System Reminder Injection', () => {
         id: 'session-1',
         projectId: 'project-1',
         workdir: '/tmp/project',
-        mode: 'planner',
         phase: 'plan',
         isRunning: true,
         criteria: [],
@@ -92,6 +94,7 @@ describe('System Reminder Injection', () => {
       sessionManager: sessionManager as any,
       sessionId: 'session-1',
       llmClient: { getModel: () => 'qwen3-32b' } as any,
+      agentId: 'planner',
     })
 
     // Check that a system reminder was injected
@@ -128,11 +131,10 @@ describe('System Reminder Injection', () => {
         id: 'session-1',
         projectId: 'project-1',
         workdir: '/tmp/project',
-        mode: 'planner',
         phase: 'plan',
         isRunning: true,
         criteria: [],
-        executionState: { lastModeWithReminder: 'planner' },
+        executionState: null,
         messages: [{ id: 'user-1', role: 'user', content: 'Continue planning' }],
       },
     }
@@ -142,6 +144,7 @@ describe('System Reminder Injection', () => {
       sessionManager: sessionManager as any,
       sessionId: 'session-1',
       llmClient: { getModel: () => 'qwen3-32b' } as any,
+      agentId: 'planner',
     })
 
     // Check that NO new system reminder was injected
@@ -177,11 +180,10 @@ describe('System Reminder Injection', () => {
         id: 'session-1',
         projectId: 'project-1',
         workdir: '/tmp/project',
-        mode: 'builder',
         phase: 'build',
         isRunning: true,
         criteria: [],
-        executionState: { lastModeWithReminder: 'planner' },
+        executionState: null,
         messages: [{ id: 'user-1', role: 'user', content: 'Build it' }],
       },
     }
@@ -191,6 +193,7 @@ describe('System Reminder Injection', () => {
       sessionManager: sessionManager as any,
       sessionId: 'session-1',
       llmClient: { getModel: () => 'qwen3-32b' } as any,
+      agentId: 'builder',
     })
 
     // Check that a NEW builder reminder was injected
@@ -204,7 +207,7 @@ describe('System Reminder Injection', () => {
     expect(reminderCall).toBeDefined()
   })
 
-  it('updates execution state after injecting reminder', async () => {
+  it('does NOT call updateExecutionState (no lastModeWithReminder tracking)', async () => {
     const eventStore = createEventStore()
     vi.mocked(getEventStore).mockReturnValue(eventStore as any)
     vi.mocked(loadAllAgentsDefault).mockResolvedValue([])
@@ -214,7 +217,6 @@ describe('System Reminder Injection', () => {
         id: 'session-1',
         projectId: 'project-1',
         workdir: '/tmp/project',
-        mode: 'planner',
         phase: 'plan',
         isRunning: true,
         criteria: [],
@@ -228,12 +230,11 @@ describe('System Reminder Injection', () => {
       sessionManager: sessionManager as any,
       sessionId: 'session-1',
       llmClient: { getModel: () => 'qwen3-32b' } as any,
+      agentId: 'planner',
     })
 
-    // Check that execution state was updated
-    expect(sessionManager.updateExecutionState).toHaveBeenCalledWith('session-1', {
-      lastModeWithReminder: 'planner',
-    })
+    // Check that execution state was NOT updated (history scan replaces state tracking)
+    expect(sessionManager.updateExecutionState).not.toHaveBeenCalled()
   })
 
   it('does NOT inject duplicate reminders across 4+ iterations in same mode', async () => {
@@ -246,7 +247,6 @@ describe('System Reminder Injection', () => {
         id: 'session-1',
         projectId: 'project-1',
         workdir: '/tmp/project',
-        mode: 'planner',
         phase: 'plan',
         isRunning: true,
         criteria: [],
@@ -262,6 +262,7 @@ describe('System Reminder Injection', () => {
         sessionManager: sessionManager as any,
         sessionId: 'session-1',
         llmClient: { getModel: () => 'qwen3-32b' } as any,
+        agentId: 'planner',
       })
     }
 

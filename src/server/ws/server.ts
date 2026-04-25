@@ -41,13 +41,11 @@ import {
   createChatMessageMessage,
   createChatDoneMessage,
   createChatErrorMessage,
-  createModeChangedMessage,
   createPhaseChangedMessage,
   createCriteriaUpdatedMessage,
   createContextStateMessage,
   isSessionLoadPayload,
   isChatSendPayload,
-  isModeSwitchPayload,
   isCriteriaEditPayload,
   isPathConfirmPayload,
   isAskAnswerPayload,
@@ -201,7 +199,7 @@ export function createWebSocketServer(
   const statsForSession = (sessionId: string): StatsIdentity =>
     getSessionStatsIdentity?.(sessionId) ?? resolveStatsIdentity(getLLMClient(), getActiveProvider)
 
-  function startTurnWithCompletionChain(sessionId: string, controller: AbortController) {
+  function startTurnWithCompletionChain(sessionId: string, controller: AbortController, agentId?: string) {
     runChatTurn({
       sessionManager,
       sessionId,
@@ -209,6 +207,7 @@ export function createWebSocketServer(
       statsIdentity: statsForSession(sessionId),
       signal: controller.signal,
       onMessage: (msg) => broadcastForSession(sessionId, msg),
+      ...(agentId ? { agentId } : {}),
     }).catch((error) => {
       if (error instanceof Error && error.message === 'Aborted') {
         return
@@ -224,7 +223,7 @@ export function createWebSocketServer(
       const nextAsap = asapMsgs[0]
       if (nextAsap) {
         for (const remaining of asapMsgs.slice(1)) {
-          sessionManager.queueMessage(sessionId, 'asap', remaining.content, remaining.attachments, remaining.messageKind as 'command' | undefined)
+          sessionManager.queueMessage(sessionId, 'asap', remaining.content, remaining.attachments, remaining.messageKind as 'command' | undefined, remaining.agentId)
         }
         broadcastForSession(sessionId, createQueueStateMessage(sessionManager.getQueueState(sessionId)))
 
@@ -238,7 +237,7 @@ export function createWebSocketServer(
 
         const newController = new AbortController()
         activeAgents.set(sessionId, newController)
-        startTurnWithCompletionChain(sessionId, newController)
+        startTurnWithCompletionChain(sessionId, newController, nextAsap.agentId)
         return
       }
 
@@ -246,7 +245,7 @@ export function createWebSocketServer(
       const next = completionMsgs[0]
       if (next) {
         for (const remaining of completionMsgs.slice(1)) {
-          sessionManager.queueMessage(sessionId, 'completion', remaining.content, remaining.attachments)
+          sessionManager.queueMessage(sessionId, 'completion', remaining.content, remaining.attachments, undefined, remaining.agentId)
         }
         broadcastForSession(sessionId, createQueueStateMessage(sessionManager.getQueueState(sessionId)))
 
@@ -259,7 +258,7 @@ export function createWebSocketServer(
 
         const newController = new AbortController()
         activeAgents.set(sessionId, newController)
-        startTurnWithCompletionChain(sessionId, newController)
+        startTurnWithCompletionChain(sessionId, newController, next.agentId)
         return
       }
 
@@ -517,7 +516,7 @@ async function handleClientMessage(
   getSessionStatsIdentity: ((sessionId: string) => StatsIdentity) | undefined,
   llmForSession: (sessionId: string) => LLMClientWithModel,
   statsForSession: (sessionId: string) => StatsIdentity,
-  startTurnWithCompletionChain: (sessionId: string, controller: AbortController) => void,
+  startTurnWithCompletionChain: (sessionId: string, controller: AbortController, agentId?: string) => void,
 ): Promise<void> {
   const send = (msg: ServerMessage) => {
     if (ws.readyState === WebSocket.OPEN) {
@@ -729,7 +728,7 @@ async function handleClientMessage(
 
         // Use NEW orchestrator (events go through EventStore → WS subscription)
         // Completion queue auto-sends next message when turn finishes
-        startTurnWithCompletionChain(sessionId, controller)
+        startTurnWithCompletionChain(sessionId, controller, message.payload.agentId)
       } catch (error) {
         // Clean up on failure (including abort during pre-turn phase)
         if (activeAgents.get(sessionId) === controller) {
@@ -886,10 +885,8 @@ async function handleClientMessage(
       ;(async () => {
         let controller: AbortController | null = null
         try {
-          // Switch to builder mode and phase
-          sessionManager.setMode(sessionId, 'builder')
+          // Set phase to build (agent is determined by the trigger message, not session state)
           sessionManager.setPhase(sessionId, 'build')
-          eventStore.append(sessionId, { type: 'mode.changed', data: { mode: 'builder', auto: false, reason: 'Criteria accepted' } })
           eventStore.append(sessionId, { type: 'phase.changed', data: { phase: 'build' } })
 
           // Create AbortController for builder (abort existing if any - defense in depth)
@@ -915,6 +912,7 @@ async function handleClientMessage(
             llmClient: llmForSession(sessionId),
             statsIdentity: statsForSession(sessionId),
             injectBuilderKickoff: !hasAcceptMessage,
+            agentId: 'builder',
             ...(acceptPayload?.workflowId ? { workflowId: acceptPayload.workflowId } : {}),
             ...(hasAcceptMessage ? { userMessage: { content: hasAcceptContent ? acceptPayload!.content! : '', ...(hasAcceptAttachments ? { attachments: acceptAttachments! } : {}) } } : {}),
             signal: controller.signal,
@@ -1107,12 +1105,6 @@ async function handleClientMessage(
           payload: { success: true, queueState },
           id: message.id,
         })
-        return
-      }
-
-      // Only allow launching from builder mode
-      if (session.mode !== 'builder') {
-        send(createErrorMessage('INVALID_MODE', 'Runner can only be launched in builder mode', message.id))
         return
       }
 

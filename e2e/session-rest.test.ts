@@ -82,7 +82,6 @@ describe('Session REST API', () => {
       expect(data.session).toBeDefined()
       expect(data.session.projectId).toBe(projectId)
       expect(data.session.metadata.title).toBe('My Session')
-      expect(data.session.mode).toBe('planner')
       expect(data.session.phase).toBe('plan')
       expect(data.session.isRunning).toBe(false)
     })

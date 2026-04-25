@@ -5,8 +5,8 @@ import { useAgentsStore, getAgentColor } from '../../stores/agents'
 import { AgentsModal } from '../settings/AgentsModal'
 
 export function AgentSelector() {
-  const currentMode = useSessionStore(state => state.currentSession?.mode)
-  const switchMode = useSessionStore(state => state.switchMode)
+  const currentAgent = useSessionStore(state => state.currentAgent)
+  const setCurrentAgent = useSessionStore(state => state.setCurrentAgent)
   const defaults = useAgentsStore(state => state.defaults)
   const userItems = useAgentsStore(state => state.userItems)
   const fetchAgents = useAgentsStore(state => state.fetchAgents)
@@ -31,12 +31,10 @@ export function AgentSelector() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  if (!currentMode) return null
-
   const topLevelAgents = agents.filter(a => !a.subagent)
-  const currentAgent = topLevelAgents.find(a => a.id === currentMode)
-  const displayName = currentAgent?.name ?? currentMode
-  const currentColor = getAgentColor(agents, currentMode)
+  const selectedAgent = topLevelAgents.find(a => a.id === currentAgent)
+  const displayName = selectedAgent?.name ?? currentAgent
+  const currentColor = getAgentColor(agents, currentAgent)
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -55,7 +53,7 @@ export function AgentSelector() {
       {isOpen && topLevelAgents.length > 0 && (
         <div className="absolute bottom-full left-0 mb-1 w-56 bg-bg-secondary border border-border rounded-lg shadow-lg overflow-hidden z-50">
           {topLevelAgents.map((agent, index) => {
-            const isActive = agent.id === currentMode
+            const isActive = agent.id === currentAgent
             const color = getAgentColor(agents, agent.id)
             const shortcut = index < 4 ? `Ctrl+${index + 1}` : null
             return (
@@ -70,7 +68,7 @@ export function AgentSelector() {
                 <button
                   type="button"
                   onClick={() => {
-                    if (!isActive) switchMode(agent.id)
+                    if (!isActive) setCurrentAgent(agent.id)
                     setIsOpen(false)
                   }}
                   className="flex-1 text-left flex items-center gap-2 min-w-0"

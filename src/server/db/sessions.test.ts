@@ -19,7 +19,6 @@ import {
   listSessions,
   listSessionsByProject,
   updateSessionMetadata,
-  updateSessionMode,
   updateSessionPhase,
   updateSessionRunning,
   updateSessionSummary,
@@ -59,7 +58,6 @@ describe('db sessions', () => {
     expect(session).toMatchObject({
       projectId: projectAId,
       workdir: rootA,
-      mode: 'planner',
       phase: 'plan',
       isRunning: false,
       summary: null,
@@ -88,7 +86,6 @@ describe('db sessions', () => {
       projectId: projectAId,
       workdir: rootA,
       phase: 'plan',
-      mode: 'planner',
       isRunning: false,
       metadata: {
         title: 'Session A',
@@ -101,15 +98,6 @@ describe('db sessions', () => {
     expect(getSession('non-existent')).toBeNull()
   })
 
-  it('updates session mode', () => {
-    const session = createSession(projectAId, rootA)
-
-    updateSessionMode(session.id, 'builder')
-    expect(getSession(session.id)?.mode).toBe('builder')
-
-    updateSessionMode(session.id, 'planner')
-    expect(getSession(session.id)?.mode).toBe('planner')
-  })
 
   it('updates session phase', () => {
     const session = createSession(projectAId, rootA)

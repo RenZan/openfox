@@ -39,6 +39,7 @@ export interface RunChatTurnParams {
   statsIdentity?: StatsIdentity
   signal: AbortSignal
   onMessage: (msg: ServerMessage) => void
+  agentId?: string
 }
 
 export function buildRunChatTurnParams(
@@ -50,6 +51,7 @@ export function buildRunChatTurnParams(
   statsIdentity?: StatsIdentity
   signal: AbortSignal
   onMessage: (msg: ServerMessage) => void
+  agentId?: string
 } {
   return {
     sessionManager: params.sessionManager,
@@ -58,5 +60,6 @@ export function buildRunChatTurnParams(
     signal: params.signal,
     onMessage: params.onMessage,
     ...(params.statsIdentity ? { statsIdentity: params.statsIdentity } : {}),
+    ...(params.agentId ? { agentId: params.agentId } : {}),
   }
 }

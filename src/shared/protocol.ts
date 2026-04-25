@@ -2,7 +2,6 @@ import type {
   Project,
   Session,
   SessionSummary,
-  SessionMode,
   SessionPhase,
   ToolMode,
   Criterion,
@@ -25,8 +24,7 @@ export type ClientMessageType =
   | 'chat.send'           // Send a message (works in any mode)
   | 'chat.stop'           // Stop current generation
   | 'chat.continue'       // Continue generation (after user interruption)
-  // Mode switching
-  | 'mode.switch'         // Switch to a different mode
+  // Criteria acceptance
   | 'mode.accept'         // Accept criteria and switch to builder (generates summary)
   // Criteria editing (from UI)
   | 'criteria.edit'
@@ -63,10 +61,7 @@ export interface ChatSendPayload {
   attachments?: Attachment[]
   messageKind?: 'command'
   isSystemGenerated?: boolean
-}
-
-export interface ModeSwitchPayload {
-  mode: SessionMode
+  agentId?: string
 }
 
 // Criteria payloads
@@ -78,11 +73,13 @@ export interface CriteriaEditPayload {
 export interface QueueAsapPayload {
   content: string
   attachments?: Attachment[]
+  agentId?: string
 }
 
 export interface QueueCompletionPayload {
   content: string
   attachments?: Attachment[]
+  agentId?: string
 }
 
 export interface QueueCancelPayload {
@@ -103,6 +100,7 @@ export interface QueuedMessage {
   attachments?: Attachment[]
   queuedAt: string
   messageKind?: string
+  agentId?: string
 }
 
 // ============================================================================
@@ -140,8 +138,6 @@ export type ServerMessageType =
   | 'chat.error'          // Error during generation
   | 'chat.path_confirmation' // Request user confirmation for outside-workdir path access
   | 'chat.ask_user'       // Request user answer to a question
-  // Mode events
-  | 'mode.changed'        // Mode was changed
   // Phase events
   | 'phase.changed'       // Workflow phase changed (plan/build/verification/done)
   // Task completion
@@ -336,13 +332,6 @@ export interface PathConfirmPayload {
 export interface ChatAskUserPayload {
   callId: string
   question: string
-}
-
-// Mode payloads
-export interface ModeChangedPayload {
-  mode: SessionMode
-  auto: boolean  // Was this an automatic switch?
-  reason?: string
 }
 
 // Phase payloads

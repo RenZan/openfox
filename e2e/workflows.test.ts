@@ -17,7 +17,7 @@ import {
   assertNoErrors,
   createProject,
   createSession,
-  setSessionMode,
+  
   type TestClient, 
   type TestProject,
   type TestServerHandle 
@@ -73,7 +73,6 @@ Please explore the existing code and propose acceptance criteria using add_crite
       // 4. Verify criteria were created
       const currentSession = client.getSession()!
       expect(currentSession.criteria.length).toBeGreaterThan(0)
-      expect(currentSession.mode).toBe('planner')
       expect(currentSession.phase).toBe('plan')
       
       // 5. Criteria should be descriptive
@@ -124,7 +123,8 @@ Please explore the existing code and propose acceptance criteria using add_crite
       })
       await client.waitForChatDone()
       const sessionId = client.getSession()!.id
-      await setSessionMode(server.url, sessionId, 'builder', server.wsUrl)
+      await client.send('chat.send', { content: 'Ready', agentId: 'builder' })
+      await client.waitForChatDone()
       await client.send('runner.launch', {})
 
       await collectUntilPhase(client, 'done', 1_500)
@@ -145,7 +145,8 @@ Please explore the existing code and propose acceptance criteria using add_crite
       })
       await client.waitForChatDone()
       const sessionId = client.getSession()!.id
-      await setSessionMode(server.url, sessionId, 'builder', server.wsUrl)
+      await client.send('chat.send', { content: 'Ready', agentId: 'builder' })
+      await client.waitForChatDone()
       await client.send('runner.launch', {})
 
       await collectUntilPhase(client, 'blocked', 5_000)
@@ -173,7 +174,8 @@ Please explore the existing code and propose acceptance criteria using add_crite
       })
       await client.waitForChatDone()
       const sessionId = client.getSession()!.id
-      await setSessionMode(server.url, sessionId, 'builder', server.wsUrl)
+      await client.send('chat.send', { content: 'Ready', agentId: 'builder' })
+      await client.waitForChatDone()
       await client.send('runner.launch', {})
 
       await collectUntilPhase(client, 'done', 15_000)
@@ -223,7 +225,8 @@ Please explore the existing code and propose acceptance criteria using add_crite
       const session = await createSession(server.url, { projectId: project.id })
       await client.send('session.load', { sessionId: session.id })
       const sessionId = client.getSession()!.id
-      await setSessionMode(server.url, sessionId, 'builder', server.wsUrl)
+      await client.send('chat.send', { content: 'Ready', agentId: 'builder' })
+      await client.waitForChatDone()
       
       // Ask to do something that will fail initially (use path inside workdir to avoid confirmation modal)
       await client.send('chat.send', { 
@@ -258,7 +261,8 @@ Please explore the existing code and propose acceptance criteria using add_crite
       
       // Switch to builder and set blocked phase manually
       const sessionId = client.getSession()!.id
-      await setSessionMode(server.url, sessionId, 'builder', server.wsUrl)
+      await client.send('chat.send', { content: 'Ready', agentId: 'builder' })
+      await client.waitForChatDone()
       
       // Start with a message (simulating user intervention)
       await client.send('chat.send', { 

@@ -3,7 +3,6 @@ import type {
   ServerMessage,
   SessionLoadPayload,
   ChatSendPayload,
-  ModeSwitchPayload,
   CriteriaEditPayload,
   AskAnswerPayload,
   ProjectStatePayload,
@@ -31,7 +30,6 @@ import type {
   ChatAskUserPayload,
   ChatVisionFallbackPayload,
   PathConfirmPayload,
-  ModeChangedPayload,
   PhaseChangedPayload,
   CriteriaUpdatedPayload,
   ContextStatePayload,
@@ -43,7 +41,7 @@ import type {
   QueuedMessage,
 } from '../../shared/protocol.js'
 import { isClientMessage, createServerMessage } from '../../shared/protocol.js'
-import type { Project, Session, SessionSummary, SessionMode, SessionPhase, Criterion, Todo, ToolResult, Message, ContextState, ToolCall } from '../../shared/types.js'
+import type { Project, Session, SessionSummary, SessionPhase, Criterion, Todo, ToolResult, Message, ContextState, ToolCall } from '../../shared/types.js'
 
 /**
  * Enrich messages by attaching tool results to their parent toolCalls.
@@ -236,11 +234,6 @@ export function createChatVisionFallbackMessage(
   return createServerMessage('chat.vision_fallback', payload)
 }
 
-// Mode messages
-export function createModeChangedMessage(mode: SessionMode, auto: boolean, reason?: string): ServerMessage<ModeChangedPayload> {
-  return createServerMessage('mode.changed', { mode, auto, ...(reason ? { reason } : {}) })
-}
-
 // Phase messages
 export function createPhaseChangedMessage(phase: SessionPhase): ServerMessage<PhaseChangedPayload> {
   return createServerMessage('phase.changed', { phase })
@@ -278,10 +271,6 @@ export function isSessionLoadPayload(payload: unknown): payload is SessionLoadPa
 // Chat payloads
 export function isChatSendPayload(payload: unknown): payload is ChatSendPayload {
   return typeof payload === 'object' && payload !== null && 'content' in payload
-}
-
-export function isModeSwitchPayload(payload: unknown): payload is ModeSwitchPayload {
-  return typeof payload === 'object' && payload !== null && 'mode' in payload
 }
 
 export function isCriteriaEditPayload(payload: unknown): payload is CriteriaEditPayload {
@@ -419,11 +408,6 @@ export function storedEventToServerMessage(event: StoredEvent): ServerMessage | 
     case 'task.completed': {
       const data = event.data as Extract<TurnEvent, { type: 'task.completed' }>['data']
       return createServerMessage('task.completed', data)
-    }
-
-    case 'mode.changed': {
-      const data = event.data as Extract<TurnEvent, { type: 'mode.changed' }>['data']
-      return createModeChangedMessage(data.mode, data.auto, data.reason)
     }
 
     case 'running.changed': {

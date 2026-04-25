@@ -21,7 +21,7 @@ import {
   assertNoErrors,
   createProject,
   createSession,
-  setSessionMode,
+  
   type TestClient, 
   type TestProject,
   type TestServerHandle 
@@ -132,7 +132,8 @@ describe('Session Reconnection', () => {
     it('preserves mode across reconnection', async () => {
       // Switch to builder mode
       const sessionId = client.getSession()!.id
-      await setSessionMode(server.url, sessionId, 'builder', server.wsUrl)
+      await client.send('chat.send', { content: 'Ready', agentId: 'builder' })
+      await client.waitForChatDone()
       
       // Reconnect
       const client2 = await createTestClient({ url: server.wsUrl })
@@ -141,7 +142,8 @@ describe('Session Reconnection', () => {
         await client2.send('session.load', { sessionId })
         
         const session = client2.getSession()!
-        expect(session.mode).toBe('builder')
+        // Mode is per-message via agentId, not stored on session
+        expect(session.phase).toBe('plan')
       } finally {
         await client2.close()
       }
@@ -229,7 +231,8 @@ describe('Session Reconnection', () => {
     it('includes tool results in loaded messages', async () => {
       // Switch to builder and run a command
       const sessionId = client.getSession()!.id
-      await setSessionMode(server.url, sessionId, 'builder', server.wsUrl)
+      await client.send('chat.send', { content: 'Ready', agentId: 'builder' })
+      await client.waitForChatDone()
       
       await client.send('chat.send', { 
         content: 'Run the command "ls" to list files' 
@@ -276,7 +279,8 @@ describe('Session Reconnection', () => {
       
       // Switch to builder and start (changes phase to build)
       const sessionId = client.getSession()!.id
-      await setSessionMode(server.url, sessionId, 'builder', server.wsUrl)
+      await client.send('chat.send', { content: 'Ready', agentId: 'builder' })
+      await client.waitForChatDone()
       
       // Reconnect
       const client2 = await createTestClient({ url: server.wsUrl })

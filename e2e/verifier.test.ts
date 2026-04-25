@@ -15,7 +15,7 @@ import {
   assertNoErrors,
   createProject,
   createSession,
-  setSessionMode,
+  
   type TestClient, 
   type TestProject,
   type TestServerHandle 
@@ -56,7 +56,8 @@ describe.skip('Verifier Mode', () => {
         content: 'Add criterion ID "trivial-pass": "Trivial pass criterion". Use add_criterion.',
       })
       await client.waitForChatDone()
-      await setSessionMode(server.url, session.id, 'builder', server.wsUrl)
+      await client.send('chat.send', { content: 'Ready', agentId: 'builder' })
+      await client.waitForChatDone()
       await client.send('runner.launch', {})
 
       const events = await collectUntilPhase(client, 'verification', 1_500)
@@ -74,7 +75,8 @@ describe.skip('Verifier Mode', () => {
       })
       await client.waitForChatDone()
       const session = client.getSession()!
-      await setSessionMode(server.url, session.id, 'builder', server.wsUrl)
+      await client.send('chat.send', { content: 'Ready', agentId: 'builder' })
+      await client.waitForChatDone()
       await client.send('runner.launch', {})
 
       await collectUntilPhase(client, 'done', 1_500)
@@ -101,7 +103,8 @@ describe.skip('Verifier Mode', () => {
       })
       await client.waitForChatDone()
       const session = client.getSession()!
-      await setSessionMode(server.url, session.id, 'builder', server.wsUrl)
+      await client.send('chat.send', { content: 'Ready', agentId: 'builder' })
+      await client.waitForChatDone()
       await client.send('runner.launch', {})
 
       await collectUntilPhase(client, 'done', 1_500)
@@ -129,7 +132,8 @@ describe.skip('Verifier Mode', () => {
         })
         await client.waitForChatDone()
         const session1 = client.getSession()!
-        await setSessionMode(server.url, session1.id, 'builder')
+        await client.send('chat.send', { content: 'Ready', agentId: 'builder' })
+        await client.waitForChatDone()
         await client.send('runner.launch', {})
 
         await collectUntilPhase(client, 'done', 1_500)
@@ -149,7 +153,8 @@ describe.skip('Verifier Mode', () => {
         })
         await client.waitForChatDone()
         const session1 = client.getSession()!
-        await setSessionMode(server.url, session1.id, 'builder')
+        await client.send('chat.send', { content: 'Ready', agentId: 'builder' })
+        await client.waitForChatDone()
         await client.send('runner.launch', {})
 
         await collectUntilPhase(client, 'blocked', 5_000)
@@ -171,7 +176,8 @@ describe.skip('Verifier Mode', () => {
       })
       await client.waitForChatDone()
       const session = client.getSession()!
-      await setSessionMode(server.url, session.id, 'builder', server.wsUrl)
+      await client.send('chat.send', { content: 'Ready', agentId: 'builder' })
+      await client.waitForChatDone()
       
       client.clearEvents()
       

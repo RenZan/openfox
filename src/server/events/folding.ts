@@ -8,7 +8,6 @@
 import type {
   Message,
   Criterion,
-  SessionMode,
   SessionPhase,
   ContextState,
   Todo,
@@ -172,7 +171,6 @@ function applyTurnEventsToSnapshotMessages(
 }
 
 export interface FoldedSessionState {
-  mode: SessionMode
   phase: SessionPhase
   isRunning: boolean
   messages: SnapshotMessage[]
@@ -181,7 +179,6 @@ export interface FoldedSessionState {
   contextState: ContextState
   currentContextWindowId: string
   readFiles: ReadFileEntry[]
-  lastModeWithReminder?: SessionMode
   pendingConfirmations: PendingPathConfirmation[]
   sessionInit?: {
     projectId: string
@@ -483,22 +480,6 @@ export function foldContextState(events: EventLike[], initialWindowId: string): 
 // ============================================================================
 
 /**
- * Fold mode from events (returns latest mode)
- */
-export function foldMode(events: EventLike[]): SessionMode {
-  let mode: SessionMode = 'planner'
-
-  for (const event of events) {
-    if (event.type === 'mode.changed') {
-      const data = event.data as Extract<TurnEvent, { type: 'mode.changed' }>['data']
-      mode = data.mode
-    }
-  }
-
-  return mode
-}
-
-/**
  * Fold phase from events (returns latest phase)
  */
 export function foldPhase(events: EventLike[]): SessionPhase {
@@ -580,7 +561,6 @@ export function foldSessionState(
   maxTokens: number,
   initialMessages?: SnapshotMessage[]
 ): FoldedSessionState {
-  const mode = foldMode(events)
   const phase = foldPhase(events)
   const isRunning = foldIsRunning(events)
   const messages = initialMessages && initialMessages.length > 0
@@ -606,54 +586,6 @@ export function foldSessionState(
   const contextState: ContextState = baseContextState.compactionCount !== contextResult.compactionCount || baseContextState.maxTokens !== maxTokens
     ? { ...baseContextState, compactionCount: contextResult.compactionCount, maxTokens }
     : { ...baseContextState, maxTokens }
-
-  // Find last mode with reminder
-  // Priority: 1) snapshot.lastModeWithReminder field, 2) snapshot messages array, 3) message.start events
-  let lastModeWithReminder: SessionMode | undefined
-  
-  // First, check the latest snapshot event
-  for (let i = events.length - 1; i >= 0; i--) {
-    const event = events[i]!
-    if (event.type === 'turn.snapshot') {
-      const snapshotData = event.data as SessionSnapshot
-      // First check the lastModeWithReminder field
-      if (snapshotData.lastModeWithReminder) {
-        lastModeWithReminder = snapshotData.lastModeWithReminder
-        break
-      }
-      // If not in field, check snapshot messages array (for cases where field wasn't set)
-      for (let j = snapshotData.messages.length - 1; j >= 0; j--) {
-        const msg = snapshotData.messages[j]!
-        if (msg.role === 'user' && msg.messageKind === 'auto-prompt' && msg.content?.includes('<system-reminder>')) {
-          if (msg.content.includes('Plan Mode')) {
-            lastModeWithReminder = 'planner'
-          } else if (msg.content.includes('Build Mode')) {
-            lastModeWithReminder = 'builder'
-          }
-          break
-        }
-      }
-      if (lastModeWithReminder) break
-    }
-  }
-  
-  // If not found in snapshot, fall back to scanning message.start events
-  if (lastModeWithReminder === undefined) {
-    for (let i = events.length - 1; i >= 0; i--) {
-      const event = events[i]!
-      if (event.type === 'message.start') {
-        const data = event.data as { role?: string; messageKind?: string; content?: string }
-        if (data.role === 'user' && data.messageKind === 'auto-prompt' && data.content?.includes('<system-reminder>')) {
-          if (data.content.includes('Plan Mode')) {
-            lastModeWithReminder = 'planner'
-          } else if (data.content.includes('Build Mode')) {
-            lastModeWithReminder = 'builder'
-          }
-          break
-        }
-      }
-    }
-  }
 
   let sessionInit: FoldedSessionState['sessionInit']
   let sessionTitle: string | undefined
@@ -739,7 +671,6 @@ export function foldSessionState(
   }
 
   return {
-    mode,
     phase,
     isRunning,
     messages,
@@ -748,7 +679,6 @@ export function foldSessionState(
     contextState,
     currentContextWindowId: contextResult.currentContextWindowId,
     readFiles: contextResult.readFiles,
-    ...(lastModeWithReminder !== undefined && { lastModeWithReminder }),
     pendingConfirmations,
     ...(sessionInit !== undefined && { sessionInit }),
     ...(sessionTitle !== undefined && { sessionTitle }),
@@ -774,7 +704,6 @@ export function buildSnapshot(
   snapshotAt: number = Date.now()
 ): SessionSnapshot {
   return {
-    mode: foldedState.mode,
     phase: foldedState.phase,
     isRunning: foldedState.isRunning,
     messages: foldedState.messages,
@@ -783,7 +712,6 @@ export function buildSnapshot(
     currentContextWindowId: foldedState.currentContextWindowId,
     todos: foldedState.todos,
     readFiles: foldedState.readFiles,
-    ...(foldedState.lastModeWithReminder !== undefined && { lastModeWithReminder: foldedState.lastModeWithReminder }),
     snapshotSeq: latestSeq,
     snapshotAt,
     ...(foldedState.sessionInit !== undefined && { sessionInit: foldedState.sessionInit }),
@@ -803,7 +731,6 @@ export function buildSnapshot(
  * @deprecated Use foldSessionState + buildSnapshot instead
  */
 interface LegacySessionState {
-  mode: SessionMode
   phase: SessionPhase
   isRunning: boolean
   criteria: Criterion[]
@@ -850,7 +777,6 @@ export function buildSnapshotFromSessionState(input: {
 
   // Override with legacy session values where provided
   return {
-    mode: session.mode,
     phase: session.phase,
     isRunning: session.isRunning,
     messages,

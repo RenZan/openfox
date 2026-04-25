@@ -73,7 +73,7 @@ describe('Session Reload After Cleanup', () => {
     // Step 4: Create snapshot (end of turn)
     const eventsBeforeCleanup = eventStore.getEvents(sessionId)
     const snapshotData: any = {
-      mode: 'planner',
+  
       phase: 'plan',
       isRunning: false,
       messages: [
@@ -161,7 +161,7 @@ describe('Session Reload After Cleanup', () => {
     // Create snapshot
     const eventsBeforeCleanup = eventStore.getEvents(sessionId)
     const snapshotData: any = {
-      mode: 'builder',
+  
       phase: 'build',
       isRunning: false,
       messages: [
@@ -225,7 +225,7 @@ describe('Session Reload After Cleanup', () => {
     eventStore.append(sessionId, {
       type: 'turn.snapshot',
       data: {
-        mode: 'planner',
+    
         phase: 'plan',
         isRunning: false,
         messages: [{ id: 'msg-1', role: 'user', content: 'Hello', timestamp: Date.now() }],
@@ -252,7 +252,7 @@ describe('Session Reload After Cleanup', () => {
     eventStore.append(sessionId, {
       type: 'turn.snapshot',
       data: {
-        mode: 'planner',
+    
         phase: 'plan',
         isRunning: false,
         messages: [
@@ -292,7 +292,7 @@ describe('Session Reload After Cleanup', () => {
     eventStore.append(sessionId, {
       type: 'turn.snapshot',
       data: {
-        mode: 'planner',
+    
         phase: 'plan',
         isRunning: false,
         messages: [{ id: 'msg-1', role: 'user', content: 'Hello', timestamp: Date.now() }],
@@ -377,7 +377,7 @@ describe('Session Reload After Cleanup', () => {
     eventStore.append(sessionId, {
       type: 'turn.snapshot',
       data: {
-        mode: 'planner',
+    
         phase: 'plan',
         isRunning: false,
         messages: [

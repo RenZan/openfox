@@ -16,7 +16,6 @@ export interface Session {
   id: string
   projectId: string
   workdir: string
-  mode: 'planner' | 'builder'
   phase: 'plan' | 'build' | 'verification' | 'done' | 'blocked'
   isRunning: boolean
   createdAt: string
@@ -154,55 +153,6 @@ export async function setSetting(
 
   const data = await response.json() as { value?: string }
   return data.value ?? null
-}
-
-/**
- * Set session mode via REST API and optionally reload via WS
- */
-export async function setSessionMode(
-  baseUrl: string,
-  sessionId: string,
-  mode: 'planner' | 'builder',
-  wsUrl?: string
-): Promise<{ session: Session; messages: unknown[] }> {
-  const response = await fetch(`${baseUrl}/api/sessions/${sessionId}/mode`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ mode }),
-  })
-
-  if (!response.ok) {
-    const error = (await response.json().catch(() => ({}))) as { error?: string }
-    throw new Error(error.error || `Failed to set session mode: ${response.status}`)
-  }
-
-  const result = response.json() as Promise<{ session: Session; messages: unknown[] }>
-
-  // If WS URL provided, briefly connect to trigger event subscription
-  // This ensures the mode.changed event gets broadcast to subscribers
-  if (wsUrl) {
-    const wsBaseUrl = wsUrl.split('?')[0]!
-    const ws = new (await import('ws')).default(wsBaseUrl)
-    try {
-      await new Promise<void>((resolve, reject) => {
-        ws.on('open', () => {
-          ws.send(JSON.stringify({ id: 'sub', type: 'session.load', payload: { sessionId } }))
-          setTimeout(() => resolve(), 500) // Brief delay to receive events
-        })
-        ws.on('error', () => {
-          // Ignore connection errors - we're just triggering subscription
-          resolve()
-        })
-        setTimeout(() => reject(new Error('Timeout')), 3000)
-      })
-    } catch {
-      // Timeout is OK - we just needed to trigger the subscription briefly
-    } finally {
-      ws.close()
-    }
-  }
-
-  return result
 }
 
 /**

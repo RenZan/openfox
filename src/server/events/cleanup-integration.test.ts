@@ -85,7 +85,7 @@ describe('Event Cleanup Integration', () => {
     
     // Build snapshot manually (simulating what buildSnapshot does)
     const snapshotData: any = {
-      mode: 'planner',
+  
       phase: 'plan',
       isRunning: false,
       messages: [
@@ -152,7 +152,7 @@ describe('Event Cleanup Integration', () => {
     eventStore.append(sessionId, {
       type: 'turn.snapshot',
       data: {
-        mode: 'planner',
+    
         phase: 'plan',
         isRunning: false,
         messages: [{ id: 'msg-1', role: 'user', content: 'First message', timestamp: Date.now() }],
@@ -183,7 +183,7 @@ describe('Event Cleanup Integration', () => {
     eventStore.append(sessionId, {
       type: 'turn.snapshot',
       data: {
-        mode: 'builder',
+    
         phase: 'build',
         isRunning: false,
         messages: [
@@ -229,7 +229,7 @@ describe('Event Cleanup Integration', () => {
     eventStore.append(sessionId, {
       type: 'turn.snapshot',
       data: {
-        mode: 'planner',
+    
         phase: 'plan',
         isRunning: false,
         messages: [],

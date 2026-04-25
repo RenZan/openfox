@@ -86,7 +86,7 @@ describe('SessionManager', () => {
     expect(getLspManagerMock).toHaveBeenCalledWith(session.id, workdir)
   })
 
-  it('updates mode, phase, running state, and summary while emitting events', () => {
+  it('updates phase, running state, and summary while emitting events', () => {
     const session = manager.createSession(projectId, 'Custom Title')
     const allEvents: string[] = []
     const sessionEvents: string[] = []
@@ -97,23 +97,15 @@ describe('SessionManager', () => {
       sessionEvents.push(event.type)
     })
 
-    const builderSession = manager.setMode(session.id, 'builder')
-    expect(builderSession.mode).toBe('builder')
-    // In event-sourced model, execution state is derived from events
-    // For a fresh session with no events, executionState is null
-
-    expect(manager.setMode(session.id, 'builder').mode).toBe('builder')
     expect(manager.setPhase(session.id, 'build').phase).toBe('build')
     expect(manager.setPhase(session.id, 'build').phase).toBe('build')
     expect(manager.setRunning(session.id, true).isRunning).toBe(true)
     expect(manager.setRunning(session.id, true).isRunning).toBe(true)
     expect(manager.setSummary(session.id, 'Build summary').summary).toBe('Build summary')
 
-    expect(allEvents).toContain('mode_changed')
     expect(allEvents).toContain('phase_changed')
     expect(allEvents).toContain('running_changed')
     expect(allEvents.filter((type) => type === 'session_updated').length).toBeGreaterThanOrEqual(2)
-    expect(sessionEvents).toContain('mode_changed')
     expect(sessionEvents).toContain('phase_changed')
   })
 

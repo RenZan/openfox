@@ -13,7 +13,7 @@ import {
   assertNoErrors,
   createProject,
   createSession,
-  setSessionMode,
+  
   stopSessionChat,
   type TestClient, 
   type TestProject,
@@ -57,7 +57,8 @@ describe.skip('Runner/Orchestrator', () => {
 
     it('requires pending criteria', async () => {
       const sessionId = client.getSession()!.id
-      await setSessionMode(server.url, sessionId, 'builder', server.wsUrl)
+      await client.send('chat.send', { content: 'Ready', agentId: 'builder' })
+      await client.waitForChatDone()
       
       const response = await client.send('runner.launch', {})
       expect(response.type).toBe('error')
@@ -77,7 +78,8 @@ describe.skip('Runner/Orchestrator', () => {
       
       // Switch to builder
       const sessionId = client.getSession()!.id
-      await setSessionMode(server.url, sessionId, 'builder', server.wsUrl)
+      await client.send('chat.send', { content: 'Ready', agentId: 'builder' })
+      await client.waitForChatDone()
       
       // Launch runner - should acknowledge since we have pending criteria
       const response = await client.send('runner.launch', {})
@@ -99,7 +101,8 @@ describe.skip('Runner/Orchestrator', () => {
       })
       await client.waitForChatDone()
       const sessionId = client.getSession()!.id
-      await setSessionMode(server.url, sessionId, 'builder', server.wsUrl)
+      await client.send('chat.send', { content: 'Ready', agentId: 'builder' })
+      await client.waitForChatDone()
       await client.send('runner.launch', {})
 
       const events = await collectUntilPhase(client, 'done', 15_000)
@@ -122,7 +125,8 @@ describe.skip('Runner/Orchestrator', () => {
       })
       await client.waitForChatDone()
       const sessionId = client.getSession()!.id
-      await setSessionMode(server.url, sessionId, 'builder', server.wsUrl)
+      await client.send('chat.send', { content: 'Ready', agentId: 'builder' })
+      await client.waitForChatDone()
       await client.send('runner.launch', {})
 
       await collectUntilPhase(client, 'done', 1_500)
@@ -161,7 +165,8 @@ describe.skip('Runner/Orchestrator', () => {
       await client.waitForChatDone()
       
       // Switch to builder and launch
-      await setSessionMode(server.url, sessionId, 'builder', server.wsUrl)
+      await client.send('chat.send', { content: 'Ready', agentId: 'builder' })
+      await client.waitForChatDone()
       await client.send('runner.launch', {})
       
       // Wait a bit then stop
@@ -185,7 +190,8 @@ describe.skip('Runner/Orchestrator', () => {
         criteria: [{ id: 'nudge-docs', description: 'src/math.ts has documentation comments', status: { type: 'pending' }, attempts: [] }],
       })
       const sessionId = client.getSession()!.id
-      await setSessionMode(server.url, sessionId, 'builder', server.wsUrl)
+      await client.send('chat.send', { content: 'Ready', agentId: 'builder' })
+      await client.waitForChatDone()
       await client.send('runner.launch', {})
 
       await client.waitFor('chat.message', (payload: unknown) => {
@@ -240,7 +246,8 @@ describe.skip('Runner/Orchestrator', () => {
       })
       await client.waitForChatDone()
       const sessionId = client.getSession()!.id
-      await setSessionMode(server.url, sessionId, 'builder', server.wsUrl)
+      await client.send('chat.send', { content: 'Ready', agentId: 'builder' })
+      await client.waitForChatDone()
       
       // Clear events before runner starts
       client.clearEvents()
@@ -271,7 +278,8 @@ describe.skip('Runner/Orchestrator', () => {
       })
       await client.waitForChatDone()
       const sessionId = client.getSession()!.id
-      await setSessionMode(server.url, sessionId, 'builder', server.wsUrl)
+      await client.send('chat.send', { content: 'Ready', agentId: 'builder' })
+      await client.waitForChatDone()
       
       // Clear events
       client.clearEvents()

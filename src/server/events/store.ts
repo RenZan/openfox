@@ -457,7 +457,7 @@ export class EventStore {
    * Clean up old events, keeping only:
    * - session.initialized event (seq 1)
    * - All snapshot events
-   * - State-changing events (criteria.set, criterion.updated, mode.changed, phase.changed, context.state, etc.)
+   * - State-changing events (criteria.set, criterion.updated, phase.changed, context.state, etc.)
    * - Events after the latest snapshot (current window)
    * 
    * This is the recommended cleanup method that preserves all snapshots and state.
@@ -486,7 +486,6 @@ export class EventStore {
         AND event_type NOT IN (
           'criteria.set',
           'criterion.updated',
-          'mode.changed',
           'phase.changed',
           'todo.updated',
           'context.state'

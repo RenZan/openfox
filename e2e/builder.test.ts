@@ -15,7 +15,6 @@ import {
   assertNoErrors,
   createProject,
   createSession,
-  setSessionMode,
   stopSessionChat,
   continueSessionChat,
   type TestClient, 
@@ -43,7 +42,8 @@ describe('Builder Mode', () => {
     const restProject = await createProject(server.url, { name: 'Builder Test', workdir: testDir.path })
     const restSession = await createSession(server.url, { projectId: restProject.id })
     await client.send('session.load', { sessionId: restSession.id })
-    await setSessionMode(server.url, restSession.id, 'builder', server.wsUrl)
+    await client.send('chat.send', { content: 'Ready for builder tasks', agentId: 'builder' })
+    await client.waitForChatDone()
   })
 
   afterEach(async () => {
@@ -154,14 +154,14 @@ describe('Builder Mode', () => {
       const sessionId = client.getSession()!.id
       
       // First add criteria in planner mode
-      await setSessionMode(server.url, sessionId, 'planner', server.wsUrl)
       await client.send('chat.send', { 
         content: 'Add criterion ID "file-created": "A new file utils.ts exists". Use add_criterion.' 
       })
       await client.waitForChatDone()
       
       // Switch to builder
-      await setSessionMode(server.url, sessionId, 'builder', server.wsUrl)
+      await client.send('chat.send', { content: 'Ready for builder tasks', agentId: 'builder' })
+      await client.waitForChatDone()
       
       // Ask to implement and complete
       await client.send('chat.send', { 
@@ -193,14 +193,14 @@ describe('Builder Mode', () => {
       const sessionId = client.getSession()!.id
       
       // First add a criterion in planner mode
-      await setSessionMode(server.url, sessionId, 'planner', server.wsUrl)
       await client.send('chat.send', { 
         content: 'Add criterion ID "test-file": "A test file exists". Use add_criterion.' 
       })
       await client.waitForChatDone()
       
       // Switch to builder
-      await setSessionMode(server.url, sessionId, 'builder', server.wsUrl)
+      await client.send('chat.send', { content: 'Ready for builder tasks', agentId: 'builder' })
+      await client.waitForChatDone()
       
       // Ask builder to read criteria first, then implement
       await client.send('chat.send', { 

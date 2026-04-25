@@ -37,9 +37,9 @@ export function QuickActionModal({ isOpen, onClose, onCloseComplete, onSelectCom
   const workflowUserItems = useWorkflowsStore(state => state.userItems)
   const agentDefaults = useAgentsStore(state => state.defaults)
   const agentUserItems = useAgentsStore(state => state.userItems)
-  const currentMode = useSessionStore(state => state.currentSession?.mode)
+  const currentAgent = useSessionStore(state => state.currentAgent)
   const currentDangerLevel = useSessionStore(state => state.currentSession?.dangerLevel ?? 'normal')
-  const switchMode = useSessionStore(state => state.switchMode)
+  const setCurrentAgent = useSessionStore(state => state.setCurrentAgent)
   const switchDangerLevel = useSessionStore(state => state.switchDangerLevel)
   const currentProjectId = useSessionStore(state => state.currentSession?.projectId)
   const createSession = useSessionStore(state => state.createSession)
@@ -114,8 +114,8 @@ export function QuickActionModal({ isOpen, onClose, onCloseComplete, onSelectCom
       },
     },
     ...dedupById(agentDefaults, agentUserItems)
-      .filter(a => !a.subagent && a.id !== currentMode)
-      .map(a => ({ id: a.id, name: a.name, prefix: 'Agent > Switch to', action: () => switchMode(a.id) })),
+      .filter(a => !a.subagent && a.id !== currentAgent)
+      .map(a => ({ id: a.id, name: a.name, prefix: 'Agent > Switch to', action: () => setCurrentAgent(a.id) })),
     ...dedupById(commandDefaults, commandUserItems)
       .map(c => ({ id: c.id, name: c.name, prefix: 'Command > Launch', action: () => onSelectCommand(c.id, textareaContent) })),
     ...dedupById(workflowDefaults, workflowUserItems)

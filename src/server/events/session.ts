@@ -6,11 +6,10 @@
  *
  * Usage:
  * ```typescript
- * import { emitUserMessage, emitModeChanged, getSessionState } from './events/session.js'
+ * import { emitUserMessage, getSessionState } from './events/session.js'
  *
  * // Emit events
  * const messageId = emitUserMessage(sessionId, 'Hello')
- * emitModeChanged(sessionId, 'builder', false, 'User switched to builder')
  *
  * // Get current state
  * const state = getSessionState(sessionId)
@@ -19,7 +18,6 @@
 
 import { updateSessionMessageCount } from '../db/sessions.js'
 import type {
-  SessionMode,
   SessionPhase,
   Criterion,
   CriterionStatus,
@@ -39,7 +37,6 @@ import {
   foldTurnEventsToSnapshotMessages,
   foldCriteria,
   foldTodos,
-  foldMode,
   foldPhase,
   foldIsRunning,
   foldContextState,
@@ -396,26 +393,6 @@ export function emitToolResult(
   eventStore.append(sessionId, {
     type: 'tool.result',
     data: { messageId, toolCallId, result },
-  })
-}
-
-/**
- * Emit mode changed
- */
-export function emitModeChanged(
-  sessionId: string,
-  mode: SessionMode,
-  auto: boolean,
-  reason?: string
-): void {
-  const eventStore = getEventStore()
-  eventStore.append(sessionId, {
-    type: 'mode.changed',
-    data: {
-      mode,
-      auto,
-      ...(reason !== undefined && { reason }),
-    },
   })
 }
 

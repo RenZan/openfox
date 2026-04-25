@@ -12,7 +12,6 @@
  */
 
 import type {
-  SessionMode,
   SessionPhase,
   Criterion,
   CriterionStatus,
@@ -145,14 +144,6 @@ export type TurnEvent =
       type: 'phase.changed'
       data: {
         phase: SessionPhase
-      }
-    }
-  | {
-      type: 'mode.changed'
-      data: {
-        mode: SessionMode
-        auto: boolean // Was this an automatic switch?
-        reason?: string
       }
     }
   | {
@@ -361,7 +352,6 @@ export type TurnEvent =
 // ============================================================================
 
 export interface SessionSnapshot {
-  mode: SessionMode
   phase: SessionPhase
   isRunning: boolean
 
@@ -371,7 +361,6 @@ export interface SessionSnapshot {
   currentContextWindowId: string
   todos: Todo[]
   readFiles?: ReadFileEntry[]
-  lastModeWithReminder?: SessionMode
   snapshotSeq: number
   snapshotAt: number
 

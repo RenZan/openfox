@@ -14,7 +14,6 @@ import {
   createProject,
   createSession,
   setSessionCriteria,
-  setSessionMode,
   type TestClient, 
   type TestProject,
   type TestServerHandle 
@@ -200,8 +199,8 @@ describe('Criteria System', () => {
       await new Promise(r => setTimeout(r, 100))
       
       // Switch to builder
-      await setSessionMode(server.url, sessionId, 'builder', server.wsUrl)
-      await new Promise(r => setTimeout(r, 50))
+      await client.send('chat.send', { content: 'Ready for builder tasks', agentId: 'builder' })
+      await client.waitForChatDone()
     })
 
     describe('complete_criterion', () => {

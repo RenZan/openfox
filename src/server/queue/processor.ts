@@ -163,10 +163,10 @@ export class QueueProcessor {
       }
     }
 
-    this.runTurn(sessionId, controller)
+    this.runTurn(sessionId, controller, nextAsap?.agentId)
   }
 
-  private async runTurn(sessionId: string, controller: AbortController): Promise<void> {
+  private async runTurn(sessionId: string, controller: AbortController, agentId?: string): Promise<void> {
     const { sessionManager, getLLMClient, getActiveProvider, broadcastForSession, providerManager } = this.deps
     const session = sessionManager.getSession(sessionId)
 
@@ -208,6 +208,7 @@ export class QueueProcessor {
       statsIdentity,
       signal: controller.signal,
       onMessage: (msg) => broadcastForSession(sessionId, msg),
+      ...(agentId ? { agentId } : {}),
     })
 
     runChatTurn(runChatTurnParams).catch((error) => {

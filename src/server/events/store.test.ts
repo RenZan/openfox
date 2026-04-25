@@ -204,7 +204,7 @@ describe('EventStore', () => {
       store.append('session-1', {
         type: 'turn.snapshot',
         data: {
-          mode: 'planner',
+      
           phase: 'plan',
           isRunning: false,
           messages: [],
@@ -224,7 +224,7 @@ describe('EventStore', () => {
       store.append('session-1', {
         type: 'turn.snapshot',
         data: {
-          mode: 'builder',
+      
           phase: 'build',
           isRunning: true,
           messages: [],
@@ -242,7 +242,6 @@ describe('EventStore', () => {
 
       expect(snapshot).toBeDefined()
       expect(snapshot!.type).toBe('turn.snapshot')
-      expect(snapshot!.data.mode).toBe('builder')
       expect(snapshot!.data.snapshotSeq).toBe(3)
     })
 
@@ -265,7 +264,7 @@ describe('EventStore', () => {
       store.append('session-1', {
         type: 'turn.snapshot',
         data: {
-          mode: 'planner',
+      
           phase: 'plan',
           isRunning: false,
           messages: [],
@@ -290,7 +289,6 @@ describe('EventStore', () => {
       const { snapshot, events } = store.getEventsSinceSnapshot('session-1')
 
       expect(snapshot).toBeDefined()
-      expect(snapshot!.mode).toBe('planner')
       expect(events).toHaveLength(2) // Events AFTER snapshot (seq 3, 4)
       expect(events[0]!.type).toBe('message.start')
       expect(events[1]!.type).toBe('message.delta')
@@ -792,7 +790,7 @@ describe('EventStore - Event Cleanup', () => {
       store.append('session-1', {
         type: 'turn.snapshot',
         data: {
-          mode: 'planner',
+      
           phase: 'plan',
           isRunning: false,
           messages: [],
@@ -828,7 +826,7 @@ describe('EventStore - Event Cleanup', () => {
       store.append('session-1', {
         type: 'turn.snapshot',
         data: {
-          mode: 'planner',
+      
           phase: 'plan',
           isRunning: false,
           messages: [],
@@ -848,7 +846,7 @@ describe('EventStore - Event Cleanup', () => {
       store.append('session-1', {
         type: 'turn.snapshot',
         data: {
-          mode: 'builder',
+      
           phase: 'build',
           isRunning: false,
           messages: [],
@@ -889,7 +887,7 @@ describe('EventStore - Event Cleanup', () => {
       store.append('session-1', {
         type: 'turn.snapshot',
         data: {
-          mode: 'planner',
+      
           phase: 'plan',
           isRunning: false,
           messages: [{ id: 'msg-1', role: 'user', content: 'Hello world', timestamp: Date.now() }],
@@ -927,7 +925,7 @@ describe('EventStore - Event Cleanup', () => {
       store.append('session-1', {
         type: 'turn.snapshot',
         data: {
-          mode: 'planner',
+      
           phase: 'plan',
           isRunning: false,
           messages: [],
@@ -959,7 +957,7 @@ describe('EventStore - Event Cleanup', () => {
 
       store.append(sessionId, { type: 'session.initialized', data: { projectId: 'p1', workdir: '/tmp', contextWindowId: 'window-1' } })
       store.append(sessionId, { type: 'message.start', data: { messageId: 'msg-1', role: 'user', content: 'Hello' } })
-      store.append(sessionId, { type: 'turn.snapshot', data: { mode: 'planner', phase: 'plan', isRunning: false, messages: [], criteria: [], contextState: { currentTokens: 100, maxTokens: 200000, compactionCount: 0, dangerZone: false, canCompact: false }, currentContextWindowId: 'window-1', todos: [], readFiles: [], snapshotSeq: 2, snapshotAt: Date.now() } })
+      store.append(sessionId, { type: 'turn.snapshot', data: {phase: 'plan', isRunning: false, messages: [], criteria: [], contextState: { currentTokens: 100, maxTokens: 200000, compactionCount: 0, dangerZone: false, canCompact: false }, currentContextWindowId: 'window-1', todos: [], readFiles: [], snapshotSeq: 2, snapshotAt: Date.now() } })
       store.append(sessionId, { type: 'message.start', data: { messageId: 'msg-2', role: 'assistant' } })
       store.append(sessionId, { type: 'message.delta', data: { messageId: 'msg-2', content: 'Hi there' } })
 
@@ -985,7 +983,7 @@ describe('EventStore - Event Cleanup', () => {
 
       store.append(sessionId, { type: 'session.initialized', data: { projectId: 'p1', workdir: '/tmp', contextWindowId: 'window-1' } })
       store.append(sessionId, { type: 'message.start', data: { messageId: 'msg-1', role: 'user', content: 'Hello' } })
-      store.append(sessionId, { type: 'turn.snapshot', data: { mode: 'planner', phase: 'plan', isRunning: false, messages: [], criteria: [], contextState: { currentTokens: 100, maxTokens: 200000, compactionCount: 0, dangerZone: false, canCompact: false }, currentContextWindowId: 'window-1', todos: [], readFiles: [], snapshotSeq: 2, snapshotAt: Date.now() } })
+      store.append(sessionId, { type: 'turn.snapshot', data: {phase: 'plan', isRunning: false, messages: [], criteria: [], contextState: { currentTokens: 100, maxTokens: 200000, compactionCount: 0, dangerZone: false, canCompact: false }, currentContextWindowId: 'window-1', todos: [], readFiles: [], snapshotSeq: 2, snapshotAt: Date.now() } })
 
       const result = store.consolidateSession(sessionId)
       expect(result).toBeNull()
@@ -1009,7 +1007,7 @@ describe('EventStore - Event Cleanup', () => {
 
       store.append(sessionId, { type: 'session.initialized', data: { projectId: 'p1', workdir: '/tmp', contextWindowId: 'window-1' } })
       store.append(sessionId, { type: 'message.start', data: { messageId: 'msg-1', role: 'user', content: 'Hello' } })
-      store.append(sessionId, { type: 'turn.snapshot', data: { mode: 'planner', phase: 'plan', isRunning: false, messages: [], criteria: [], contextState: { currentTokens: 100, maxTokens: 200000, compactionCount: 0, dangerZone: false, canCompact: false }, currentContextWindowId: 'window-1', todos: [], readFiles: [], snapshotSeq: 2, snapshotAt: Date.now() } })
+      store.append(sessionId, { type: 'turn.snapshot', data: {phase: 'plan', isRunning: false, messages: [], criteria: [], contextState: { currentTokens: 100, maxTokens: 200000, compactionCount: 0, dangerZone: false, canCompact: false }, currentContextWindowId: 'window-1', todos: [], readFiles: [], snapshotSeq: 2, snapshotAt: Date.now() } })
       store.append(sessionId, { type: 'message.start', data: { messageId: 'msg-2', role: 'assistant' } })
 
       const orphaned = store.findOrphanedSessions()
@@ -1022,7 +1020,7 @@ describe('EventStore - Event Cleanup', () => {
 
       store.append(sessionId, { type: 'session.initialized', data: { projectId: 'p1', workdir: '/tmp', contextWindowId: 'window-1' } })
       store.append(sessionId, { type: 'message.start', data: { messageId: 'msg-1', role: 'user', content: 'Hello' } })
-      store.append(sessionId, { type: 'turn.snapshot', data: { mode: 'planner', phase: 'plan', isRunning: false, messages: [], criteria: [], contextState: { currentTokens: 100, maxTokens: 200000, compactionCount: 0, dangerZone: false, canCompact: false }, currentContextWindowId: 'window-1', todos: [], readFiles: [], snapshotSeq: 2, snapshotAt: Date.now() } })
+      store.append(sessionId, { type: 'turn.snapshot', data: {phase: 'plan', isRunning: false, messages: [], criteria: [], contextState: { currentTokens: 100, maxTokens: 200000, compactionCount: 0, dangerZone: false, canCompact: false }, currentContextWindowId: 'window-1', todos: [], readFiles: [], snapshotSeq: 2, snapshotAt: Date.now() } })
 
       const orphaned = store.findOrphanedSessions()
       expect(orphaned).not.toContain(sessionId)
@@ -1033,7 +1031,7 @@ describe('EventStore - Event Cleanup', () => {
       db.prepare(`INSERT INTO sessions (id, is_running, updated_at) VALUES (?, 1, ?)`).run(sessionId, Date.now() - 10 * 60 * 1000)
 
       store.append(sessionId, { type: 'session.initialized', data: { projectId: 'p1', workdir: '/tmp', contextWindowId: 'window-1' } })
-      store.append(sessionId, { type: 'turn.snapshot', data: { mode: 'planner', phase: 'plan', isRunning: true, messages: [], criteria: [], contextState: { currentTokens: 100, maxTokens: 200000, compactionCount: 0, dangerZone: false, canCompact: false }, currentContextWindowId: 'window-1', todos: [], readFiles: [], snapshotSeq: 1, snapshotAt: Date.now() } })
+      store.append(sessionId, { type: 'turn.snapshot', data: {phase: 'plan', isRunning: true, messages: [], criteria: [], contextState: { currentTokens: 100, maxTokens: 200000, compactionCount: 0, dangerZone: false, canCompact: false }, currentContextWindowId: 'window-1', todos: [], readFiles: [], snapshotSeq: 1, snapshotAt: Date.now() } })
       store.append(sessionId, { type: 'message.start', data: { messageId: 'msg-1', role: 'user', content: 'Hello' } })
 
       const orphaned = store.findOrphanedSessions()

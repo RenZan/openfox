@@ -20,7 +20,7 @@ import {
   assertNoErrors,
   createProject,
   createSession,
-  setSessionMode,
+  
   stopSessionChat,
   type TestClient, 
   type TestProject,

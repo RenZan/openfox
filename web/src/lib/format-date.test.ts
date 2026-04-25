@@ -57,7 +57,6 @@ describe('groupSessionsByDate', () => {
     id,
     projectId: 'proj-1',
     workdir: '/home/user/project',
-    mode: 'planner',
     phase: 'done',
     isRunning: false,
     createdAt: updatedAt,

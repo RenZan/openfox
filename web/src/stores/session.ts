@@ -3,7 +3,6 @@ import { authFetch } from '../lib/api'
 import type {
   Session,
   SessionSummary,
-  SessionMode,
   Criterion,
   Todo,
   Message,
@@ -31,7 +30,6 @@ import type {
   ChatErrorPayload,
   ChatPathConfirmationPayload,
   ChatVisionFallbackPayload,
-  ModeChangedPayload,
   PhaseChangedPayload,
   CriteriaUpdatedPayload,
   ContextStatePayload,
@@ -119,7 +117,6 @@ function mergeSessionIntoSummary(sessions: SessionSummary[], session: Session): 
         ...existingSession,
         projectId: session.projectId,
         workdir: session.workdir,
-        mode: session.mode,
         phase: session.phase,
         isRunning: session.isRunning,
         messageCount: session.messages.length,
@@ -130,7 +127,6 @@ function mergeSessionIntoSummary(sessions: SessionSummary[], session: Session): 
         id: session.id,
         projectId: session.projectId,
         workdir: session.workdir,
-        mode: session.mode,
         phase: session.phase,
         isRunning: session.isRunning,
         createdAt: '',
@@ -157,7 +153,6 @@ function mergeSessionList(
     return {
       ...incomingSession,
       title: incomingSession.title ?? existingSession?.title,
-      mode: currentSessionOverride?.mode ?? existingSession?.mode ?? incomingSession.mode,
       phase: currentSessionOverride?.phase ?? existingSession?.phase ?? incomingSession.phase,
       isRunning: currentSessionOverride?.isRunning ?? existingSession?.isRunning ?? incomingSession.isRunning,
       messageCount: incomingSession.messageCount,
@@ -230,6 +225,9 @@ interface SessionState {
   // Error state
   error: { code: string; message: string } | null
 
+  // Current agent (local state, sent with each message)
+  currentAgent: string
+
   // Sessions pagination
   sessionsHasMore: boolean
   sessionsPaginationLoading: boolean
@@ -265,8 +263,8 @@ interface SessionState {
   // Runner (auto-loop)
   launchRunner: (content?: string, attachments?: Attachment[], workflowId?: string) => void
 
-  // Mode switching
-  switchMode: (mode: SessionMode) => void
+  // Agent switching (local state only — agent ID is sent with each message)
+  setCurrentAgent: (agentId: string) => void
   switchDangerLevel: (dangerLevel: 'normal' | 'dangerous') => void
   acceptAndBuild: (workflowId?: string, content?: string, attachments?: Attachment[]) => void
 
@@ -313,12 +311,10 @@ interface SessionState {
 // to 'done' before the EventStore phase.changed event arrives.
 const lastSeenPhase = new Map<string, string>()
 
-function resolveAgentType(state: SessionState, sessionId?: string): AgentType | undefined {
-  const session = sessionId === state.currentSession?.id ? state.currentSession : null
-  const summary = state.sessions.find((s) => s.id === sessionId)
-  const mode = session?.mode ?? summary?.mode
-  if (mode === 'planner') return 'planner'
-  if (mode === 'builder') return 'build'
+function resolveAgentType(state: SessionState, _sessionId?: string): AgentType | undefined {
+  const agent = state.currentAgent
+  if (agent === 'planner') return 'planner'
+  if (agent === 'builder') return 'build'
   return 'planner' // default sound profile for custom agents
 }
 
@@ -475,6 +471,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     queuedMessages: [],
     abortInProgress: false,
     error: null,
+    currentAgent: 'planner',
     sessionsHasMore: true,
     sessionsPaginationLoading: false,
     pendingSessionCreate: false as boolean | string,
@@ -757,13 +754,15 @@ export const useSessionStore = create<SessionState>((set, get) => {
 
       set({ streamingMessageId: null })
 
+      const agentId = get().currentAgent
+
       // Use unified /message endpoint - always queues, processes at turn boundaries
       // This works whether agent is running (queues) or idle (processes immediately)
       try {
         const res = await authFetch(`/api/sessions/${sessionId}/message`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content, attachments, messageKind: opts?.messageKind }),
+          body: JSON.stringify({ content, attachments, messageKind: opts?.messageKind, agentId }),
         })
         const data = await res.json()
         if (data.queueState) {
@@ -811,28 +810,8 @@ export const useSessionStore = create<SessionState>((set, get) => {
       wsClient.send('runner.launch', payload)
     },
 
-    switchMode: async (mode) => {
-      const sessionId = get().currentSession?.id
-      if (!sessionId) return
-
-      try {
-        const res = await authFetch(`/api/sessions/${sessionId}/mode`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode }),
-        })
-        if (!res.ok) {
-          console.error('Failed to switch mode:', await res.json())
-          return
-        }
-        const data = await res.json()
-        // Update session with new mode
-        if (data.session) {
-          set({ currentSession: data.session })
-        }
-      } catch (error) {
-        console.error('Error switching mode:', error)
-      }
+    setCurrentAgent: (agentId) => {
+      set({ currentAgent: agentId })
     },
 
     switchDangerLevel: async (dangerLevel: 'normal' | 'dangerous') => {
@@ -1529,18 +1508,6 @@ export const useSessionStore = create<SessionState>((set, get) => {
               question: payload.question,
             },
           })
-          break
-        }
-
-        case 'mode.changed': {
-          if (!isMessageForCurrentSession(message, get().currentSession?.id ?? null)) {
-            markBackgroundSessionUnread()
-            break
-          }
-          const payload = message.payload as ModeChangedPayload
-          set((state) => ({
-            currentSession: state.currentSession ? { ...state.currentSession, mode: payload.mode } : null,
-          }))
           break
         }
 

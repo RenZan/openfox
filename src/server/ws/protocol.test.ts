@@ -16,7 +16,6 @@ import {
   createContextStateMessage,
   createCriteriaUpdatedMessage,
   createErrorMessage,
-  createModeChangedMessage,
   createPhaseChangedMessage,
   createProjectListMessage,
   createProjectStateMessage,
@@ -25,7 +24,6 @@ import {
   createSessionStateMessage,
   isChatSendPayload,
   isCriteriaEditPayload,
-  isModeSwitchPayload,
   isPathConfirmPayload,
   isSessionLoadPayload,
   parseClientMessage,
@@ -55,7 +53,6 @@ describe('ws/protocol', () => {
       id: 'session-1',
       projectId: 'project-1',
       workdir: '/tmp/project',
-      mode: 'planner' as const,
       phase: 'plan' as const,
       isRunning: false,
       summary: null,
@@ -123,10 +120,10 @@ describe('ws/protocol', () => {
 
       expect(createProjectStateMessage(project, 'corr')).toEqual({ id: 'corr', type: 'project.state', payload: { project } })
       expect(createProjectListMessage([project])).toEqual({ type: 'project.list', payload: { projects: [project] } })
-      expect(createSessionListMessage([{ id: 'session-1', projectId: 'project-1', workdir: '/tmp/project', mode: 'planner', phase: 'plan', isRunning: false, createdAt: 'a', updatedAt: 'b', criteriaCount: 0, criteriaCompleted: 0, messageCount: 0 }], 'corr')).toEqual({
+      expect(createSessionListMessage([{ id: 'session-1', projectId: 'project-1', workdir: '/tmp/project', phase: 'plan', isRunning: false, createdAt: 'a', updatedAt: 'b', criteriaCount: 0, criteriaCompleted: 0, messageCount: 0 }], 'corr')).toEqual({
         id: 'corr',
         type: 'session.list',
-        payload: { sessions: [{ id: 'session-1', projectId: 'project-1', workdir: '/tmp/project', mode: 'planner', phase: 'plan', isRunning: false, createdAt: 'a', updatedAt: 'b', criteriaCount: 0, criteriaCompleted: 0, messageCount: 0 }] },
+        payload: { sessions: [{ id: 'session-1', projectId: 'project-1', workdir: '/tmp/project', phase: 'plan', isRunning: false, createdAt: 'a', updatedAt: 'b', criteriaCount: 0, criteriaCompleted: 0, messageCount: 0 }] },
       })
       expect(createSessionRunningMessage(true)).toEqual({ type: 'session.running', payload: { isRunning: true } })
     })
@@ -272,7 +269,6 @@ describe('ws/protocol', () => {
         type: 'chat.path_confirmation',
         payload: { callId: 'call-1', tool: 'read_file', paths: ['/etc/passwd'], workdir: '/tmp/project', reason: 'outside_workdir' },
       })
-      expect(createModeChangedMessage('builder', true, 'criteria accepted')).toEqual({ type: 'mode.changed', payload: { mode: 'builder', auto: true, reason: 'criteria accepted' } })
       expect(createPhaseChangedMessage('verification')).toEqual({ type: 'phase.changed', payload: { phase: 'verification' } })
       expect(createCriteriaUpdatedMessage([{ id: 'tests-pass', description: 'Tests pass', status: { type: 'pending' }, attempts: [] }], 'tests-pass')).toEqual({
         type: 'criteria.updated',
@@ -294,13 +290,11 @@ describe('ws/protocol', () => {
     it('accepts valid payloads and rejects invalid ones', () => {
       expect(isSessionLoadPayload({ sessionId: 'session-1' })).toBe(true)
       expect(isChatSendPayload({ content: 'hello' })).toBe(true)
-      expect(isModeSwitchPayload({ mode: 'builder' })).toBe(true)
       expect(isCriteriaEditPayload({ criteria: [] })).toBe(true)
       expect(isPathConfirmPayload({ callId: 'call-1', approved: true })).toBe(true)
 
       expect(isSessionLoadPayload({})).toBe(false)
       expect(isChatSendPayload({ nope: true })).toBe(false)
-      expect(isModeSwitchPayload({})).toBe(false)
       expect(isCriteriaEditPayload({ nope: true })).toBe(false)
       expect(isPathConfirmPayload({ callId: 'call-1' })).toBe(false)
     })
@@ -318,13 +312,12 @@ describe('ws/protocol', () => {
         { ...baseEvent, type: 'message.start', data: { messageId: 'm1', role: 'assistant', content: 'Hello', subAgentId: 'sub-1', subAgentType: 'verifier', isSystemGenerated: true, messageKind: 'correction' } },
         { ...baseEvent, type: 'message.delta', data: { messageId: 'm1', content: ' world' } },
         { ...baseEvent, type: 'message.thinking', data: { messageId: 'm1', content: 'thinking' } },
-        { ...baseEvent, type: 'message.done', data: { messageId: 'm1', partial: true, stats: { providerId: 'provider-1', providerName: 'Local vLLM', backend: 'vllm', model: 'qwen', mode: 'planner', totalTime: 1, toolTime: 0, prefillTokens: 1, prefillSpeed: 1, generationTokens: 1, generationSpeed: 1 }, promptContext: { systemPrompt: 'sys', injectedFiles: [], userMessage: 'hello', messages: [{ role: 'user', content: 'hello', source: 'history' }], tools: [{ name: 'read_file', description: 'Read', parameters: {} }], requestOptions: { toolChoice: 'auto', disableThinking: false } } } },
+        { ...baseEvent, type: 'message.done', data: { messageId: 'm1', partial: true, stats: { providerId: 'provider-1', providerName: 'Local vLLM', backend: 'vllm', model: 'qwen', mode: 'builder', totalTime: 1, toolTime: 0, prefillTokens: 1, prefillSpeed: 1, generationTokens: 1, generationSpeed: 1 }, promptContext: { systemPrompt: 'sys', injectedFiles: [], userMessage: 'hello', messages: [{ role: 'user', content: 'hello', source: 'history' }], tools: [{ name: 'read_file', description: 'Read', parameters: {} }], requestOptions: { toolChoice: 'auto', disableThinking: false } } } },
         { ...baseEvent, type: 'tool.preparing', data: { messageId: 'm1', index: 0, name: 'read_file' } },
         { ...baseEvent, type: 'tool.call', data: { messageId: 'm1', toolCall: { id: 'call-1', name: 'read_file', arguments: { path: 'x' } } } },
         { ...baseEvent, type: 'tool.output', data: { toolCallId: 'call-1', stream: 'stdout', content: 'chunk' } },
         { ...baseEvent, type: 'tool.result', data: { messageId: 'm1', toolCallId: 'call-1', result: { success: true, output: 'done', durationMs: 1, truncated: false } } },
         { ...baseEvent, type: 'phase.changed', data: { phase: 'build' } },
-        { ...baseEvent, type: 'mode.changed', data: { mode: 'builder', auto: true, reason: 'criteria complete' } },
         { ...baseEvent, type: 'running.changed', data: { isRunning: true } },
         { ...baseEvent, type: 'criteria.set', data: { criteria: [] } },
         { ...baseEvent, type: 'criterion.updated', data: { criterionId: 'tests-pass', status: { type: 'passed', verifiedAt: '2024-01-01' } } },
@@ -333,7 +326,7 @@ describe('ws/protocol', () => {
         { ...baseEvent, type: 'chat.done', data: { messageId: 'm1', reason: 'complete' } },
         { ...baseEvent, type: 'chat.error', data: { error: 'boom', recoverable: false } },
         { ...baseEvent, type: 'format.retry', data: { attempt: 2, maxAttempts: 10 } },
-        { ...baseEvent, type: 'turn.snapshot', data: { mode: 'planner', phase: 'plan', isRunning: false, messages: [], criteria: [], contextState: { currentTokens: 0, maxTokens: 1, dangerZone: false, canCompact: false, compactionCount: 0 }, currentContextWindowId: 'window-1', todos: [], readFiles: [], snapshotSeq: 1, snapshotAt: 1 } },
+        { ...baseEvent, type: 'turn.snapshot', data: { phase: 'plan', isRunning: false, messages: [], criteria: [], contextState: { currentTokens: 0, maxTokens: 1, dangerZone: false, canCompact: false, compactionCount: 0 }, currentContextWindowId: 'window-1', todos: [], readFiles: [], snapshotSeq: 1, snapshotAt: 1 } },
         { ...baseEvent, type: 'context.compacted', data: { closedWindowId: 'window-1', beforeTokens: 10, afterTokens: 5, newWindowId: 'window-2', summary: 'compact' } },
         { ...baseEvent, type: 'unknown-event' as never, data: {} as never },
       ]
@@ -359,24 +352,23 @@ describe('ws/protocol', () => {
       })
       expect(converted[1]).toEqual({ type: 'chat.delta', payload: { messageId: 'm1', content: ' world' } })
       expect(converted[2]).toEqual({ type: 'chat.thinking', payload: { messageId: 'm1', content: 'thinking' } })
-      expect(converted[3]).toEqual({ type: 'chat.message_updated', payload: { messageId: 'm1', updates: { isStreaming: false, partial: true, stats: { providerId: 'provider-1', providerName: 'Local vLLM', backend: 'vllm', model: 'qwen', mode: 'planner', totalTime: 1, toolTime: 0, prefillTokens: 1, prefillSpeed: 1, generationTokens: 1, generationSpeed: 1 }, promptContext: { systemPrompt: 'sys', injectedFiles: [], userMessage: 'hello', messages: [{ role: 'user', content: 'hello', source: 'history' }], tools: [{ name: 'read_file', description: 'Read', parameters: {} }], requestOptions: { toolChoice: 'auto', disableThinking: false } } } } })
+      expect(converted[3]).toEqual({ type: 'chat.message_updated', payload: { messageId: 'm1', updates: { isStreaming: false, partial: true, stats: { providerId: 'provider-1', providerName: 'Local vLLM', backend: 'vllm', model: 'qwen', mode: 'builder', totalTime: 1, toolTime: 0, prefillTokens: 1, prefillSpeed: 1, generationTokens: 1, generationSpeed: 1 }, promptContext: { systemPrompt: 'sys', injectedFiles: [], userMessage: 'hello', messages: [{ role: 'user', content: 'hello', source: 'history' }], tools: [{ name: 'read_file', description: 'Read', parameters: {} }], requestOptions: { toolChoice: 'auto', disableThinking: false } } } } })
       expect(converted[4]).toEqual({ type: 'chat.tool_preparing', payload: { messageId: 'm1', index: 0, name: 'read_file' } })
       expect(converted[5]).toEqual({ type: 'chat.tool_call', payload: { messageId: 'm1', callId: 'call-1', tool: 'read_file', args: { path: 'x' } } })
       expect(converted[6]).toEqual({ type: 'chat.tool_output', payload: { messageId: '', callId: 'call-1', output: 'chunk', stream: 'stdout' } })
       expect(converted[7]).toEqual({ type: 'chat.tool_result', payload: { messageId: 'm1', callId: 'call-1', tool: '', result: { success: true, output: 'done', durationMs: 1, truncated: false } } })
       expect(converted[8]).toEqual({ type: 'phase.changed', payload: { phase: 'build' } })
-      expect(converted[9]).toEqual({ type: 'mode.changed', payload: { mode: 'builder', auto: true, reason: 'criteria complete' } })
-      expect(converted[10]).toEqual({ type: 'session.running', payload: { isRunning: true } })
-      expect(converted[11]).toEqual({ type: 'criteria.updated', payload: { criteria: [] } })
-      expect(converted[12]).toBeNull()
-      expect(converted[13]).toEqual({ type: 'context.state', payload: { context: { currentTokens: 1, maxTokens: 2, dangerZone: false, canCompact: true, compactionCount: 0 } } })
-      expect(converted[14]).toEqual({ type: 'chat.todo', payload: { todos: [{ content: 'write tests', status: 'pending' }] } })
-      expect(converted[15]).toEqual({ type: 'chat.done', payload: { messageId: 'm1', reason: 'complete' } })
-      expect(converted[16]).toEqual({ type: 'chat.error', payload: { error: 'boom', recoverable: false } })
-      expect(converted[17]).toEqual({ type: 'chat.format_retry', payload: { attempt: 2, maxAttempts: 10 } })
+      expect(converted[9]).toEqual({ type: 'session.running', payload: { isRunning: true } })
+      expect(converted[10]).toEqual({ type: 'criteria.updated', payload: { criteria: [] } })
+      expect(converted[11]).toBeNull()
+      expect(converted[12]).toEqual({ type: 'context.state', payload: { context: { currentTokens: 1, maxTokens: 2, dangerZone: false, canCompact: true, compactionCount: 0 } } })
+      expect(converted[13]).toEqual({ type: 'chat.todo', payload: { todos: [{ content: 'write tests', status: 'pending' }] } })
+      expect(converted[14]).toEqual({ type: 'chat.done', payload: { messageId: 'm1', reason: 'complete' } })
+      expect(converted[15]).toEqual({ type: 'chat.error', payload: { error: 'boom', recoverable: false } })
+      expect(converted[16]).toEqual({ type: 'chat.format_retry', payload: { attempt: 2, maxAttempts: 10 } })
+      expect(converted[17]).toBeNull()
       expect(converted[18]).toBeNull()
       expect(converted[19]).toBeNull()
-      expect(converted[20]).toBeNull()
     })
   })
 })

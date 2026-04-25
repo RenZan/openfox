@@ -15,8 +15,6 @@ export interface Project {
 // Session Types
 // ============================================================================
 
-export type SessionMode = string
-
 // Tool mode includes 'verifier' for the verification sub-agent (which uses distinct tools but runs inline within builder)
 export type ToolMode = string
 
@@ -29,7 +27,6 @@ export interface Session {
   id: string
   projectId: string
   workdir: string
-  mode: SessionMode
   phase: SessionPhase  // Current workflow phase
   isRunning: boolean  // Is the agent actively working?
   summary: string | null  // Generated when switching to builder, used by verifier
@@ -78,7 +75,6 @@ export interface SessionSummary {
   projectId: string
   title?: string
   workdir: string
-  mode: SessionMode
   phase: SessionPhase  // Current workflow phase
   isRunning: boolean
   providerId?: string | null     // Per-session provider override
@@ -430,7 +426,6 @@ export interface ExecutionState {
   compactionCount: number
   startedAt: string
   lastActivityAt: string
-  lastModeWithReminder?: string     // Track which mode last had a system reminder injected
 }
 
 // ============================================================================
