@@ -230,10 +230,10 @@ export class QueueProcessor {
         this.activeAgents.delete(sessionId)
 
         try {
-          const session = this.deps.sessionManager.getSession(sessionId)
+          const session = sessionManager.getSession(sessionId)
           if (!session) {
-            this.deps.sessionManager.setRunning(sessionId, false)
-            this.deps.broadcastForSession(sessionId, createSessionRunningMessage(false))
+            sessionManager.setRunning(sessionId, false)
+            broadcastForSession(sessionId, createSessionRunningMessage(false))
             return
           }
 
@@ -245,7 +245,10 @@ export class QueueProcessor {
 
           this.startTurn(sessionId)
         } catch (error) {
-          logger.error('Error in turn completion cleanup', { sessionId, error: error instanceof Error ? error.message : String(error) })
+          logger.error('Error in turn completion cleanup', {
+            sessionId,
+            error: error instanceof Error ? error.message : String(error),
+          })
         }
       })
   }
