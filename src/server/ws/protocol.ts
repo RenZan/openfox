@@ -437,7 +437,7 @@ export function storedEventToServerMessage(event: StoredEvent): ServerMessage | 
 
     case 'tool.output': {
       const data = event.data as Extract<TurnEvent, { type: 'tool.output' }>['data']
-      return createChatToolOutputMessage('', data.toolCallId, data.content, data.stream)
+      return createChatToolOutputMessage(data.messageId, data.toolCallId, data.content, data.stream)
     }
 
     case 'tool.result': {

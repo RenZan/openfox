@@ -389,6 +389,7 @@ export function emitToolCall(sessionId: string, messageId: string, toolCall: Too
  */
 export function emitToolOutput(
   sessionId: string,
+  messageId: string,
   toolCallId: string,
   stream: 'stdout' | 'stderr',
   content: string,
@@ -396,7 +397,7 @@ export function emitToolOutput(
   const eventStore = getEventStore()
   eventStore.append(sessionId, {
     type: 'tool.output',
-    data: { toolCallId, stream, content },
+    data: { messageId, toolCallId, stream, content },
   })
 }
 

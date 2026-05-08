@@ -17,6 +17,7 @@ import type { ToolContext, ToolRegistry } from '../tools/types.js'
 import type { RequestContextMessage, MinimalMessage } from './request-context.js'
 import { PathAccessDeniedError, AskUserInterrupt } from '../tools/index.js'
 import { createToolProgressHandler } from './tool-streaming.js'
+import { getEventStore } from '../events/index.js'
 import {
   streamLLMPure,
   consumeStreamGenerator,
@@ -28,7 +29,7 @@ import {
   createChatDoneEvent,
   createFormatRetryEvent,
 } from './stream-pure.js'
-import { getEventStore, getCurrentContextWindowId } from '../events/index.js'
+import { getCurrentContextWindowId } from '../events/index.js'
 import { maybeAutoCompactContext } from '../context/auto-compaction.js'
 import { getAllInstructions } from '../context/instructions.js'
 import { getEnabledSkillMetadata } from '../skills/registry.js'
@@ -212,7 +213,9 @@ export async function executeToolBatch(
       }
     }
 
-    const onProgress = ctx.onMessage ? createToolProgressHandler(assistantMsgId, toolCall.id, ctx.onMessage) : undefined
+    const onProgress = ctx.onMessage
+      ? createToolProgressHandler(eventStore, assistantMsgId, toolCall.id, ctx.sessionId)
+      : undefined
 
     const toolContext: ToolContext = {
       sessionManager: ctx.sessionManager,

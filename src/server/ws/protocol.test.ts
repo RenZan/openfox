@@ -218,6 +218,13 @@ describe('ws/protocol', () => {
       expect(parsed.payload.output).toBe('test')
       expect(parsed.payload.stream).toBe('stdout')
     })
+
+    it('includes messageId in payload for proper frontend correlation', () => {
+      const msg = createChatToolOutputMessage('msg-123', 'call-456', 'output data', 'stdout')
+
+      expect(msg.payload.messageId).toBe('msg-123')
+      expect(msg.payload.callId).toBe('call-456')
+    })
   })
 
   describe('createChatToolPreparingMessage', () => {
@@ -457,7 +464,11 @@ describe('ws/protocol', () => {
           type: 'tool.call',
           data: { messageId: 'm1', toolCall: { id: 'call-1', name: 'read_file', arguments: { path: 'x' } } },
         },
-        { ...baseEvent, type: 'tool.output', data: { toolCallId: 'call-1', stream: 'stdout', content: 'chunk' } },
+        {
+          ...baseEvent,
+          type: 'tool.output',
+          data: { messageId: 'm1', toolCallId: 'call-1', stream: 'stdout', content: 'chunk' },
+        },
         {
           ...baseEvent,
           type: 'tool.result',
@@ -578,7 +589,7 @@ describe('ws/protocol', () => {
       })
       expect(converted[6]).toEqual({
         type: 'chat.tool_output',
-        payload: { messageId: '', callId: 'call-1', output: 'chunk', stream: 'stdout' },
+        payload: { messageId: 'm1', callId: 'call-1', output: 'chunk', stream: 'stdout' },
       })
       expect(converted[7]).toEqual({
         type: 'chat.tool_result',

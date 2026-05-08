@@ -1,8 +1,22 @@
-import { describe, it, expect, vi } from 'vitest'
-import type { ServerMessage } from '../../shared/protocol.js'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createToolProgressHandler, parseProgressMessage } from './tool-streaming.js'
+import { EventStore } from '../events/store.js'
+import Database from 'better-sqlite3'
+
+let db: Database.Database
+let eventStore: EventStore
 
 describe('tool streaming', () => {
+  beforeEach(() => {
+    db = new Database(':memory:')
+    eventStore = new EventStore(db)
+    ;(global as any).__eventStore = eventStore
+  })
+
+  afterEach(() => {
+    db.close()
+  })
+
   describe('parseProgressMessage', () => {
     it('parses [stdout] prefix correctly', () => {
       const result = parseProgressMessage('[stdout] hello world')
@@ -57,67 +71,64 @@ describe('tool streaming', () => {
   })
 
   describe('createToolProgressHandler', () => {
-    it('creates handler that emits chat.tool_output events', () => {
-      const messages: ServerMessage[] = []
-      const onMessage = vi.fn((msg: ServerMessage) => messages.push(msg))
-
-      const handler = createToolProgressHandler('msg-1', 'call-1', onMessage)
+    it('creates handler that emits tool.output events to EventStore', () => {
+      const handler = createToolProgressHandler(eventStore, 'msg-1', 'call-1', 'test-session')
       handler('[stdout] test output')
 
-      expect(messages).toHaveLength(1)
-      expect(messages[0]!.type).toBe('chat.tool_output')
-      expect(messages[0]!.payload).toEqual({
+      const events = eventStore.getEvents('test-session')
+
+      expect(events).toHaveLength(1)
+      expect(events[0]!.type).toBe('tool.output')
+      expect(events[0]!.data).toEqual({
         messageId: 'msg-1',
-        callId: 'call-1',
-        output: 'test output',
+        toolCallId: 'call-1',
         stream: 'stdout',
+        content: 'test output',
       })
     })
 
     it('handles multiple progress calls', () => {
-      const messages: ServerMessage[] = []
-      const onMessage = vi.fn((msg: ServerMessage) => messages.push(msg))
-
-      const handler = createToolProgressHandler('msg-1', 'call-1', onMessage)
+      const handler = createToolProgressHandler(eventStore, 'msg-1', 'call-1', 'test-session')
       handler('[stdout] line1')
       handler('[stdout] line2')
       handler('[stderr] warning')
 
-      expect(messages).toHaveLength(3)
-      expect(messages[0]!.payload).toMatchObject({ stream: 'stdout', output: 'line1' })
-      expect(messages[1]!.payload).toMatchObject({ stream: 'stdout', output: 'line2' })
-      expect(messages[2]!.payload).toMatchObject({ stream: 'stderr', output: 'warning' })
+      const events = eventStore.getEvents('test-session')
+
+      expect(events).toHaveLength(3)
+      expect(events[0]!.data).toMatchObject({ stream: 'stdout', content: 'line1' })
+      expect(events[1]!.data).toMatchObject({ stream: 'stdout', content: 'line2' })
+      expect(events[2]!.data).toMatchObject({ stream: 'stderr', content: 'warning' })
     })
 
     it('ignores malformed progress messages', () => {
-      const messages: ServerMessage[] = []
-      const onMessage = vi.fn((msg: ServerMessage) => messages.push(msg))
-
-      const handler = createToolProgressHandler('msg-1', 'call-1', onMessage)
+      const handler = createToolProgressHandler(eventStore, 'msg-1', 'call-1', 'test-session')
       handler('not a valid progress message')
       handler('[invalid] prefix')
 
-      expect(messages).toHaveLength(0)
-      expect(onMessage).not.toHaveBeenCalled()
+      const events = eventStore.getEvents('test-session')
+
+      expect(events).toHaveLength(0)
     })
 
     it('passes correct messageId and callId for each call', () => {
-      const messages: ServerMessage[] = []
-      const onMessage = vi.fn((msg: ServerMessage) => messages.push(msg))
-
-      const handler1 = createToolProgressHandler('msg-A', 'call-A', onMessage)
-      const handler2 = createToolProgressHandler('msg-B', 'call-B', onMessage)
+      const handler1 = createToolProgressHandler(eventStore, 'msg-A', 'call-A', 'test-session')
+      const handler2 = createToolProgressHandler(eventStore, 'msg-B', 'call-B', 'test-session')
 
       handler1('[stdout] from A')
       handler2('[stdout] from B')
 
-      expect(messages[0]!.payload).toMatchObject({
+      const events = eventStore.getEvents('test-session')
+
+      expect(events[0]!.data).toMatchObject({
         messageId: 'msg-A',
-        callId: 'call-A',
+        toolCallId: 'call-A',
+        content: 'from A',
       })
-      expect(messages[1]!.payload).toMatchObject({
+      expect(events[1]!.data).toMatchObject({
         messageId: 'msg-B',
-        callId: 'call-B',
+        toolCallId: 'call-B',
+        content: 'from B',
       })
     })
   })

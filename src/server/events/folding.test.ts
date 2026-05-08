@@ -30,12 +30,12 @@ describe('apply-events.ts new handlers', () => {
         {
           ...baseEvent,
           type: 'tool.output',
-          data: { toolCallId: 'call-1', stream: 'stdout', content: 'First line\n' },
+          data: { messageId: 'm1', toolCallId: 'call-1', stream: 'stdout', content: 'First line\n' },
         },
         {
           ...baseEvent,
           type: 'tool.output',
-          data: { toolCallId: 'call-1', stream: 'stderr', content: 'Error output\n' },
+          data: { messageId: 'm1', toolCallId: 'call-1', stream: 'stderr', content: 'Error output\n' },
         },
         {
           ...baseEvent,

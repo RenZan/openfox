@@ -125,6 +125,7 @@ export type TurnEvent =
   | {
       type: 'tool.output'
       data: {
+        messageId: string
         toolCallId: string
         stream: 'stdout' | 'stderr'
         content: string

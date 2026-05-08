@@ -330,7 +330,7 @@ export async function* streamLLMPure(options: PureStreamOptions): AsyncGenerator
                         .replace(/\\\\/g, '\\')
                       yield {
                         type: 'tool.output',
-                        data: { toolCallId, stream: 'stdout' as const, content: unescaped },
+                        data: { messageId, toolCallId, stream: 'stdout' as const, content: unescaped },
                       }
                     }
                   }

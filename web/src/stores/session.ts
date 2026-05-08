@@ -1399,12 +1399,16 @@ export const useSessionStore = create<SessionState>((set, get) => {
           }
           const payload = message.payload as ChatToolOutputPayload
 
-          // Skip if this is a stale event — the message already has this tool call completed
+          // Check if this is a stale event — skip only if tool call already has streaming output
           // This can happen when session.state replaces messages mid-stream during parallel execution
-          const messageHasToolCall = get()
+          const existingToolCall = get()
             .messages.find((m) => m.id === payload.messageId)
-            ?.toolCalls?.some((tc) => tc.id === payload.callId)
-          if (messageHasToolCall) break
+            ?.toolCalls?.find((tc) => tc.id === payload.callId)
+
+          // Only skip if the tool call exists AND already has streaming output with content
+          if (existingToolCall?.streamingOutput && existingToolCall.streamingOutput.length > 0) {
+            break
+          }
 
           streamingBuffer.messageId = payload.messageId
           streamingBuffer.toolOutput.push({

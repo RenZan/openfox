@@ -1,12 +1,11 @@
 /**
  * Tool streaming utilities
  *
- * Handles conversion of tool onProgress callbacks to chat.tool_output events.
+ * Handles conversion of tool onProgress callbacks to tool.output events.
  * Used for streaming shell command output to the client in real-time.
  */
 
-import type { ServerMessage } from '../../shared/protocol.js'
-import { createChatToolOutputMessage } from '../ws/protocol.js'
+import type { EventStore } from '../events/store.js'
 
 export interface ParsedProgress {
   stream: 'stdout' | 'stderr'
@@ -30,22 +29,27 @@ export function parseProgressMessage(message: string): ParsedProgress | null {
 }
 
 /**
- * Create an onProgress handler that converts progress messages to chat.tool_output events.
+ * Create an onProgress handler that emits tool.output events to EventStore.
  *
+ * @param eventStore - The EventStore instance to emit events to
  * @param messageId - The assistant message ID this tool call belongs to
  * @param callId - The tool call ID
- * @param onMessage - Callback to send server messages to the client
+ * @param sessionId - The session ID
  * @returns Progress handler function to pass to tool context
  */
 export function createToolProgressHandler(
+  eventStore: EventStore,
   messageId: string,
   callId: string,
-  onMessage: (msg: ServerMessage) => void,
+  sessionId: string,
 ): (message: string) => void {
   return (message: string) => {
     const parsed = parseProgressMessage(message)
     if (!parsed) return
 
-    onMessage(createChatToolOutputMessage(messageId, callId, parsed.content, parsed.stream))
+    eventStore.append(sessionId, {
+      type: 'tool.output',
+      data: { messageId, toolCallId: callId, stream: parsed.stream, content: parsed.content },
+    })
   }
 }
