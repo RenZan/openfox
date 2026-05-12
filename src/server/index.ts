@@ -303,6 +303,19 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
     res.json({ success: true })
   })
 
+  app.put('/api/projects/:id/star', async (req, res) => {
+    const { toggleStar } = await import('./db/projects.js')
+    const { isStarred } = req.body
+    if (typeof isStarred !== 'boolean') {
+      return res.status(400).json({ error: 'isStarred is required and must be a boolean' })
+    }
+    const project = toggleStar(req.params.id, isStarred)
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' })
+    }
+    res.json({ project })
+  })
+
   // Session endpoints (REST)
 
   app.get('/api/sessions', async (req, res) => {

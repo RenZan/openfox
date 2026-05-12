@@ -125,6 +125,12 @@ export function deleteProject(id: string): void {
   db.prepare('DELETE FROM projects WHERE id = ?').run(id)
 }
 
+export function toggleStar(id: string, isStarred: boolean): Project | null {
+  const db = getDatabase()
+  db.prepare('UPDATE projects SET is_starred = ? WHERE id = ?').run(isStarred ? 1 : 0, id)
+  return getProject(id)
+}
+
 // ============================================================================
 // Row Types
 // ============================================================================
@@ -135,6 +141,7 @@ interface ProjectRow {
   workdir: string
   custom_instructions: string | null
   danger_level: string | null
+  is_starred: number
   created_at: string
   updated_at: string
 }
@@ -146,6 +153,7 @@ function rowToProject(row: ProjectRow): Project {
     workdir: row.workdir,
     ...(row.custom_instructions ? { customInstructions: row.custom_instructions } : {}),
     ...(row.danger_level ? { dangerLevel: row.danger_level as DangerLevel } : {}),
+    isStarred: !!row.is_starred,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }

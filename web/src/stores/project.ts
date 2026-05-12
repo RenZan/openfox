@@ -17,6 +17,7 @@ interface ProjectState {
     updates: { name?: string; customInstructions?: string | null; dangerLevel?: string | null },
   ) => Promise<Project | null>
   deleteProject: (projectId: string) => Promise<boolean>
+  toggleStar: (projectId: string, isStarred: boolean) => Promise<boolean>
   clearProject: () => void
 }
 
@@ -103,6 +104,27 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       if (get().currentProject?.id === projectId) {
         set({ currentProject: null })
       }
+      return true
+    } catch {
+      return false
+    }
+  },
+
+  toggleStar: async (projectId, isStarred) => {
+    try {
+      const res = await authFetch(`/api/projects/${projectId}/star`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isStarred }),
+      })
+      if (!res.ok) return false
+      // Update current project if it's the one being starred
+      if (get().currentProject?.id === projectId) {
+        const data = await res.json()
+        set({ currentProject: data.project })
+      }
+      // Refresh project list
+      await get().listProjects()
       return true
     } catch {
       return false

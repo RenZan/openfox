@@ -154,6 +154,11 @@ function runMigrations(db: Database.Database): void {
     db.exec(`ALTER TABLE projects ADD COLUMN danger_level TEXT`)
   }
 
+  if (!projectColumnNames.includes('is_starred')) {
+    logger.info('Migrating projects table: adding is_starred column')
+    db.exec(`ALTER TABLE projects ADD COLUMN is_starred INTEGER NOT NULL DEFAULT 0`)
+  }
+
   // Create events table for EventStore (single source of truth)
   // Note: EventStore creates this table with its own schema in initSchema()
   // We just ensure the index exists for the event_type column

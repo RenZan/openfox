@@ -8,6 +8,7 @@ export interface Project {
   workdir: string
   customInstructions?: string // Project-specific instructions injected into prompts
   dangerLevel?: DangerLevel // Project default danger level for new sessions
+  isStarred?: boolean // Whether the project is starred for quick access
   createdAt: string
   updatedAt: string
 }
