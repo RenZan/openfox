@@ -24,9 +24,9 @@ let mockRows = 24
 
 vi.mock('@xterm/xterm', () => ({
   Terminal: class MockTerminal {
-    options: any
+    options: Record<string, unknown>
     element: HTMLElement | null = null
-    constructor(options: any) {
+    constructor(options: Record<string, unknown>) {
       this.options = options
     }
     loadAddon() {}

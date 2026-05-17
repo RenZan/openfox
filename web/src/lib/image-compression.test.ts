@@ -73,10 +73,10 @@ class MockFileReader {
 }
 
 function setupMocks() {
-  ;(globalThis as any).Image = MockImage
-  ;(globalThis as any).HTMLImageElement = MockImage
-  ;(globalThis as any).FileReader = MockFileReader
-  ;(globalThis as any).document = {
+  ;(globalThis as Record<string, unknown>).Image = MockImage
+  ;(globalThis as Record<string, unknown>).HTMLImageElement = MockImage
+  ;(globalThis as Record<string, unknown>).FileReader = MockFileReader
+  ;(globalThis as Record<string, unknown>).document = {
     createElement: () => new MockCanvas(),
   }
 }
@@ -90,7 +90,6 @@ describe('Image Compression', () => {
       // Create a mock file
       const mockFile = new File(['mock image data'], 'test.png', { type: 'image/png' })
 
-      // @ts-ignore - using mock objects
       const result = await compressImage(mockFile, {
         maxWidth: 1920,
         maxHeight: 1920,
@@ -106,7 +105,6 @@ describe('Image Compression', () => {
     it('should maintain aspect ratio when scaling', async () => {
       const mockFile = new File(['mock'], 'test.jpg', { type: 'image/jpeg' })
 
-      // @ts-ignore
       const result = await compressImage(mockFile, {
         maxWidth: 1920,
         maxHeight: 1920,

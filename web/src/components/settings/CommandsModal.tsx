@@ -229,7 +229,8 @@ export function CommandsModal({ isOpen, onClose, initialEditId }: CommandsModalP
       return
     }
 
-    initialEditId ? onClose() : setView('list')
+    if (initialEditId) onClose()
+    else setView('list')
   }
 
   const handleCancel = () => {

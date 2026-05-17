@@ -16,7 +16,7 @@ function createMarkdownComponents(muted: boolean) {
   const strongColor = muted ? 'text-text-secondary' : 'text-amber-400'
 
   return {
-    code({ className, children, ...props }: any) {
+    code({ className, children, ...props }: React.ComponentPropsWithoutRef<'code'>) {
       const match = /language-(\w+)/.exec(className || '')
       const isInline = !match && !String(children).includes('\n')
 
@@ -75,49 +75,49 @@ function createMarkdownComponents(muted: boolean) {
       )
     },
 
-    p({ children }: any) {
+    p({ children }: { children?: React.ReactNode }) {
       const color = muted ? 'text-text-muted' : 'text-text-primary'
       return <p className={`${color} mb-1.5 last:mb-0 leading-tight`}>{children}</p>
     },
 
-    ul({ children }: any) {
+    ul({ children }: { children?: React.ReactNode }) {
       return <ul className="list-disc list-inside mb-1.5 space-y-0.5">{children}</ul>
     },
 
-    ol({ children }: any) {
+    ol({ children }: { children?: React.ReactNode }) {
       return <ol className="list-decimal list-inside mb-1.5 space-y-0.5">{children}</ol>
     },
 
-    li({ children }: any) {
+    li({ children }: { children?: React.ReactNode }) {
       const color = muted ? 'text-text-muted' : 'text-text-primary'
       return <li className={`${color} text-sm list-item`}>{children}</li>
     },
 
-    h1({ children }: any) {
+    h1({ children }: { children?: React.ReactNode }) {
       return <h1 className={`text-base font-bold mb-1.5 mt-2 first:mt-0 ${headingColor}`}>{children}</h1>
     },
 
-    h2({ children }: any) {
+    h2({ children }: { children?: React.ReactNode }) {
       return <h2 className={`text-sm font-bold mb-1.5 mt-2 first:mt-0 ${headingColor}`}>{children}</h2>
     },
 
-    h3({ children }: any) {
+    h3({ children }: { children?: React.ReactNode }) {
       return <h3 className={`text-sm font-bold mb-1.5 mt-1.5 first:mt-0 ${headingColor}`}>{children}</h3>
     },
 
-    h4({ children }: any) {
+    h4({ children }: { children?: React.ReactNode }) {
       return <h4 className={`text-sm font-bold mb-1.5 mt-1.5 first:mt-0 ${headingColor}`}>{children}</h4>
     },
 
-    strong({ children }: any) {
+    strong({ children }: { children?: React.ReactNode }) {
       return <strong className={`font-bold ${strongColor}`}>{children}</strong>
     },
 
-    em({ children }: any) {
+    em({ children }: { children?: React.ReactNode }) {
       return <em className={muted ? 'italic text-text-secondary' : 'italic'}>{children}</em>
     },
 
-    a({ href, children }: any) {
+    a({ href, children }: { href?: string; children?: React.ReactNode }) {
       return (
         <a
           href={href}
@@ -130,7 +130,7 @@ function createMarkdownComponents(muted: boolean) {
       )
     },
 
-    blockquote({ children }: any) {
+    blockquote({ children }: { children?: React.ReactNode }) {
       const color = muted ? 'text-text-muted' : 'text-text-secondary'
       return (
         <blockquote className={`border-l-2 border-accent-primary pl-2 my-1.5 ${color} italic text-sm`}>
@@ -139,7 +139,7 @@ function createMarkdownComponents(muted: boolean) {
       )
     },
 
-    table({ children }: any) {
+    table({ children }: { children?: React.ReactNode }) {
       return (
         <div className="overflow-x-auto my-1.5">
           <table className="min-w-full border border-border">{children}</table>
@@ -147,13 +147,13 @@ function createMarkdownComponents(muted: boolean) {
       )
     },
 
-    th({ children }: any) {
+    th({ children }: { children?: React.ReactNode }) {
       return (
         <th className="border border-border bg-bg-tertiary px-2 py-1 text-left font-semibold text-sm">{children}</th>
       )
     },
 
-    td({ children }: any) {
+    td({ children }: { children?: React.ReactNode }) {
       return <td className="border border-border px-2 py-1 text-sm">{children}</td>
     },
 
@@ -161,7 +161,7 @@ function createMarkdownComponents(muted: boolean) {
       return <hr className="border-border my-2" />
     },
 
-    input({ checked, ...props }: any) {
+    input({ checked, ...props }: React.ComponentPropsWithoutRef<'input'>) {
       return <input type="checkbox" checked={checked} disabled className="mr-1.5 w-3.5 h-3.5" {...props} />
     },
   }
@@ -192,7 +192,7 @@ export const Markdown = memo(function Markdown({ content, className = '', muted 
  * - Unicode bullets (•) → markdown bullets (-)
  * - Numbered items with content on next line (1.\n**text**) → same line (1. **text**)
  * - Table pipes on separate lines → join with previous line
- * - Strip line numbers from read_file output (e.g., "15: | Path" → "| Path")
+ * - Strip line numbers from read_file output (e.g., "123: | Path" → "| Path")
  */
 function preprocessMarkdown(content: string): string {
   // Convert Unicode bullets to markdown list markers

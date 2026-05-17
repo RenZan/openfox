@@ -1468,7 +1468,8 @@ export function WorkflowsModal({ isOpen, onClose, initialEditId }: WorkflowsModa
   }
   const handleSaveAndClose = async () => {
     if (await doSave()) {
-      initialEditId ? onClose() : setView('list')
+      if (initialEditId) onClose()
+      else setView('list')
     }
   }
 

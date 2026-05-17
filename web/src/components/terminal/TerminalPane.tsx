@@ -3,6 +3,7 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { useTerminalStore } from '../../stores/terminal'
 import { wsClient } from '../../lib/ws'
+import type { ServerMessage } from '@shared/protocol.js'
 import { XCloseSmallIcon } from '../shared/icons'
 
 interface TerminalPaneProps {
@@ -15,7 +16,7 @@ interface TerminalPaneProps {
 export function TerminalPane({ sessionId, onClose, onEscape, autoFocus }: TerminalPaneProps) {
   const terminalRef = useRef<HTMLDivElement>(null)
   const sessionIdRef = useRef(sessionId)
-  const termRef = useRef<any>(null)
+  const termRef = useRef<{ term: Terminal; fitAddon: FitAddon } | null>(null)
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const writeSession = useTerminalStore((state) => state.writeSession)
@@ -114,9 +115,10 @@ export function TerminalPane({ sessionId, onClose, onEscape, autoFocus }: Termin
       }
     })
 
-    const unsubscribe = wsClient.subscribe((msg: any) => {
-      if (msg.type === 'terminal.output' && msg.payload?.sessionId === sessionIdRef.current) {
-        const data = msg.payload?.data
+    const unsubscribe = wsClient.subscribe((msg: ServerMessage) => {
+      const payload = msg.payload as { sessionId?: string; data?: string } | undefined
+      if ((msg.type as string) === 'terminal.output' && payload?.sessionId === sessionIdRef.current) {
+        const data = payload?.data
         if (data) {
           term.write(data)
         }

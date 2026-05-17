@@ -131,10 +131,9 @@ async function compressToTarget(file: File, opts: Required<CompressionOptions>):
 
   // Compress with quality adjustment
   let quality = opts.quality
-  let compressedDataUrl: string
+  let compressedDataUrl = ''
 
-  // Try to compress to target size
-  do {
+  for (let i = 0; i < 10; i++) {
     compressedDataUrl = canvas.toDataURL(file.type.startsWith('image/gif') ? 'image/png' : file.type, quality)
     const size = dataUrlToSize(compressedDataUrl)
 
@@ -143,7 +142,7 @@ async function compressToTarget(file: File, opts: Required<CompressionOptions>):
     }
 
     quality -= 0.1
-  } while (true)
+  }
 
   const finalSize = dataUrlToSize(compressedDataUrl)
 

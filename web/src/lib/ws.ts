@@ -128,7 +128,7 @@ class WebSocketClient {
 
     // Only auto-reconnect if NO token - with token, expect user to manually reconnect
     if (isAuthFailure && this.hasToken()) {
-      console.log('[WS] Auth failure or initial failure with token - not auto-reconnecting, awaiting user action')
+      console.warn('[WS] Auth failure or initial failure with token - not auto-reconnecting, awaiting user action')
       return
     }
 

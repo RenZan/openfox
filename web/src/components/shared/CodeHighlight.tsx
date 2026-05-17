@@ -2,7 +2,7 @@ import { memo } from 'react'
 import { SyntaxHighlighter, oneDark } from '../../lib/syntax-highlighter'
 
 // Custom oneDark theme with transparent backgrounds and word wrapping
-export const oneDarkTransparent: Record<string, any> = {
+export const oneDarkTransparent: { [key: string]: React.CSSProperties } = {
   ...oneDark,
   'pre[class*="language-"]': {
     ...(oneDark['pre[class*="language-"]'] as Record<string, unknown>),

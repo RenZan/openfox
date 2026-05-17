@@ -57,7 +57,7 @@ export function parseAnsi(text: string): ParsedSegment[] {
   const segments: ParsedSegment[] = []
 
   // Regex to match ANSI escape sequences
-  const ansiRegex = /\x1b\[([0-9;]+)m/g
+  const ansiRegex = new RegExp(String.fromCharCode(0x1b) + '\\[([0-9;]+)m', 'g')
 
   let lastIndex = 0
   let currentClasses = 'text-text-primary'
@@ -155,7 +155,7 @@ export function parseAnsi(text: string): ParsedSegment[] {
  * Used as fallback or when colors are not needed
  */
 export function stripAnsi(text: string): string {
-  return text.replace(/\x1b\[([0-9;]+)m/g, '')
+  return text.replace(new RegExp(String.fromCharCode(0x1b) + '\\[([0-9;]+)m', 'g'), '')
 }
 
 /**

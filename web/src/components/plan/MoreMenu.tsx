@@ -315,7 +315,8 @@ export function MoreMenu({
                 type="button"
                 onClick={() => {
                   setIsOpen(false)
-                  tab === 'commands' ? onOpenCommandsManager() : onOpenWorkflowsManager()
+                  if (tab === 'commands') onOpenCommandsManager()
+                  else onOpenWorkflowsManager()
                 }}
                 className="w-full text-left px-3 py-1.5 rounded text-sm text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors"
               >

@@ -405,7 +405,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     set((state) => {
       const sm = state.streamingMessage
       if (sm && sm.id === buf.messageId) {
-        let updated = { ...sm }
+        const updated = { ...sm }
         if (hasDelta) {
           updated.content = updated.content + delta
         }
@@ -1320,11 +1320,11 @@ export const useSessionStore = create<SessionState>((set, get) => {
 
           set((state) => {
             const existing = state.streamingMessage!.preparingToolCalls ?? []
-            const existingIndex = existing.findIndex((p: any) => p.index === payload.index)
+            const existingIndex = existing.findIndex((p) => p.index === payload.index)
             let preparingToolCalls: typeof existing
             if (existingIndex >= 0) {
               // Update existing entry with new partial arguments
-              preparingToolCalls = existing.map((p: any, i: any) =>
+              preparingToolCalls = existing.map((p, i) =>
                 i === existingIndex ? { ...p, arguments: payload.arguments } : p,
               )
             } else {
@@ -1504,7 +1504,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
           // Progress messages are transient - could add to a separate state if needed
           // For now, just log
           const payload = message.payload as ChatProgressPayload
-          console.log('Progress:', payload.message, payload.phase)
+          console.warn('Progress:', payload.message, payload.phase)
           break
         }
 
@@ -1515,7 +1515,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
           }
           // Format retry - could show in UI
           const payload = message.payload as ChatFormatRetryPayload
-          console.log('Format retry:', payload.attempt, '/', payload.maxAttempts)
+          console.warn('Format retry:', payload.attempt, '/', payload.maxAttempts)
           break
         }
 

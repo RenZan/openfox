@@ -3,8 +3,7 @@ import { useSessionStore, useIsRunning, useQueuedMessages } from '../../stores/s
 
 import { type TurnStats } from '../../lib/types'
 
-// @ts-ignore
-import type { Message, ToolCall, Attachment } from '@shared/types.js'
+import type { Attachment } from '@shared/types.js'
 import { SessionLayout } from '../layout/SessionLayout'
 import { SessionHeader } from './SessionHeader'
 import { TurnStatsModal } from './TurnStatsModal'
@@ -130,17 +129,20 @@ export function PlanPanel({
 
   const { force_scroll_to_bottom, isAutoScrollActive, setAutoScroll } = useAutoScroll(scrollContainerRef, session)
 
-  // Auto-resize textarea based on content, up to 200px max
+  const prevLenRef = useRef(0)
+
   const resizeTextarea = useCallback(() => {
     const textarea = textareaRef.current
     if (!textarea) return
 
-    // Reset height to auto to get correct scrollHeight
-    textarea.style.height = 'auto'
-    // Calculate new height based on content
-    const newHeight = Math.min(200, textarea.scrollHeight)
-    textarea.style.height = `${newHeight}px`
-  }, [])
+    const isGrowing = input.length >= prevLenRef.current
+    prevLenRef.current = input.length
+
+    if (!isGrowing) {
+      textarea.style.height = 'auto'
+    }
+    textarea.style.height = `${Math.min(200, textarea.scrollHeight)}px`
+  }, [input])
 
   // Load draft from localStorage on session change
   useEffect(() => {
@@ -287,7 +289,7 @@ export function PlanPanel({
     // Handle prompt history navigation when history is visible
     if (showHistory) {
       switch (e.key) {
-        case 'Enter':
+        case 'Enter': {
           e.preventDefault()
           const selectedContent = selectCurrent()
           if (selectedContent) {
@@ -295,6 +297,7 @@ export function PlanPanel({
             closeHistory()
           }
           return
+        }
         case 'Escape':
           e.preventDefault()
           closeHistory()

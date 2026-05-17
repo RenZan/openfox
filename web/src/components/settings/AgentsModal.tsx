@@ -348,7 +348,8 @@ export function AgentsModal({ isOpen, onClose, initialEditId }: AgentsModalProps
       return
     }
 
-    initialEditId ? onClose() : setView('list')
+    if (initialEditId) onClose()
+    else setView('list')
   }
 
   const handleCancel = () => {

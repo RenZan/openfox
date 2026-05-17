@@ -11,7 +11,7 @@ function generateUUID(): string {
 }
 
 function sendTerminalMessage(type: string, payload: unknown): void {
-  const ws = (wsClient as any).ws
+  const ws = (wsClient as unknown as { ws: WebSocket | null }).ws
   if (!ws || ws.readyState !== WebSocket.OPEN) return
   ws.send(JSON.stringify({ id: generateUUID(), type, payload }))
 }
@@ -34,7 +34,7 @@ export interface TerminalState {
   writeSession: (sessionId: string, data: string) => void
   resizeSession: (sessionId: string, cols: number, rows: number) => void
   killSession: (sessionId: string) => Promise<void>
-  handleMessage: (message: { type: string; payload?: any }) => void
+  handleMessage: (message: { type: string; payload?: unknown }) => void
 }
 
 export const useTerminalStore = create<TerminalState>((set, get) => {
@@ -60,7 +60,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => {
           const serverSessions = (await res.json()) as TerminalSession[]
           set({ sessions: serverSessions })
 
-          const ws = (wsClient as any).ws
+          const ws = (wsClient as unknown as { ws: WebSocket | null }).ws
           if (ws && ws.readyState === WebSocket.OPEN) {
             for (const session of serverSessions) {
               ws.send(
@@ -91,7 +91,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => {
             sessions: [...state.sessions, session],
           }))
 
-          const ws = (wsClient as any).ws
+          const ws = (wsClient as unknown as { ws: WebSocket | null }).ws
           if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(
               JSON.stringify({
@@ -133,7 +133,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => {
     handleMessage: (message) => {
       switch (message.type) {
         case 'terminal.exit': {
-          const { sessionId } = message.payload || {}
+          const { sessionId } = (message.payload || {}) as { sessionId?: string }
           if (sessionId) {
             set((state) => {
               const newSessions = state.sessions.filter((s) => s.id !== sessionId)
@@ -152,6 +152,6 @@ export const useTerminalStore = create<TerminalState>((set, get) => {
 
 wsClient.subscribe((message) => {
   if (message.type?.startsWith('terminal.')) {
-    useTerminalStore.getState().handleMessage(message as any)
+    useTerminalStore.getState().handleMessage(message as { type: string; payload?: unknown })
   }
 })
