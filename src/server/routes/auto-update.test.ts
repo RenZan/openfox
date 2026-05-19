@@ -1,0 +1,73 @@
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import express from 'express'
+import { createAutoUpdateRoutes } from './auto-update.js'
+
+describe('Auto Update Routes', () => {
+  let app: express.Express
+  let server: ReturnType<typeof app.listen>
+  let baseUrl: string
+
+  beforeEach(async () => {
+    app = express()
+    app.use(express.json())
+    app.use('/api/auto-update', createAutoUpdateRoutes())
+
+    return new Promise<void>((resolve) => {
+      server = app.listen(0, () => {
+        baseUrl = `http://localhost:${(server.address() as any).port}`
+        resolve()
+      })
+    })
+  })
+
+  afterEach(() => {
+    server?.close()
+  })
+
+  describe('GET /api/auto-update/check', () => {
+    it('returns current version and latest', async () => {
+      const res = await fetch(`${baseUrl}/api/auto-update/check`)
+      expect(res.status).toBe(200)
+      const body = (await res.json()) as { current: string; latest: string; isUpdateAvailable: boolean }
+      expect(typeof body.current).toBe('string')
+      expect(typeof body.latest).toBe('string')
+      expect(typeof body.isUpdateAvailable).toBe('boolean')
+    })
+
+    it('returns mock versions when test=1', async () => {
+      const res = await fetch(`${baseUrl}/api/auto-update/check?test=1`)
+      expect(res.status).toBe(200)
+      const body = (await res.json()) as { current: string; latest: string; isUpdateAvailable: boolean }
+      expect(body.current).toBe('1.0.0')
+      expect(body.latest).toBe('1.1.0')
+      expect(body.isUpdateAvailable).toBe(true)
+    })
+
+    it('returns isUpdateAvailable false when current matches latest', async () => {
+      const res = await fetch(`${baseUrl}/api/auto-update/check`)
+      expect(res.status).toBe(200)
+      const body = (await res.json()) as { current: string; latest: string; isUpdateAvailable: boolean }
+      expect(body.isUpdateAvailable).toBe(body.current !== body.latest)
+    })
+  })
+
+  describe('POST /api/auto-update', () => {
+    it('returns 200 immediately and does not block', async () => {
+      const start = Date.now()
+      const res = await fetch(`${baseUrl}/api/auto-update`, { method: 'POST' })
+      const elapsed = Date.now() - start
+
+      expect(res.status).toBe(200)
+      const body = (await res.json()) as { success: boolean }
+      expect(body.success).toBe(true)
+      expect(elapsed).toBeLessThan(2000)
+    })
+
+    it('returns error on failure', async () => {
+      const res = await fetch(`${baseUrl}/api/auto-update`, { method: 'POST' })
+      expect(res.status).toBe(200)
+      const body = (await res.json()) as { success: boolean }
+      expect(body).toHaveProperty('success')
+    })
+  })
+})

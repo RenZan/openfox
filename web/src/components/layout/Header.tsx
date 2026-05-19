@@ -398,13 +398,14 @@ export function Header({ onMenuClick, onCriteriaToggle }: HeaderProps) {
           </button>
         )}
 
-        {/* Desktop: OpenFox logo */}
+        {/* OpenFox logo */}
         <Link
           href="/"
-          className="text-accent-primary font-semibold text-base hover:underline flex-shrink-0 hidden md:inline"
+          className="text-accent-primary font-semibold text-sm hover:underline flex-shrink-0 hidden md:inline"
         >
           OpenFox
         </Link>
+
         {project && (
           <>
             {/* Desktop: separate project and session dropdowns */}

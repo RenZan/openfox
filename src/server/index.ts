@@ -20,9 +20,11 @@ import { setRuntimeConfig } from './runtime-config.js'
 import { createSkillRoutes } from './routes/skills.js'
 import { createCommandRoutes } from './routes/commands.js'
 import { createAgentRoutes } from './routes/agents.js'
+import { loadAllAgentsDefault, getTopLevelAgents } from './agents/registry.js'
 import { createWorkflowRoutes } from './routes/workflows.js'
 import { createDevServerRoutes } from './routes/dev-server.js'
 import { createTerminalRoutes } from './routes/terminals.js'
+import { createAutoUpdateRoutes } from './routes/auto-update.js'
 import { devServerManager } from './dev-server/manager.js'
 import { getGlobalConfigDir } from '../cli/paths.js'
 import { logger, setLogLevel } from './utils/logger.js'
@@ -142,7 +144,7 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
   // Auth middleware for all /api routes (except /api/health and /api/auth/login)
   const authMiddleware = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const path = req.path
-    const publicPaths = ['/health', '/auth', '/auth/login']
+    const publicPaths = ['/health', '/auth', '/auth/login', '/auto-update/check', '/auto-update']
     if (publicPaths.includes(path)) {
       return next()
     }
@@ -471,15 +473,18 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
     }
 
     const { mode } = req.body
-    if (!mode || !['planner', 'builder'].includes(mode)) {
-      return res.status(400).json({ error: 'mode is required and must be "planner" or "builder"' })
+    if (!mode) {
+      return res.status(400).json({ error: 'mode is required' })
+    }
+    const allAgents = await loadAllAgentsDefault()
+    const topLevelIds = getTopLevelAgents(allAgents).map((a) => a.metadata.id)
+    if (!topLevelIds.includes(mode)) {
+      return res.status(400).json({ error: `Invalid mode. Must be one of: ${topLevelIds.join(', ')}` })
     }
 
     sessionManager.setMode(sessionId, mode)
 
     const eventStore = getEventStore()
-    eventStore.append(sessionId, { type: 'mode.changed', data: { mode, auto: false } })
-
     const events = eventStore.getEvents(sessionId)
     const messages = buildMessagesFromStoredEvents(events)
     const updatedSession = sessionManager.getSession(sessionId)
@@ -1040,6 +1045,7 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
   app.use('/api/workflows', createWorkflowRoutes(configDir, config))
   app.use('/api/dev-server', createDevServerRoutes())
   app.use('/api/terminals', createTerminalRoutes())
+  app.use('/api/auto-update', createAutoUpdateRoutes())
 
   // Background process routes
   app.get('/api/sessions/:id/background-processes', async (req, res) => {

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useSessionStats } from '../../hooks/useSessionStats'
 import { useGitStatus } from '../../hooks/useGitStatus'
 import { useConfigStore } from '../../stores/config'
@@ -8,7 +8,8 @@ import { StatsModal } from './StatsModal'
 import { CriteriaProgressSummary } from '../shared/CriteriaProgressSummary'
 import { DevServerFooter } from './DevServerFooter'
 import { BackgroundProcesses } from './BackgroundProcesses'
-import { BranchIcon } from '../shared/icons'
+import { BranchIcon, ReloadIcon } from '../shared/icons'
+import { AutoUpdateModal } from '../AutoUpdateModal'
 import { DiffViewer } from './DiffViewer'
 import type { Message } from '@shared/types.js'
 
@@ -20,10 +21,44 @@ interface SummaryDisplayProps {
 
 export function SummaryDisplay({ summary, messages, workdir }: SummaryDisplayProps) {
   const [showStatsModal, setShowStatsModal] = useState(false)
+  const [checkingUpdate, setCheckingUpdate] = useState(false)
+  const [updateAvailable, setUpdateAvailable] = useState(false)
+  const [showUpdateModal, setShowUpdateModal] = useState(false)
+
   const stats = useSessionStats(messages)
   const { branch } = useGitStatus()
   const version = useConfigStore((state) => state.version)
   const session = useSessionStore((state) => state.currentSession)
+
+  const checkForUpdate = useCallback(async () => {
+    setCheckingUpdate(true)
+    try {
+      const res = await fetch('/api/auto-update/check')
+      if (res.ok) {
+        const data = (await res.json()) as { isUpdateAvailable: boolean; current: string; latest: string }
+        setUpdateAvailable(data.isUpdateAvailable)
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setCheckingUpdate(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    checkForUpdate()
+  }, [checkForUpdate])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('test-update') === '1') {
+      setUpdateAvailable(true)
+      setShowUpdateModal(true)
+      const url = new URL(window.location.href)
+      url.searchParams.delete('test-update')
+      window.history.replaceState({}, '', url.toString())
+    }
+  }, [])
 
   return (
     <div className="flex flex-col h-full">
@@ -92,18 +127,35 @@ export function SummaryDisplay({ summary, messages, workdir }: SummaryDisplayPro
       {/* Version footer */}
       {version && (
         <div className="mt-4 pt-4 border-t border-border text-center text-xs text-text-muted">
-          <a
-            href="https://github.com/co-l/openfox"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-accent-primary transition-colors"
-          >
-            OpenFox
-          </a>
-          {' - '}
-          <span>v{version}</span>
+          <div className="flex items-center justify-center gap-1">
+            <a
+              href="https://github.com/co-l/openfox"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-accent-primary transition-colors"
+            >
+              OpenFox
+            </a>
+            {' - '}
+            <span className="font-mono">v{version}</span>
+            <button
+              onClick={() => checkForUpdate()}
+              disabled={checkingUpdate}
+              className="p-0.5 rounded hover:bg-bg-tertiary text-text-muted hover:text-text-primary transition-colors disabled:opacity-50"
+              title="Check for updates"
+            >
+              <ReloadIcon className={`w-3 h-3 ${checkingUpdate ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+          {updateAvailable && (
+            <button onClick={() => setShowUpdateModal(true)} className="text-accent-primary hover:underline mt-1">
+              Update OpenFox →
+            </button>
+          )}
         </div>
       )}
+
+      <AutoUpdateModal isOpen={showUpdateModal} onClose={() => setShowUpdateModal(false)} versionInfo={null} />
     </div>
   )
 }

@@ -25,6 +25,7 @@ import { PlanPanel } from './components/plan/PlanPanel'
 import { Spinner, SpinnerWithText } from './components/shared/Spinner'
 import { PasswordModal } from './components/PasswordModal'
 import { OnboardingWizard } from './components/onboarding/OnboardingWizard'
+import { UpdateBanner } from './components/UpdateBanner'
 
 function hasStoredToken(): boolean {
   if (typeof window === 'undefined') return false
@@ -362,6 +363,7 @@ function App() {
           </Switch>
         </div>
       </div>
+      <UpdateBanner />
     </>
   )
 }
