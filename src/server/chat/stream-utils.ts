@@ -11,6 +11,7 @@ function buildStreamRequestObject(params: {
   modelSettings?:
     | { temperature?: number; topP?: number; topK?: number; maxTokens?: number; supportsVision?: boolean }
     | undefined
+  disableXmlProtection?: boolean
   onVisionFallbackStart?: ((attachmentId: string, filename?: string) => void) | undefined
   onVisionFallbackDone?: ((attachmentId: string, description: string) => void) | undefined
 }): LLMCompletionRequest {
@@ -21,6 +22,7 @@ function buildStreamRequestObject(params: {
     disableThinking,
     signal,
     modelSettings,
+    disableXmlProtection,
     onVisionFallbackStart,
     onVisionFallbackDone,
   } = params
@@ -31,6 +33,7 @@ function buildStreamRequestObject(params: {
     disableThinking: disableThinking ?? false,
     ...(signal && { signal }),
     ...(modelSettings && { modelSettings }),
+    ...(disableXmlProtection !== undefined && { disableXmlProtection }),
   }
   if (onVisionFallbackStart) streamRequest.onVisionFallbackStart = onVisionFallbackStart
   if (onVisionFallbackDone) streamRequest.onVisionFallbackDone = onVisionFallbackDone

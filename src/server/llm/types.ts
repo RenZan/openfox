@@ -30,6 +30,7 @@ export interface LLMCompletionRequest {
   disableThinking?: boolean
   // User-configured model settings override
   modelSettings?: { temperature?: number; topP?: number; topK?: number; maxTokens?: number; supportsVision?: boolean }
+  disableXmlProtection?: boolean
   // Vision fallback event callbacks
   onVisionFallbackStart?: (attachmentId: string, filename?: string) => void
   onVisionFallbackDone?: (attachmentId: string, description: string) => void

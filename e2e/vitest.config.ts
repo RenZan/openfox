@@ -13,7 +13,7 @@ export default defineConfig({
     // Run tests in parallel with fork pool
     // Each test file gets its own in-process server on a dynamic port
     pool: 'forks',
-    maxWorkers: 10, // Full parallelism - auth disabled in test mode
+    maxWorkers: 5, // Reduce to avoid resource contention causing mock LLM response delays
 
     // No global setup - each test file manages its own server
     // globalSetup: './setup.ts',  // REMOVED - using in-process servers

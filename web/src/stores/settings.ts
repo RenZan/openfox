@@ -12,6 +12,7 @@ export const SETTINGS_KEYS = {
   DISPLAY_SHOW_WORKFLOW_BARS: 'display.showWorkflowBars',
   DISPLAY_THEME: 'display.theme',
   DISPLAY_USER_PRESETS: 'display.userPresets',
+  LLM_DISABLE_XML_PROTECTION: 'llm.disableXmlProtection',
 } as const
 
 interface SettingsState {

@@ -4,7 +4,6 @@ import { getDatabase } from './index.js'
 // Settings Operations
 // ============================================================================
 
-// Well-known settings keys
 export const SETTINGS_KEYS = {
   GLOBAL_INSTRUCTIONS: 'global_instructions',
   DISPLAY_SHOW_THINKING: 'display.showThinking',
@@ -14,6 +13,7 @@ export const SETTINGS_KEYS = {
   DISPLAY_SHOW_WORKFLOW_BARS: 'display.showWorkflowBars',
   DISPLAY_THEME: 'display.theme',
   DISPLAY_USER_PRESETS: 'display.userPresets',
+  LLM_DISABLE_XML_PROTECTION: 'llm.disableXmlProtection',
 } as const
 
 export const SETTINGS_DEFAULTS: Record<string, string> = {
@@ -23,6 +23,7 @@ export const SETTINGS_DEFAULTS: Record<string, string> = {
   [SETTINGS_KEYS.DISPLAY_SHOW_AGENT_DEFINITIONS]: 'true',
   [SETTINGS_KEYS.DISPLAY_SHOW_WORKFLOW_BARS]: 'true',
   [SETTINGS_KEYS.DISPLAY_THEME]: JSON.stringify({ preset: 'dark' }),
+  [SETTINGS_KEYS.LLM_DISABLE_XML_PROTECTION]: 'false',
 }
 
 export type SettingsKey = (typeof SETTINGS_KEYS)[keyof typeof SETTINGS_KEYS]
@@ -33,26 +34,22 @@ interface SettingsRow {
   updated_at: string
 }
 
-/**
- * Get a setting value by key.
- */
 export function getSetting(key: string): string | null {
-  const db = getDatabase()
-
-  const row = db
-    .prepare(
-      `
-    SELECT value FROM settings WHERE key = ?
-  `,
-    )
-    .get(key) as { value: string } | undefined
-
-  return row?.value ?? null
+  try {
+    const db = getDatabase()
+    const row = db
+      .prepare(
+        `
+      SELECT value FROM settings WHERE key = ?
+    `,
+      )
+      .get(key) as { value: string } | undefined
+    return row?.value ?? null
+  } catch {
+    return null
+  }
 }
 
-/**
- * Set a setting value. Creates if not exists, updates if exists.
- */
 export function setSetting(key: string, value: string): void {
   const db = getDatabase()
   const now = new Date().toISOString()
@@ -66,17 +63,11 @@ export function setSetting(key: string, value: string): void {
   ).run(key, value, now)
 }
 
-/**
- * Delete a setting by key.
- */
 export function deleteSetting(key: string): void {
   const db = getDatabase()
   db.prepare(`DELETE FROM settings WHERE key = ?`).run(key)
 }
 
-/**
- * Get all settings as a key-value object.
- */
 export function getAllSettings(): Record<string, string> {
   const db = getDatabase()
 

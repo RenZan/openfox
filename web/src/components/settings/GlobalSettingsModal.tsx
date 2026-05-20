@@ -56,14 +56,56 @@ export function GlobalSettingsModal({ isOpen, onClose }: GlobalSettingsModalProp
 
 function AdvancedTab({ onClose }: { onClose: () => void }) {
   const [, navigate] = useLocation()
+  const { settings, loading, getSetting, setSetting } = useSettingsStoreState()
+
+  const disableXmlProtection = settings[SETTINGS_KEYS.LLM_DISABLE_XML_PROTECTION] === 'true'
+  const isLoading = loading[SETTINGS_KEYS.LLM_DISABLE_XML_PROTECTION] ?? false
+
+  useEffect(() => {
+    getSetting(SETTINGS_KEYS.LLM_DISABLE_XML_PROTECTION)
+  }, [getSetting])
+
+  const handleToggleXmlProtection = async () => {
+    const newValue = String(!disableXmlProtection)
+    await setSetting(SETTINGS_KEYS.LLM_DISABLE_XML_PROTECTION, newValue)
+  }
 
   function handleLaunchOnboarding() {
     onClose()
     navigate('/onboarding')
   }
 
+  if (isLoading) {
+    return <div className="text-sm text-text-muted">Loading...</div>
+  }
+
   return (
     <div className="space-y-6">
+      <div>
+        <label className="flex items-center justify-between cursor-pointer">
+          <div>
+            <div className="text-sm font-medium text-text-primary">Disable XML Tool Call Protection</div>
+            <div className="text-xs text-text-muted mt-0.5">
+              Allow the model to output XML tool call format instead of JSON function calls. Some third-party providers
+              may require this.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleToggleXmlProtection}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              disableXmlProtection ? 'bg-accent-primary' : 'bg-bg-tertiary'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                disableXmlProtection ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </label>
+      </div>
+      <hr className="border-border" />
       <div>
         <h3 className="text-sm font-medium text-text-primary mb-1">Onboarding</h3>
         <p className="text-sm text-text-muted mb-4">

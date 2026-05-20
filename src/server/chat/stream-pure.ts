@@ -57,6 +57,7 @@ export interface PureStreamOptions {
   onVisionFallbackDone?: (attachmentId: string, description: string) => void
   /** User-configured model settings (temperature, topP, topK, maxTokens, supportsVision) */
   modelSettings?: ModelParams & { supportsVision?: boolean }
+  disableXmlProtection?: boolean
 }
 
 export interface PureStreamResult {
@@ -167,6 +168,7 @@ export async function* streamLLMPure(options: PureStreamOptions): AsyncGenerator
     disableThinking,
     onVisionFallbackStart,
     onVisionFallbackDone,
+    disableXmlProtection,
   } = options
 
   // Build LLM messages
@@ -210,6 +212,7 @@ export async function* streamLLMPure(options: PureStreamOptions): AsyncGenerator
     disableThinking: disableThinking ?? false,
     signal,
     modelSettings: options.modelSettings,
+    ...(disableXmlProtection !== undefined && { disableXmlProtection }),
     onVisionFallbackStart,
     onVisionFallbackDone,
   })

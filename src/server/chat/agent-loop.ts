@@ -29,6 +29,7 @@ import {
   createChatDoneEvent,
   createFormatRetryEvent,
 } from './stream-pure.js'
+import { getSetting } from '../db/settings.js'
 import { getCurrentContextWindowId } from '../events/index.js'
 import { maybeAutoCompactContext } from '../context/auto-compaction.js'
 import { getAllInstructions } from '../context/instructions.js'
@@ -424,6 +425,8 @@ export async function runTopLevelAgentLoop(
         ? { ...sessionManager.getCurrentModelSettings(), maxTokens: currentMaxTokensOverride }
         : sessionManager.getCurrentModelSettings()
 
+    const disableXmlProtection = getSetting('llm.disableXmlProtection') === 'true'
+
     const streamGen = streamLLMPure({
       messageId: assistantMsgId,
       systemPrompt: assembledRequest.systemPrompt,
@@ -432,6 +435,7 @@ export async function runTopLevelAgentLoop(
       tools: toolRegistry.definitions,
       toolChoice: 'auto',
       signal,
+      disableXmlProtection,
       onVisionFallbackStart,
       onVisionFallbackDone,
       ...(modelSettings && { modelSettings }),

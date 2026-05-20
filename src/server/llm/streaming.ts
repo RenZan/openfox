@@ -100,7 +100,7 @@ export async function* streamWithSegments(
           currentTextSegment += event.content
 
           // Check for XML tool syntax - abort immediately to save tokens
-          if (hasXmlToolPattern(content)) {
+          if (!request.disableXmlProtection && hasXmlToolPattern(content)) {
             xmlAbortController.abort()
             yield { type: 'xml_tool_abort' }
             return null
