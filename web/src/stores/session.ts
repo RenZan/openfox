@@ -214,8 +214,8 @@ interface SessionState {
   // Per-subagent context states (keyed by subAgentInstanceId)
   subAgentContextStates: Record<string, ContextState>
 
-  // Pending path confirmation (outside-workdir access request)
-  pendingPathConfirmation: PendingPathConfirmation | null
+  // Pending path confirmations (outside-workdir access requests)
+  pendingPathConfirmations: PendingPathConfirmation[]
 
   // Git status (branch + diff, pushed via WS)
   gitStatus: {
@@ -479,7 +479,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     currentTodos: [],
     contextState: null,
     subAgentContextStates: {},
-    pendingPathConfirmation: null,
+    pendingPathConfirmations: [],
     pendingQuestion: null,
     visionFallbackByMessage: {},
     gitStatus: null,
@@ -649,7 +649,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
             streamingMessage: null,
             currentTodos: [],
             contextState: null,
-            pendingPathConfirmation: null,
+            pendingPathConfirmations: [],
             queuedMessages: [],
             abortInProgress: false,
             error: null,
@@ -1128,15 +1128,6 @@ export const useSessionStore = create<SessionState>((set, get) => {
           const streamingMsg = payload.messages.find((m) => m.isStreaming) ?? null
           const wasPendingCreate = get().pendingSessionCreate === true
 
-          // Restore pending confirmations from server state (persists across reload)
-          // Merge with any existing real-time confirmations (if user already responded on this client)
-          const serverConfirmations = payload.pendingConfirmations ?? []
-          const currentConfirmation = stateSnapshot.pendingPathConfirmation
-
-          // Only keep server confirmation if we don't have one locally (user already responded)
-          const pendingPathConfirmation =
-            currentConfirmation ?? (serverConfirmations.length > 0 ? (serverConfirmations[0] ?? null) : null)
-
           set({
             currentSession: payload.session,
             sessions: mergeSessionIntoSummary(get().sessions, payload.session),
@@ -1145,7 +1136,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
             streamingMessageId: streamingMsg?.id ?? null,
             streamingMessage: streamingMsg,
             currentTodos: [],
-            pendingPathConfirmation,
+            pendingPathConfirmations: payload.pendingConfirmations ?? [],
             error: null,
             // When this is the response to a session.create, store the new session ID for navigation
             ...(wasPendingCreate ? { pendingSessionCreate: payload.session.id } : {}),
@@ -1197,7 +1188,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
           if (!isBackgroundSession) {
             set((state) => ({
               currentSession: state.currentSession ? { ...state.currentSession, isRunning: payload.isRunning } : null,
-              // Don't clear pendingPathConfirmation on stop - wait for user response
+              // Don't clear pendingPathConfirmations on stop - wait for user response
               // Reset abort and queue state when agent stops running
               ...(!payload.isRunning ? { abortInProgress: false, queuedMessages: [] } : {}),
             }))
@@ -1602,15 +1593,16 @@ export const useSessionStore = create<SessionState>((set, get) => {
             break
           }
           const payload = message.payload as ChatPathConfirmationPayload
-          set({
-            pendingPathConfirmation: {
-              callId: payload.callId,
-              tool: payload.tool,
-              paths: payload.paths,
-              workdir: payload.workdir,
-              reason: payload.reason,
-            },
-          })
+          const newConfirmation: PendingPathConfirmation = {
+            callId: payload.callId,
+            tool: payload.tool,
+            paths: payload.paths,
+            workdir: payload.workdir,
+            reason: payload.reason,
+          }
+          set((state) => ({
+            pendingPathConfirmations: [...state.pendingPathConfirmations, newConfirmation],
+          }))
           break
         }
 

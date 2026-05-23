@@ -144,7 +144,7 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
   // Auth middleware for all /api routes (except /api/health and /api/auth/login)
   const authMiddleware = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const path = req.path
-    const publicPaths = ['/health', '/auth', '/auth/login', '/auto-update/check', '/auto-update']
+    const publicPaths = ['/health', '/auth', '/auth/login', '/auto-update/check']
     if (publicPaths.includes(path)) {
       return next()
     }
@@ -1045,7 +1045,20 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
   app.use('/api/workflows', createWorkflowRoutes(configDir, config))
   app.use('/api/dev-server', createDevServerRoutes())
   app.use('/api/terminals', createTerminalRoutes())
-  app.use('/api/auto-update', createAutoUpdateRoutes())
+  app.use(
+    '/api/auto-update',
+    createAutoUpdateRoutes({
+      requireAuth: async (req) => {
+        const authConfig = getAuthConfig()
+        if (authConfig?.strategy !== 'network' || !authConfig?.encryptedPassword) {
+          return true
+        }
+        const token = req.headers['x-session-token'] as string
+        if (!token) return false
+        return Boolean(await isValidToken(token))
+      },
+    }),
+  )
 
   // Background process routes
   app.get('/api/sessions/:id/background-processes', async (req, res) => {

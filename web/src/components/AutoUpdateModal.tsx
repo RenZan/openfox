@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Modal } from './shared/Modal'
+import { authFetch } from '../lib/api'
 
 type ModalState = 'ready' | 'updating' | 'reloading'
 
@@ -38,7 +39,7 @@ export function AutoUpdateModal({ isOpen, onClose, versionInfo }: AutoUpdateModa
     setState('updating')
 
     const isTestMode = modalVersionInfo?.current === '1.0.0' && modalVersionInfo?.latest === '1.1.0'
-    await fetch('/api/auto-update', { method: 'POST' })
+    await authFetch('/api/auto-update', { method: 'POST' })
 
     if (isTestMode) {
       setTimeout(() => {

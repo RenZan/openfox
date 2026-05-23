@@ -119,13 +119,15 @@ describe('useSessionStore session isolation', () => {
       ],
       currentTodos: [{ content: 'old todo', status: 'pending' }],
       contextState: { currentTokens: 99, maxTokens: 200000, compactionCount: 0, dangerZone: false, canCompact: false },
-      pendingPathConfirmation: {
-        callId: 'path-old',
-        tool: 'read_file',
-        paths: ['/tmp/project-1/secret.txt'],
-        workdir: '/tmp/project-1',
-        reason: 'outside_workdir',
-      },
+      pendingPathConfirmations: [
+        {
+          callId: 'path-old',
+          tool: 'read_file',
+          paths: ['/tmp/project-1/secret.txt'],
+          workdir: '/tmp/project-1',
+          reason: 'outside_workdir',
+        },
+      ],
       error: { code: 'CHAT_ERROR', message: 'old error' },
     }))
 
@@ -136,7 +138,7 @@ describe('useSessionStore session isolation', () => {
     expect(useSessionStore.getState().messages).toEqual([])
     expect(useSessionStore.getState().currentTodos).toEqual([])
     expect(useSessionStore.getState().contextState).toBeNull()
-    expect(useSessionStore.getState().pendingPathConfirmation).toBeNull()
+    expect(useSessionStore.getState().pendingPathConfirmations).toEqual([])
 
     useSessionStore.getState().handleServerMessage({
       id: 'load-session-2',
@@ -546,13 +548,15 @@ describe('useSessionStore session isolation', () => {
         criteria: [],
         summary: null,
       } as any,
-      pendingPathConfirmation: {
-        callId: 'path-1',
-        tool: 'read_file',
-        paths: ['/tmp/project-1/secrets.txt'],
-        workdir: '/tmp/project-1',
-        reason: 'outside_workdir',
-      },
+      pendingPathConfirmations: [
+        {
+          callId: 'path-1',
+          tool: 'read_file',
+          paths: ['/tmp/project-1/secrets.txt'],
+          workdir: '/tmp/project-1',
+          reason: 'outside_workdir',
+        },
+      ],
     }))
 
     useSessionStore.getState().handleServerMessage({
@@ -563,7 +567,7 @@ describe('useSessionStore session isolation', () => {
 
     expect(useSessionStore.getState().currentSession?.isRunning).toBe(false)
     // Pending path confirmation persists until user responds (new behavior)
-    expect(useSessionStore.getState().pendingPathConfirmation).not.toBeNull()
+    expect(useSessionStore.getState().pendingPathConfirmations).toHaveLength(1)
   })
 
   it('applies partial updates from chat.message_updated immediately', async () => {
@@ -882,6 +886,56 @@ describe('useSessionStore session isolation', () => {
     expect(playNotificationMock).not.toHaveBeenCalled()
   })
 
+  it('preserves pending path confirmations from parallel tool calls without losing earlier ones', async () => {
+    const useSessionStore = await loadSessionStore()
+
+    useSessionStore.setState((state) => ({
+      ...state,
+      currentSession: {
+        id: 'session-1',
+        projectId: 'project-1',
+        workdir: '/tmp/project-1',
+        mode: 'builder',
+        phase: 'build',
+        isRunning: true,
+        criteria: [],
+        summary: null,
+      } as any,
+    }))
+
+    useSessionStore.getState().handleServerMessage({
+      type: 'chat.path_confirmation',
+      sessionId: 'session-1',
+      payload: {
+        callId: 'call-env',
+        tool: 'write_file',
+        paths: ['/tmp/project-1/.env'],
+        workdir: '/tmp/project-1',
+        reason: 'sensitive_file',
+      },
+    })
+
+    useSessionStore.getState().handleServerMessage({
+      type: 'chat.path_confirmation',
+      sessionId: 'session-1',
+      payload: {
+        callId: 'call-env-production',
+        tool: 'write_file',
+        paths: ['/tmp/project-1/.env.production'],
+        workdir: '/tmp/project-1',
+        reason: 'sensitive_file',
+      },
+    })
+
+    const state = useSessionStore.getState()
+    expect(state.pendingPathConfirmations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ callId: 'call-env' }),
+        expect.objectContaining({ callId: 'call-env-production' }),
+      ]),
+    )
+  })
+
   it('does not mark a background session unread when it only receives session state', async () => {
     const useSessionStore = await loadSessionStore()
 
@@ -965,7 +1019,7 @@ describe('useSessionStore session isolation', () => {
       streamingMessageId: null,
       currentTodos: [],
       contextState: null,
-      pendingPathConfirmation: null,
+      pendingPathConfirmations: [],
       error: null,
     })
 
@@ -1018,7 +1072,7 @@ describe('useSessionStore session isolation', () => {
       streamingMessageId: null,
       currentTodos: [],
       contextState: null,
-      pendingPathConfirmation: null,
+      pendingPathConfirmations: [],
       error: null,
     })
 

@@ -86,11 +86,9 @@ export const ToolCallDisplay = memo(function ToolCallDisplay({
   const config = statusConfig[status]
 
   // Check if there's a pending path confirmation matching this tool call
-  const pendingPathConfirmation = useSessionStore((state) => state.pendingPathConfirmation)
+  const pendingPathConfirmations = useSessionStore((state) => state.pendingPathConfirmations)
   const pendingConfirmation: PendingPathConfirmation | null =
-    status === 'pending' && pendingPathConfirmation && callId && pendingPathConfirmation.callId === callId
-      ? pendingPathConfirmation
-      : null
+    status === 'pending' && callId ? (pendingPathConfirmations.find((pc) => pc.callId === callId) ?? null) : null
 
   // Compact variant - single line, no expansion
   if (variant === 'compact') {

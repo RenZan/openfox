@@ -1,8 +1,19 @@
 import { Router } from 'express'
+import type { Request } from 'express'
 import { spawn } from 'node:child_process'
 import { VERSION } from '../../constants.js'
 
-export function createAutoUpdateRoutes(): Router {
+export interface AutoUpdateRoutesOptions {
+  requireAuth?: (req: Request) => Promise<boolean>
+}
+
+let updateInProgress = false
+
+export function resetUpdateInProgress(): void {
+  updateInProgress = false
+}
+
+export function createAutoUpdateRoutes(options: AutoUpdateRoutesOptions = {}): Router {
   const router = Router()
 
   router.get('/check', async (req, res) => {
@@ -46,23 +57,49 @@ export function createAutoUpdateRoutes(): Router {
   })
 
   router.post('/', async (req, res) => {
-    try {
-      const isTest = req.query['test'] === '1'
+    if (options.requireAuth) {
+      const authorized = await options.requireAuth(req)
+      if (!authorized) {
+        res.status(401).json({ error: 'Unauthorized' })
+        return
+      }
+    }
 
+    if (updateInProgress) {
+      res.status(409).json({ error: 'Update already in progress' })
+      return
+    }
+
+    try {
+      let stderr = ''
       const child = spawn('bash', ['-c', 'openfox update'], {
         detached: true,
-        stdio: 'ignore',
+        stdio: ['ignore', 'ignore', 'pipe'],
       })
-      child.unref()
-      res.json({ success: true })
 
-      if (isTest) {
-        setTimeout(() => {
-          console.warn('[auto-update] test mode: simulating server exit in 5s')
-          process.exit(0)
-        }, 5_000)
+      if (child.stderr) {
+        child.stderr.on('data', (data) => {
+          stderr += data.toString()
+        })
       }
+
+      child.unref()
+      updateInProgress = true
+
+      child.on('close', () => {
+        updateInProgress = false
+      })
+
+      setTimeout(() => {
+        if (stderr) {
+          console.error('[auto-update] subprocess error:', stderr)
+        }
+        updateInProgress = false
+      }, 30_000)
+
+      res.json({ success: true })
     } catch (err) {
+      updateInProgress = false
       res.status(500).json({ error: err instanceof Error ? err.message : 'Update failed to start' })
     }
   })

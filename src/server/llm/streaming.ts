@@ -120,7 +120,7 @@ export async function* streamWithSegments(
           currentThinkingSegment += event.content
 
           // Check for XML tool syntax in thinking too
-          if (hasXmlToolPattern(thinkingContent)) {
+          if (!request.disableXmlProtection && hasXmlToolPattern(thinkingContent)) {
             xmlAbortController.abort()
             yield { type: 'xml_tool_abort' }
             return null
