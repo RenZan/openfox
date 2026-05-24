@@ -14,7 +14,7 @@ export const devServerTool = createTool<DevServerArgs>(
     function: {
       name: 'dev_server',
       description:
-        'Control the project dev server. Start, stop, restart, check status, or fetch logs with optional pagination. The dev server command and URL are configured in .openfox/dev-dev.json (dev mode) or .openfox/dev.json (prod).',
+        'Control the project dev server. Start, stop, restart, check status, or fetch logs with optional pagination. The dev server is configured via .openfox/dev.json in the project root with fields: command (string, required), url (string, required), hotReload (boolean, optional, default false), disableInspect (boolean, optional, default false).',
       parameters: {
         type: 'object',
         properties: {
@@ -89,8 +89,8 @@ export const devServerTool = createTool<DevServerArgs>(
 
     if (!status.config) {
       return helpers.error(
-        'No .openfox/dev-dev.json (dev mode) or .openfox/dev.json (prod) config found. Create one with:\n\n' +
-          '{\n  "command": "npm run dev",\n  "url": "http://localhost:3000",\n  "hotReload": true\n}',
+        'No .openfox/dev.json config found in the project root. Create one with:\n\n' +
+          '{\n  "command": "npm run dev",\n  "url": "http://localhost:3000",\n  "hotReload": true,\n  "disableInspect": false\n}',
       )
     }
 
