@@ -106,11 +106,11 @@ const workspaceSchema = z.object({
 const visionFallbackSchema = z.object({
   enabled: z.boolean().default(false),
   url: z.string().default('http://localhost:11434'),
-  model: z.string().default('qwen3-vl:2b'),
+  model: z.string().default('qwen3.5:0.8b'),
   timeout: z.number().default(120),
 })
 
-const defaultVisionFallback = { enabled: false, url: 'http://localhost:11434', model: 'qwen3-vl:2b', timeout: 120 }
+const defaultVisionFallback = { enabled: false, url: 'http://localhost:11434', model: 'qwen3.5:0.8b', timeout: 120 }
 
 // New config schema with providers array
 const configSchema = z
@@ -328,7 +328,7 @@ export async function loadGlobalConfig(mode: Mode): Promise<GlobalConfig> {
 }
 
 export function getDefaultVisionFallback() {
-  return { enabled: false, url: 'http://localhost:11434', model: 'qwen3-vl:2b', timeout: 120 }
+  return { enabled: false, url: 'http://localhost:11434', model: 'qwen3.5:0.8b', timeout: 120 }
 }
 
 export async function saveGlobalConfig(mode: Mode, config: Partial<GlobalConfig>): Promise<void> {
@@ -345,7 +345,7 @@ export async function saveGlobalConfig(mode: Mode, config: Partial<GlobalConfig>
     visionFallback: config.visionFallback ?? {
       enabled: false,
       url: 'http://localhost:11434',
-      model: 'qwen3-vl:2b',
+      model: 'qwen3.5:0.8b',
       timeout: 120,
     },
   }
@@ -394,7 +394,7 @@ export function setDefaultModelSelection(
     visionFallback: config.visionFallback ?? {
       enabled: false,
       url: 'http://localhost:11434',
-      model: 'qwen3-vl:2b',
+      model: 'qwen3.5:0.8b',
       timeout: 120,
     },
   }
@@ -425,7 +425,7 @@ export function addProvider(config: Partial<GlobalConfig>, provider: Omit<Provid
     visionFallback: config.visionFallback ?? {
       enabled: false,
       url: 'http://localhost:11434',
-      model: 'qwen3-vl:2b',
+      model: 'qwen3.5:0.8b',
       timeout: 120,
     },
   }
@@ -465,7 +465,7 @@ export function removeProvider(config: Partial<GlobalConfig>, providerId: string
     visionFallback: config.visionFallback ?? {
       enabled: false,
       url: 'http://localhost:11434',
-      model: 'qwen3-vl:2b',
+      model: 'qwen3.5:0.8b',
       timeout: 120,
     },
   }
@@ -486,7 +486,7 @@ export function activateProvider(config: Partial<GlobalConfig>, providerId: stri
       visionFallback: config.visionFallback ?? {
         enabled: false,
         url: 'http://localhost:11434',
-        model: 'qwen3-vl:2b',
+        model: 'qwen3.5:0.8b',
         timeout: 120,
       },
     }
@@ -504,7 +504,7 @@ export function activateProvider(config: Partial<GlobalConfig>, providerId: stri
     visionFallback: config.visionFallback ?? {
       enabled: false,
       url: 'http://localhost:11434',
-      model: 'qwen3-vl:2b',
+      model: 'qwen3.5:0.8b',
       timeout: 120,
     },
   }

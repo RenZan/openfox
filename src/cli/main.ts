@@ -106,7 +106,7 @@ async function runNetworkSetup(mode: Mode): Promise<void> {
     logging: { level: 'error' },
     database: { path: '' },
     workspace: { workdir: process.cwd() },
-    visionFallback: { enabled: false, url: 'http://localhost:11434', model: 'qwen3-vl:2b', timeout: 120 },
+    visionFallback: { enabled: false, url: 'http://localhost:11434', model: 'qwen3.5:0.8b', timeout: 120 },
   })
 
   console.log('✓ Configuration saved!\n')

@@ -10,7 +10,7 @@ export interface VisionFallbackConfig {
 const DEFAULT_CONFIG: VisionFallbackConfig = {
   enabled: false,
   url: 'http://localhost:11434',
-  model: 'qwen3-vl:2b',
+  model: 'qwen3.5:0.8b',
   timeout: 120000,
 }
 
@@ -54,7 +54,7 @@ export async function ensureVisionFallbackConfigLoaded(): Promise<void> {
     config = {
       enabled: fallback.enabled ?? false,
       url: fallback.url ?? 'http://localhost:11434',
-      model: fallback.model ?? 'qwen3-vl:2b',
+      model: fallback.model ?? 'qwen3.5:0.8b',
       timeout: (fallback.timeout ?? 120) * 1000,
     }
     configLoaded = true

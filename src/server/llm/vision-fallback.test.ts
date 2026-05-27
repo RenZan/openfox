@@ -15,7 +15,7 @@ describe('vision-fallback', () => {
     vi.clearAllMocks()
     vi.mocked(fetch).mockReset()
     clearDescriptionCache()
-    setVisionFallbackConfig({ enabled: false, url: 'http://localhost:11434', model: 'qwen3-vl:2b' })
+    setVisionFallbackConfig({ enabled: false, url: 'http://localhost:11434', model: 'qwen3.5:0.8b' })
   })
 
   describe('describeImage', () => {

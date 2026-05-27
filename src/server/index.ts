@@ -723,7 +723,7 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
         visionFallback = {
           enabled: fallback.enabled ?? false,
           url: fallback.url ?? 'http://localhost:11434',
-          model: fallback.model ?? 'qwen3-vl:2b',
+          model: fallback.model ?? 'qwen3.5:0.8b',
           timeout: fallback.timeout ?? 120,
         }
       }

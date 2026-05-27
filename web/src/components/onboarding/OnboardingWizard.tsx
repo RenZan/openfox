@@ -581,7 +581,7 @@ interface VisionStepProps {
 function VisionStep({ onNext }: VisionStepProps) {
   const [enabled, setEnabled] = useState(false)
   const [url, setUrl] = useState('http://localhost:11434')
-  const [model, setModel] = useState('qwen3-vl:2b')
+  const [model, setModel] = useState('qwen3.5:0.8b')
   const { copied, copy } = useCopyToClipboard()
 
   useEffect(() => {
@@ -632,9 +632,9 @@ function VisionStep({ onNext }: VisionStepProps) {
             Download Ollama
           </a>
           <div className="mt-3 p-2 bg-bg-primary rounded border border-border flex items-center justify-between gap-2">
-            <code className="text-text-secondary text-xs">ollama pull qwen3-vl:2b</code>
+            <code className="text-text-secondary text-xs">ollama pull qwen3.5:0.8b</code>
             <button
-              onClick={() => copy('ollama pull qwen3-vl:2b')}
+              onClick={() => copy('ollama pull qwen3.5:0.8b')}
               className="text-text-muted hover:text-text-primary transition-colors"
               title="Copy"
             >
@@ -672,7 +672,7 @@ function VisionStep({ onNext }: VisionStepProps) {
                 type="text"
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
-                placeholder="qwen3-vl:2b"
+                placeholder="qwen3.5:0.8b"
                 className="w-full px-4 py-2 bg-bg-secondary border border-border rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:border-accent-primary"
               />
             </div>
