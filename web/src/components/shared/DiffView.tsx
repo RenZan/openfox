@@ -1,6 +1,7 @@
 import { memo, useMemo, useState } from 'react'
-import { CodeHighlight, getLanguageFromPath } from './CodeHighlight'
-export { getLanguageFromPath, wrappedCodeStyle, oneDarkTransparent } from './CodeHighlight'
+import { CodeHighlight } from './CodeHighlight'
+import { getLanguageFromPath } from '../../lib/syntax-highlighter'
+export { getLanguageFromPath, wrappedCodeStyle } from '../../lib/syntax-highlighter'
 import type { EditContextRegion } from '@shared/types.js'
 import { ImageModal } from './ImageModal'
 import { Markdown } from './Markdown'
@@ -39,7 +40,7 @@ export const DiffView = memo(function DiffView({ oldString, newString, filePath 
           <div className="bg-red-400/60" />
           <div className="bg-red-950/30 text-red-400/70 text-sm font-mono text-center">
             {oldLines.map((_, i) => (
-              <div key={i} className="leading-[1.5rem]">
+              <div key={i} className="leading-[0.9]">
                 -
               </div>
             ))}
@@ -56,7 +57,7 @@ export const DiffView = memo(function DiffView({ oldString, newString, filePath 
           <div className="bg-green-400/60" />
           <div className="bg-green-950/30 text-green-400/70 text-sm font-mono text-center">
             {newLines.map((_, i) => (
-              <div key={i} className="leading-[1.5rem]">
+              <div key={i} className="leading-[0.9]">
                 +
               </div>
             ))}
@@ -85,7 +86,7 @@ export const FilePreview = memo(function FilePreview({ content, filePath }: File
         <div className="bg-green-400/60" />
         <div className="bg-green-950/30 text-green-400/70 text-sm font-mono text-center">
           {content.split('\n').map((_, i) => (
-            <div key={i} className="leading-[1.5rem]">
+            <div key={i} className="leading-[0.9]">
               +
             </div>
           ))}
@@ -128,110 +129,78 @@ interface EditRegionViewProps {
   language: string
 }
 
-const EditRegionView = memo(function EditRegionView({ region, language }: EditRegionViewProps) {
-  // Build the display items: context lines, edits (with intermediate context), trailing context
-  const items = buildDisplayItems(region)
+type SectionType = 'context' | 'removed' | 'added'
 
-  // Calculate max line number width for consistent alignment
-  const maxLineNum = Math.max(
-    ...region.beforeContext.map((l) => l.lineNumber),
-    ...region.afterContext.map((l) => l.lineNumber),
-    ...region.edits.flatMap((e) => [e.startLine, e.endLine]),
-  )
-  const lineNumWidth = String(maxLineNum).length
+interface SectionGroup {
+  type: SectionType
+  startLine: number
+  lines: string[]
+}
+
+function groupIntoSections(region: EditContextRegion): SectionGroup[] {
+  const groups: SectionGroup[] = []
+
+  function push(type: SectionType, lineNumber: number, content: string) {
+    const last = groups[groups.length - 1]
+    if (last && last.type === type && last.startLine + last.lines.length === lineNumber) {
+      last.lines.push(content)
+    } else {
+      groups.push({ type, startLine: lineNumber, lines: [content] })
+    }
+  }
+
+  for (const line of region.beforeContext) {
+    push('context', line.lineNumber, line.content)
+  }
+
+  for (const edit of region.edits) {
+    const oldLines = edit.oldContent.split('\n')
+    for (let i = 0; i < oldLines.length; i++) {
+      push('removed', edit.startLine + i, oldLines[i]!)
+    }
+    const newLines = edit.newContent.split('\n')
+    for (let i = 0; i < newLines.length; i++) {
+      push('added', edit.startLine + i, newLines[i]!)
+    }
+  }
+
+  for (const line of region.afterContext) {
+    push('context', line.lineNumber, line.content)
+  }
+
+  return groups
+}
+
+const EditRegionView = memo(function EditRegionView({ region, language }: EditRegionViewProps) {
+  const sections = groupIntoSections(region)
 
   return (
     <div className="rounded overflow-hidden border border-border font-mono text-sm">
-      {items.map((item, i) => (
-        <DisplayItemRow key={i} item={item} language={language} lineNumWidth={lineNumWidth} />
+      {sections.map((section, i) => (
+        <SectionView key={i} section={section} language={language} />
       ))}
     </div>
   )
 })
 
-type DisplayItem =
-  | { type: 'context'; lineNumber: number; content: string }
-  | { type: 'removed'; lineNumber: number; content: string }
-  | { type: 'added'; lineNumber: number; content: string }
-
-/**
- * Build display items from a region, interleaving context and edits correctly.
- */
-function buildDisplayItems(region: EditContextRegion): DisplayItem[] {
-  const items: DisplayItem[] = []
-
-  // Before context
-  for (const line of region.beforeContext) {
-    items.push({ type: 'context', lineNumber: line.lineNumber, content: line.content })
-  }
-
-  // Edits - for multiple edits in a merged region
-  for (const edit of region.edits) {
-    // Show removed lines
-    const oldLines = edit.oldContent.split('\n')
-    for (let i = 0; i < oldLines.length; i++) {
-      items.push({
-        type: 'removed',
-        lineNumber: edit.startLine + i,
-        content: oldLines[i]!,
-      })
-    }
-
-    // Show added lines (use same starting line number for the "replacement")
-    const newLines = edit.newContent.split('\n')
-    for (let i = 0; i < newLines.length; i++) {
-      items.push({
-        type: 'added',
-        lineNumber: edit.startLine + i,
-        content: newLines[i]!,
-      })
-    }
-  }
-
-  // After context
-  for (const line of region.afterContext) {
-    items.push({ type: 'context', lineNumber: line.lineNumber, content: line.content })
-  }
-
-  return items
-}
-
-interface DisplayItemRowProps {
-  item: DisplayItem
+interface SectionViewProps {
+  section: SectionGroup
   language: string
-  lineNumWidth: number
 }
 
-const DisplayItemRow = memo(function DisplayItemRow({ item, language, lineNumWidth }: DisplayItemRowProps) {
-  const lineNumStr = String(item.lineNumber).padStart(lineNumWidth, ' ')
+const SectionView = memo(function SectionView({ section, language }: SectionViewProps) {
+  const content = section.lines.join('\n')
 
-  const bgClass =
-    item.type === 'context' ? 'bg-bg-secondary' : item.type === 'removed' ? 'bg-red-950/30' : 'bg-green-950/30'
-
-  const indicatorClass =
-    item.type === 'context' ? 'text-text-muted' : item.type === 'removed' ? 'text-red-400/70' : 'text-green-400/70'
-
-  const indicator = item.type === 'context' ? ' ' : item.type === 'removed' ? '-' : '+'
-
-  const lineClass = item.type === 'removed' ? 'line-through decoration-red-400/30' : ''
-
-  const accentClass =
-    item.type === 'context' ? 'bg-transparent' : item.type === 'removed' ? 'bg-red-400/60' : 'bg-green-400/60'
+  const bgClass = section.type === 'context' ? '' : section.type === 'removed' ? 'diff-removed-bg' : 'diff-added-bg'
+  const borderClass = section.type === 'context' ? 'border-transparent' : section.type === 'removed' ? 'diff-removed-border' : 'diff-added-border'
+  const lineClass = section.type === 'removed' ? 'line-through decoration-red-400/30' : ''
 
   return (
-    <div className={`grid grid-cols-[3px_auto_1.25rem_1fr] ${bgClass}`}>
-      {/* Color accent bar */}
-      <div className={accentClass} />
-
-      {/* Line number */}
-      <div className="px-2 text-text-muted text-right select-none leading-[1.5rem]">{lineNumStr}</div>
-
-      {/* +/- indicator */}
-      <div className={`text-center select-none leading-[1.5rem] ${indicatorClass}`}>{indicator}</div>
-
-      {/* Code content */}
-      <div className={`pr-2 overflow-x-auto min-w-0 ${lineClass}`}>
-        <CodeHighlight code={item.content || ' '} language={language} variant="inline" />
+    <div className={`border-l-[3px] ${borderClass} ${bgClass}`}>
+      <div className={`min-w-0 py-1 ${lineClass}`}>
+        <div className="shiki-compact shiki-transparent-bg">
+          <CodeHighlight code={content} language={language} variant="block" showLineNumbers startLine={section.startLine} />
+        </div>
       </div>
     </div>
   )
@@ -243,6 +212,14 @@ interface ReadFileViewProps {
   metadata?: Record<string, unknown>
   filePath: string
   heightExpanded?: boolean
+}
+
+function stripLineNumbers(content: string): string {
+  return content
+    .split('\n')
+    .filter((l) => !l.startsWith('\n[') && !l.startsWith('['))
+    .map((l) => l.replace(/^\d+: /, ''))
+    .join('\n')
 }
 
 export const ReadFileView = memo(function ReadFileView({
@@ -277,14 +254,11 @@ export const ReadFileView = memo(function ReadFileView({
     return <div className="text-xs text-text-muted italic p-2">Empty file</div>
   }
 
+  const content: string = result
+
   // For markdown files, render as markdown instead of syntax-highlighted code
   if (language === 'markdown') {
-    // Strip line numbers prefix (format: "1: content") for markdown rendering
-    const strippedContent = result
-      .split('\n')
-      .filter((l) => !l.startsWith('\n[') && !l.startsWith('['))
-      .map((l) => l.replace(/^\d+: /, ''))
-      .join('\n')
+    const strippedContent = stripLineNumbers(content)
 
     return (
       <div
@@ -296,33 +270,16 @@ export const ReadFileView = memo(function ReadFileView({
   }
 
   // For other file types, show with syntax highlighting and line numbers
-  const lines = result.split('\n')
-  const strippedContent = lines
-    .filter((l) => !l.startsWith('\n[') && !l.startsWith('['))
-    .map((l) => l.replace(/^\d+: /, ''))
-    .join('\n')
+  const strippedContent = stripLineNumbers(content)
+  const firstLine = content.split('\n')[0]
+  const startMatch = firstLine?.match(/^(\d+): /)
+  const startLine = startMatch ? parseInt(startMatch[1]!, 10) : 1
 
   return (
     <div
       className={`rounded overflow-hidden border border-border ${heightExpanded ? '' : 'max-h-[45vh]'} overflow-y-auto`}
     >
-      <div className="grid grid-cols-[2.5rem_1fr]">
-        <div className="bg-bg-tertiary text-text-muted text-xs font-mono text-right pr-2 select-none py-0.5">
-          {lines
-            .filter((l) => !l.startsWith('\n[') && !l.startsWith('['))
-            .map((l, i) => {
-              const match = l.match(/^(\d+): /)
-              return (
-                <div key={i} className="leading-[1.5rem]">
-                  {match ? match[1] : i + 1}
-                </div>
-              )
-            })}
-        </div>
-        <div className="min-w-0 overflow-x-hidden py-0.5">
-          <CodeHighlight code={strippedContent} language={language} variant="block" />
-        </div>
-      </div>
+      <CodeHighlight code={strippedContent} language={language} variant="block" showLineNumbers startLine={startLine} />
     </div>
   )
 })

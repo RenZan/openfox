@@ -62,4 +62,80 @@
   .feed-item {
     @apply mb-4;
   }
+
+  .shiki {
+    white-space: pre-wrap !important;
+    overflow-wrap: break-word !important;
+    word-break: break-word !important;
+    line-height: 0.9;
+    padding: 0.75rem 0;
+  }
+
+  .shiki code {
+    white-space: pre-wrap !important;
+    overflow-wrap: break-word !important;
+    word-break: break-word !important;
+    line-height: 0.9;
+    counter-reset: shiki-line calc(var(--shiki-start, 1) - 1);
+  }
+
+  .shiki .line {
+    display: block;
+    padding-left: 3.25rem;
+    position: relative;
+    line-height: 0.9;
+    min-height: 0.9em;
+    counter-increment: shiki-line;
+  }
+
+  .shiki .line::before {
+    content: counter(shiki-line);
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 2.5rem;
+    text-align: right;
+    padding-right: 0.75rem;
+    color: rgb(var(--color-text-muted) / 0.4);
+    font-size: 0.75rem;
+    line-height: 0.9;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .shiki-plain .shiki {
+    padding: 0;
+  }
+
+  .shiki-plain .shiki .line {
+    padding-left: 0;
+  }
+
+  .shiki-plain .shiki .line::before {
+    display: none;
+  }
+
+  .shiki-compact .shiki {
+    padding: 0;
+  }
+
+  .shiki-transparent-bg .shiki {
+    background: transparent !important;
+  }
+
+  .diff-removed-bg {
+    background-color: rgb(var(--color-accent-error) / 0.12);
+  }
+
+  .diff-added-bg {
+    background-color: rgb(var(--color-accent-success) / 0.12);
+  }
+
+  .diff-removed-border {
+    border-color: rgb(var(--color-accent-error) / 0.45);
+  }
+
+  .diff-added-border {
+    border-color: rgb(var(--color-accent-success) / 0.45);
+  }
 }

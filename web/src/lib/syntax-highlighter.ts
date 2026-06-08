@@ -1,59 +1,156 @@
-// PrismLight with selective language registration.
-// Reduces bundle size by ~200-300KB compared to the full Prism build.
-// Unregistered languages fall back to plain text rendering.
+import { createHighlighter } from 'shiki'
+import type { ShikiTransformer } from 'shiki'
+import { useThemeStore } from '../stores/theme'
 
-import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
+let highlighterPromise: Promise<Awaited<ReturnType<typeof createHighlighter>>> | null = null
 
-// Register commonly used languages
-import typescript from 'react-syntax-highlighter/dist/esm/languages/prism/typescript'
-import javascript from 'react-syntax-highlighter/dist/esm/languages/prism/javascript'
-import tsx from 'react-syntax-highlighter/dist/esm/languages/prism/tsx'
-import jsx from 'react-syntax-highlighter/dist/esm/languages/prism/jsx'
-import python from 'react-syntax-highlighter/dist/esm/languages/prism/python'
-import bash from 'react-syntax-highlighter/dist/esm/languages/prism/bash'
-import json from 'react-syntax-highlighter/dist/esm/languages/prism/json'
-import css from 'react-syntax-highlighter/dist/esm/languages/prism/css'
-import html from 'react-syntax-highlighter/dist/esm/languages/prism/markup'
-import sql from 'react-syntax-highlighter/dist/esm/languages/prism/sql'
-import yaml from 'react-syntax-highlighter/dist/esm/languages/prism/yaml'
-import markdown from 'react-syntax-highlighter/dist/esm/languages/prism/markdown'
-import diff from 'react-syntax-highlighter/dist/esm/languages/prism/diff'
-import rust from 'react-syntax-highlighter/dist/esm/languages/prism/rust'
-import go from 'react-syntax-highlighter/dist/esm/languages/prism/go'
-import java from 'react-syntax-highlighter/dist/esm/languages/prism/java'
-import cLang from 'react-syntax-highlighter/dist/esm/languages/prism/c'
-import cpp from 'react-syntax-highlighter/dist/esm/languages/prism/cpp'
-import ruby from 'react-syntax-highlighter/dist/esm/languages/prism/ruby'
-import toml from 'react-syntax-highlighter/dist/esm/languages/prism/toml'
-import scss from 'react-syntax-highlighter/dist/esm/languages/prism/scss'
-import graphql from 'react-syntax-highlighter/dist/esm/languages/prism/graphql'
-import docker from 'react-syntax-highlighter/dist/esm/languages/prism/docker'
+const langs: Array<string> = [
+  'typescript',
+  'javascript',
+  'tsx',
+  'jsx',
+  'python',
+  'bash',
+  'json',
+  'css',
+  'html',
+  'sql',
+  'yaml',
+  'markdown',
+  'diff',
+  'rust',
+  'go',
+  'java',
+  'c',
+  'cpp',
+  'ruby',
+  'toml',
+  'scss',
+  'graphql',
+  'docker',
+  'powershell',
+]
 
-SyntaxHighlighter.registerLanguage('typescript', typescript)
-SyntaxHighlighter.registerLanguage('javascript', javascript)
-SyntaxHighlighter.registerLanguage('tsx', tsx)
-SyntaxHighlighter.registerLanguage('jsx', jsx)
-SyntaxHighlighter.registerLanguage('python', python)
-SyntaxHighlighter.registerLanguage('bash', bash)
-SyntaxHighlighter.registerLanguage('json', json)
-SyntaxHighlighter.registerLanguage('css', css)
-SyntaxHighlighter.registerLanguage('html', html)
-SyntaxHighlighter.registerLanguage('markup', html)
-SyntaxHighlighter.registerLanguage('xml', html)
-SyntaxHighlighter.registerLanguage('sql', sql)
-SyntaxHighlighter.registerLanguage('yaml', yaml)
-SyntaxHighlighter.registerLanguage('markdown', markdown)
-SyntaxHighlighter.registerLanguage('diff', diff)
-SyntaxHighlighter.registerLanguage('rust', rust)
-SyntaxHighlighter.registerLanguage('go', go)
-SyntaxHighlighter.registerLanguage('java', java)
-SyntaxHighlighter.registerLanguage('c', cLang)
-SyntaxHighlighter.registerLanguage('cpp', cpp)
-SyntaxHighlighter.registerLanguage('ruby', ruby)
-SyntaxHighlighter.registerLanguage('toml', toml)
-SyntaxHighlighter.registerLanguage('scss', scss)
-SyntaxHighlighter.registerLanguage('graphql', graphql)
-SyntaxHighlighter.registerLanguage('docker', docker)
+const themes = ['github-dark-default', 'vitesse-light', 'monokai', 'dracula', 'nord']
 
-export { SyntaxHighlighter, oneDark }
+export const THEME_MAP: Record<string, string> = {
+  dark: 'github-dark-default',
+  light: 'vitesse-light',
+  monokai: 'monokai',
+  dracula: 'dracula',
+  nord: 'nord',
+}
+
+export function lineNumbersTransformer(): ShikiTransformer {
+  return {
+    name: 'line-numbers',
+    line(node, line) {
+      node.properties['data-line'] = String(line + 1)
+    },
+  }
+}
+
+export async function getHighlighter() {
+  if (!highlighterPromise) {
+    highlighterPromise = createHighlighter({ themes, langs })
+  }
+  return highlighterPromise
+}
+
+export async function highlightCode(code: string, language: string, theme = 'github-dark-default'): Promise<string> {
+  const h = await getHighlighter()
+  return h.codeToHtml(code, {
+    lang: language,
+    theme,
+    transformers: [lineNumbersTransformer()],
+  })
+}
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    highlighterPromise?.then((h) => h.dispose())
+    highlighterPromise = null
+  })
+}
+
+const extensionToLanguage: Record<string, string> = {
+  ts: 'typescript',
+  tsx: 'tsx',
+  js: 'javascript',
+  jsx: 'jsx',
+  py: 'python',
+  rb: 'ruby',
+  rs: 'rust',
+  go: 'go',
+  java: 'java',
+  c: 'c',
+  cpp: 'cpp',
+  h: 'c',
+  hpp: 'cpp',
+  cs: 'csharp',
+  php: 'php',
+  swift: 'swift',
+  kt: 'kotlin',
+  scala: 'scala',
+  sh: 'bash',
+  bash: 'bash',
+  zsh: 'bash',
+  fish: 'bash',
+  ps1: 'powershell',
+  sql: 'sql',
+  html: 'html',
+  htm: 'html',
+  css: 'css',
+  scss: 'scss',
+  sass: 'sass',
+  less: 'less',
+  json: 'json',
+  yaml: 'yaml',
+  yml: 'yaml',
+  xml: 'xml',
+  md: 'markdown',
+  markdown: 'markdown',
+  toml: 'toml',
+  ini: 'ini',
+  conf: 'ini',
+  dockerfile: 'docker',
+  makefile: 'makefile',
+  cmake: 'cmake',
+  graphql: 'graphql',
+  gql: 'graphql',
+  vue: 'vue',
+  svelte: 'svelte',
+}
+
+export function getLanguageFromPath(filePath?: string): string {
+  if (!filePath) return 'text'
+
+  const fileName = filePath.split('/').pop() ?? ''
+
+  const lowerName = fileName.toLowerCase()
+  if (lowerName === 'dockerfile') return 'docker'
+  if (lowerName === 'makefile') return 'makefile'
+  if (lowerName === 'cmakelists.txt') return 'cmake'
+
+  const ext = fileName.split('.').pop()?.toLowerCase()
+  if (!ext) return 'text'
+
+  return extensionToLanguage[ext] ?? 'text'
+}
+
+export const wrappedCodeStyle: React.CSSProperties = {
+  margin: 0,
+  padding: 0,
+  borderRadius: 0,
+  fontSize: '0.875rem',
+  lineHeight: '1.5rem',
+  background: 'transparent',
+  whiteSpace: 'pre-wrap',
+  overflowWrap: 'break-word',
+}
+
+export function useShikiTheme(): string {
+  const currentPreset = useThemeStore((s) => s.currentPreset)
+  const isCustom = useThemeStore((s) => s.isCustom)
+  return isCustom ? 'github-dark-default' : (THEME_MAP[currentPreset] ?? 'github-dark-default')
+}

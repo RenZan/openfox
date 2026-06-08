@@ -1,7 +1,7 @@
-import { memo, useMemo } from 'react'
+import { memo, useMemo, useEffect, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { SyntaxHighlighter, oneDark } from '../../lib/syntax-highlighter'
+import { highlightCode, useShikiTheme } from '../../lib/syntax-highlighter'
 import { useDisplaySettings } from '../../stores/settings'
 import { useCopyToClipboard } from '../../hooks/useCopyToClipboard'
 import { CheckIcon, CopyIcon } from './icons'
@@ -10,6 +10,60 @@ interface MarkdownProps {
   content: string
   className?: string
   muted?: boolean
+}
+
+function CodeBlock({
+  language,
+  codeString,
+  showSyntaxHighlighting,
+}: {
+  language: string
+  codeString: string
+  showSyntaxHighlighting: boolean
+}) {
+  const { copied, copy } = useCopyToClipboard()
+  const [html, setHtml] = useState<string | null>(null)
+  const shikiTheme = useShikiTheme()
+
+  useEffect(() => {
+    if (!showSyntaxHighlighting) return
+    let cancelled = false
+    highlightCode(codeString, language, shikiTheme).then((result) => {
+      if (!cancelled) setHtml(result)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [codeString, language, shikiTheme, showSyntaxHighlighting])
+
+  return (
+    <div className="relative group my-1.5 rounded overflow-hidden">
+      <div className="absolute bottom-0 right-0 flex items-center gap-2 px-2 py-1 text-xs text-text-muted/70 bg-bg-tertiary/60 rounded-tl rounded-tr z-10">
+        <span>{language}</span>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            copy(codeString)
+          }}
+          className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-text-primary p-0.5"
+          title="Copy code"
+        >
+          {copied ? <CheckIcon /> : <CopyIcon />}
+        </button>
+      </div>
+      {showSyntaxHighlighting && html ? (
+        <div className="min-w-0" dangerouslySetInnerHTML={{ __html: html }} />
+      ) : (
+        <div className="overflow-x-auto">
+          <pre className="my-0 px-4 py-3 overflow-x-auto font-mono text-sm whitespace-pre-wrap break-word">
+            <code className={`language-${language}`}>{codeString}</code>
+          </pre>
+        </div>
+      )}
+    </div>
+  )
 }
 
 function createMarkdownComponents(muted: boolean, showSyntaxHighlighting: boolean) {
@@ -32,75 +86,8 @@ function createMarkdownComponents(muted: boolean, showSyntaxHighlighting: boolea
 
       const language = match?.[1] || 'text'
       const codeString = String(children).replace(/\n$/, '')
-      const { copied, copy } = useCopyToClipboard()
 
-      if (!showSyntaxHighlighting) {
-        return (
-          <div className="relative group my-1.5 rounded overflow-hidden">
-            <div className="absolute bottom-0 right-0 flex items-center gap-2 px-2 py-1 text-xs text-text-muted/70 bg-bg-tertiary/60 rounded-tl rounded-tr z-10">
-              <span>{language}</span>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  copy(codeString)
-                }}
-                className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-text-primary p-0.5"
-                title="Copy code"
-              >
-                {copied ? <CheckIcon /> : <CopyIcon />}
-              </button>
-            </div>
-            <div className="overflow-x-auto">
-              <pre className="my-0 px-4 py-3 overflow-x-auto font-mono text-sm whitespace-pre-wrap break-word">
-                <code className="language-{language}">{codeString}</code>
-              </pre>
-            </div>
-          </div>
-        )
-      }
-
-      return (
-        <div className="relative group my-1.5 rounded overflow-hidden">
-          <div className="absolute bottom-0 right-0 flex items-center gap-2 px-2 py-1 text-xs text-text-muted/70 bg-bg-tertiary/60 rounded-tl rounded-tr z-10">
-            <span>{language}</span>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                copy(codeString)
-              }}
-              className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-text-primary p-0.5"
-              title="Copy code"
-            >
-              {copied ? <CheckIcon /> : <CopyIcon />}
-            </button>
-          </div>
-          <div className="overflow-x-auto">
-            <SyntaxHighlighter
-              style={oneDark}
-              language={language}
-              PreTag="div"
-              customStyle={
-                {
-                  margin: 0,
-                  fontSize: '0.75rem',
-                } as React.CSSProperties
-              }
-              codeTagProps={{
-                style: {
-                  whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-word',
-                },
-              }}
-            >
-              {codeString}
-            </SyntaxHighlighter>
-          </div>
-        </div>
-      )
+      return <CodeBlock language={language} codeString={codeString} showSyntaxHighlighting={showSyntaxHighlighting} />
     },
 
     p({ children }: { children?: React.ReactNode }) {
