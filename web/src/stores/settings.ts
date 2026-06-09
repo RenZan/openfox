@@ -14,6 +14,7 @@ export const SETTINGS_KEYS = {
   DISPLAY_THEME: 'display.theme',
   DISPLAY_USER_PRESETS: 'display.userPresets',
   DISPLAY_FOLLOW_SYSTEM_THEME: 'display.followSystemTheme',
+  DISPLAY_SHOW_OPEN_IN_EDITOR: 'display.showOpenInEditorLinks',
   LLM_DISABLE_XML_PROTECTION: 'llm.disableXmlProtection',
   KEYBINDINGS: 'keybindings',
 } as const
@@ -48,6 +49,7 @@ export const DISPLAY_SETTINGS_KEYS = [
   SETTINGS_KEYS.DISPLAY_SHOW_WORKFLOW_BARS,
   SETTINGS_KEYS.DISPLAY_SHOW_SYNTAX_HIGHLIGHTING,
   SETTINGS_KEYS.DISPLAY_FOLLOW_SYSTEM_THEME,
+  SETTINGS_KEYS.DISPLAY_SHOW_OPEN_IN_EDITOR,
 ] as const
 
 export function useDisplaySettings() {

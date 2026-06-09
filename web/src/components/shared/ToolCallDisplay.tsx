@@ -8,6 +8,7 @@ import { Markdown } from './Markdown'
 import { PathConfirmationButtons } from './PathConfirmationButtons'
 import { formatToolArgsFull, formatToolArgsWithMetadata } from '../../lib/formatToolArgs'
 import { useSessionStore, type PendingPathConfirmation } from '../../stores/session'
+import { useSettingsStore, SETTINGS_KEYS } from '../../stores/settings'
 
 type ToolStatus = 'pending' | 'success' | 'error' | 'interrupted'
 
@@ -84,6 +85,7 @@ export const ToolCallDisplay = memo(function ToolCallDisplay({
   const shouldAutoExpand = forceCompact ? false : isFileOperation || isRunningCommand || isReturnValue
   const [expanded, setExpanded] = useState(shouldAutoExpand)
   const config = statusConfig[status]
+  const showEditorLink = useSettingsStore((s) => s.settings[SETTINGS_KEYS.DISPLAY_SHOW_OPEN_IN_EDITOR]) === 'true'
 
   // Check if there's a pending path confirmation matching this tool call
   const pendingPathConfirmations = useSessionStore((state) => state.pendingPathConfirmations)
@@ -219,7 +221,19 @@ export const ToolCallDisplay = memo(function ToolCallDisplay({
           {/* Duration badge for file operations */}
           {status === 'success' &&
             (tool === 'edit_file' || tool === 'write_file' || tool === 'read_file') &&
-            durationMs !== undefined && <div className="text-[10px] text-text-muted">Completed in {durationMs}ms</div>}
+            durationMs !== undefined && (
+              <div className="text-[10px] text-text-muted flex items-center gap-2">
+                <span>Completed in {durationMs}ms</span>
+                {showEditorLink && tool === 'read_file' && String(args.path ?? '') && (
+                  <a
+                    href={`vscode://file/${String(args.path)}`}
+                    className="text-accent-primary hover:underline ml-auto"
+                  >
+                    Open in VSCode
+                  </a>
+                )}
+              </div>
+            )}
 
           {/* Error display for non-run_command (run_command handles its own errors) */}
           {status === 'error' && error && tool !== 'run_command' && (

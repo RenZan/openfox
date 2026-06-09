@@ -67,20 +67,45 @@ export function GlobalSettingsModal({ isOpen, onClose }: GlobalSettingsModalProp
   )
 }
 
+function Toggle({ enabled, onClick }: { enabled: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+        enabled ? 'bg-accent-primary' : 'bg-bg-tertiary'
+      }`}
+    >
+      <span
+        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+          enabled ? 'translate-x-6' : 'translate-x-1'
+        }`}
+      />
+    </button>
+  )
+}
+
 function AdvancedTab({ onClose }: { onClose: () => void }) {
   const [, navigate] = useLocation()
   const { settings, loading, getSetting, setSetting } = useSettingsStoreState()
 
   const disableXmlProtection = settings[SETTINGS_KEYS.LLM_DISABLE_XML_PROTECTION] === 'true'
+  const showOpenInEditor = settings[SETTINGS_KEYS.DISPLAY_SHOW_OPEN_IN_EDITOR] === 'true'
   const isLoading = loading[SETTINGS_KEYS.LLM_DISABLE_XML_PROTECTION] ?? false
 
   useEffect(() => {
     getSetting(SETTINGS_KEYS.LLM_DISABLE_XML_PROTECTION)
+    getSetting(SETTINGS_KEYS.DISPLAY_SHOW_OPEN_IN_EDITOR)
   }, [getSetting])
 
   const handleToggleXmlProtection = async () => {
     const newValue = String(!disableXmlProtection)
     await setSetting(SETTINGS_KEYS.LLM_DISABLE_XML_PROTECTION, newValue)
+  }
+
+  const handleToggleOpenInEditor = async () => {
+    const newValue = String(!showOpenInEditor)
+    await setSetting(SETTINGS_KEYS.DISPLAY_SHOW_OPEN_IN_EDITOR, newValue)
   }
 
   function handleLaunchOnboarding() {
@@ -103,19 +128,20 @@ function AdvancedTab({ onClose }: { onClose: () => void }) {
               may require this.
             </div>
           </div>
-          <button
-            type="button"
-            onClick={handleToggleXmlProtection}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-              disableXmlProtection ? 'bg-accent-primary' : 'bg-bg-tertiary'
-            }`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                disableXmlProtection ? 'translate-x-6' : 'translate-x-1'
-              }`}
-            />
-          </button>
+          <Toggle enabled={disableXmlProtection} onClick={handleToggleXmlProtection} />
+        </label>
+      </div>
+      <hr className="border-border" />
+      <div>
+        <h3 className="text-sm font-medium text-text-primary mb-3">Integrations</h3>
+        <label className="flex items-center justify-between cursor-pointer">
+          <div>
+            <div className="text-sm text-text-primary">Show "Open in VSCode" links</div>
+            <div className="text-xs text-text-muted mt-0.5">
+              Display a link on file reads to open the file directly in VS Code.
+            </div>
+          </div>
+          <Toggle enabled={showOpenInEditor} onClick={handleToggleOpenInEditor} />
         </label>
       </div>
       <hr className="border-border" />
