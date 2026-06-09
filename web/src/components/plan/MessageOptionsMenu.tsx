@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PromptContext } from '@shared/types.js'
 import { PromptInspector } from '../shared/PromptInspector'
-import { CheckIcon, CopyIcon, EyeIcon, EllipsisIcon, TrashIcon } from '../shared/icons'
-import { truncateSession } from '../../lib/api.js'
+import { CheckIcon, CopyIcon, EyeIcon, EllipsisIcon, ReloadIcon } from '../shared/icons'
+import { replayMessage } from '../../lib/api.js'
 import { useSessionStore } from '../../stores/session.js'
 
 interface MessageOptionsMenuProps {
@@ -23,7 +23,6 @@ export function MessageOptionsMenu({
   const [showMenu, setShowMenu] = useState(false)
   const [showInspector, setShowInspector] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [deleting, setDeleting] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const loadSession = useSessionStore((s) => s.loadSession)
 
@@ -63,17 +62,12 @@ export function MessageOptionsMenu({
     }
   }
 
-  const handleDeleteAfter = async () => {
+  const handleReplay = async () => {
     if (!sessionId || messageIndex === undefined) return
-    if (!window.confirm('Delete all messages after this point?')) return
 
-    setDeleting(true)
     setShowMenu(false)
-    const ok = await truncateSession(sessionId, messageIndex)
-    if (ok) {
-      loadSession(sessionId)
-    }
-    setDeleting(false)
+    await replayMessage(sessionId, messageIndex)
+    loadSession(sessionId)
   }
 
   const isRightAligned = align === 'right'
@@ -107,12 +101,11 @@ export function MessageOptionsMenu({
                 <>
                   <div className="border-t border-border my-1" />
                   <button
-                    onClick={handleDeleteAfter}
-                    disabled={deleting}
-                    className="w-full px-3 py-1.5 text-left text-sm text-red-400 hover:bg-bg-tertiary flex items-center gap-2 disabled:opacity-50"
+                    onClick={handleReplay}
+                    className="w-full px-3 py-1.5 text-left text-sm text-text-primary hover:bg-bg-tertiary flex items-center gap-2"
                   >
-                    <TrashIcon className="w-4 h-4" />
-                    {deleting ? 'Deleting...' : 'Delete after'}
+                    <ReloadIcon className="w-4 h-4" />
+                    Replay
                   </button>
                 </>
               )}

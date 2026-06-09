@@ -656,6 +656,32 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
     res.json({ success: true })
   })
 
+  // Replay: truncate at messageIndex and re-queue that message
+  app.post('/api/sessions/:id/replay', async (req, res) => {
+    const sessionId = req.params.id as string
+    const session = sessionManager.getSession(sessionId)
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found' })
+    }
+
+    const { messageIndex } = req.body
+    if (typeof messageIndex !== 'number' || messageIndex < 0) {
+      return res.status(400).json({ error: 'messageIndex must be a non-negative number' })
+    }
+
+    const msg = session.messages[messageIndex]
+    if (!msg) {
+      return res.status(400).json({ error: 'Message not found at this index' })
+    }
+
+    const { truncateSessionMessages } = await import('./events/index.js')
+    truncateSessionMessages(sessionId, messageIndex - 1)
+
+    sessionManager.queueMessage(sessionId, 'asap', msg.content, msg.attachments, msg.messageKind)
+
+    res.json({ success: true })
+  })
+
   // Chat operations (REST)
   app.post('/api/sessions/:id/chat', async (req, res) => {
     const sessionId = req.params.id

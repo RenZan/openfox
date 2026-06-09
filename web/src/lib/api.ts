@@ -24,3 +24,16 @@ export async function truncateSession(sessionId: string, messageIndex: number): 
     return false
   }
 }
+
+export async function replayMessage(sessionId: string, messageIndex: number): Promise<boolean> {
+  try {
+    const res = await authFetch(`/api/sessions/${sessionId}/replay`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messageIndex }),
+    })
+    return res.ok
+  } catch {
+    return false
+  }
+}

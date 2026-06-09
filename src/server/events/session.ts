@@ -651,7 +651,7 @@ export function truncateSessionMessages(sessionId: string, messageIndex: number)
   const messages = snapshot.messages
 
   const lastKept = messageIndex + 1
-  if (lastKept < 1 || lastKept >= messages.length) return
+  if (lastKept < 0 || lastKept >= messages.length) return
 
   snapshot.messages = messages.slice(0, lastKept)
 
@@ -662,7 +662,7 @@ export function truncateSessionMessages(sessionId: string, messageIndex: number)
     data: snapshot,
   })
 
-  const removed = messages.length - messageIndex
+  const removed = messages.length - lastKept
   updateSessionMessageCount(sessionId, -removed)
 }
 
