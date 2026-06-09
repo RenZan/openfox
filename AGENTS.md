@@ -89,6 +89,14 @@ npx vitest run protocol.test.ts   # Run specific test
 OPENFOX_TEST_VERBOSE=true npx vitest run
 ```
 
+### Git Commands
+
+Precommit hooks take >40s, so always use a 120s timeout when committing:
+
+```bash
+git commit -m "message"   # timeout: 120000ms
+```
+
 ## Code Conventions
 
 ### TypeScript Configuration
