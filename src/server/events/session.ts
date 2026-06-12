@@ -528,6 +528,7 @@ export function emitContextState(
   dangerZone: boolean,
   canCompact: boolean,
   subAgentId?: string,
+  dynamicContextChanged?: boolean,
 ): void {
   const eventStore = getEventStore()
   eventStore.append(sessionId, {
@@ -538,6 +539,7 @@ export function emitContextState(
       compactionCount,
       dangerZone,
       canCompact,
+      dynamicContextChanged: dynamicContextChanged ?? false,
       ...(subAgentId !== undefined && { subAgentId }),
     },
   })

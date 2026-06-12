@@ -395,23 +395,45 @@ describe('ws/protocol', () => {
           maxTokens: 200000,
           dangerZone: false,
           canCompact: true,
+          dynamicContextChanged: false,
           compactionCount: 0,
         }),
       ).toEqual({
         type: 'context.state',
         payload: {
-          context: { currentTokens: 100, maxTokens: 200000, dangerZone: false, canCompact: true, compactionCount: 0 },
+          context: {
+            currentTokens: 100,
+            maxTokens: 200000,
+            dangerZone: false,
+            canCompact: true,
+            dynamicContextChanged: false,
+            compactionCount: 0,
+          },
         },
       })
       expect(
         createContextStateMessage(
-          { currentTokens: 100, maxTokens: 200000, dangerZone: false, canCompact: true, compactionCount: 0 },
+          {
+            currentTokens: 100,
+            maxTokens: 200000,
+            dangerZone: false,
+            canCompact: true,
+            dynamicContextChanged: false,
+            compactionCount: 0,
+          },
           'sub-1',
         ),
       ).toEqual({
         type: 'context.state',
         payload: {
-          context: { currentTokens: 100, maxTokens: 200000, dangerZone: false, canCompact: true, compactionCount: 0 },
+          context: {
+            currentTokens: 100,
+            maxTokens: 200000,
+            dangerZone: false,
+            canCompact: true,
+            dynamicContextChanged: false,
+            compactionCount: 0,
+          },
           subAgentId: 'sub-1',
         },
       })
@@ -508,7 +530,14 @@ describe('ws/protocol', () => {
         {
           ...baseEvent,
           type: 'context.state',
-          data: { currentTokens: 1, maxTokens: 2, dangerZone: false, canCompact: true, compactionCount: 0 },
+          data: {
+            currentTokens: 1,
+            maxTokens: 2,
+            dangerZone: false,
+            canCompact: true,
+            dynamicContextChanged: false,
+            compactionCount: 0,
+          },
         },
         { ...baseEvent, type: 'todo.updated', data: { todos: [{ content: 'write tests', status: 'pending' }] } },
         { ...baseEvent, type: 'chat.done', data: { messageId: 'm1', reason: 'complete' } },
@@ -523,7 +552,14 @@ describe('ws/protocol', () => {
             isRunning: false,
             messages: [],
             criteria: [],
-            contextState: { currentTokens: 0, maxTokens: 1, dangerZone: false, canCompact: false, compactionCount: 0 },
+            contextState: {
+              currentTokens: 0,
+              maxTokens: 1,
+              dangerZone: false,
+              canCompact: false,
+              dynamicContextChanged: false,
+              compactionCount: 0,
+            },
             currentContextWindowId: 'window-1',
             todos: [],
             readFiles: [],
@@ -629,7 +665,14 @@ describe('ws/protocol', () => {
       expect(converted[13]).toEqual({
         type: 'context.state',
         payload: {
-          context: { currentTokens: 1, maxTokens: 2, dangerZone: false, canCompact: true, compactionCount: 0 },
+          context: {
+            currentTokens: 1,
+            maxTokens: 2,
+            dangerZone: false,
+            canCompact: true,
+            dynamicContextChanged: false,
+            compactionCount: 0,
+          },
         },
       })
       expect(converted[14]).toEqual({

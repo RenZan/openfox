@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { Modal } from '../shared/SelfContainedModal'
-import { KvCacheWarning } from '../shared/KvCacheWarning'
 import { ModalFooter } from '../shared/ModalFooter'
 
 interface InstructionsModalInfoRow {
@@ -89,8 +88,6 @@ export function InstructionsModal({
             disabled={isBusy}
           />
         </div>
-
-        {isDirty && <KvCacheWarning />}
 
         <ModalFooter onCancel={handleCancel} onSave={handleSave} saving={saving} saveDisabled={!isDirty || isBusy} />
       </div>

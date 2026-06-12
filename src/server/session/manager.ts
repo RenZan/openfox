@@ -84,6 +84,8 @@ export class SessionManager {
   private events = new EventEmitter<SessionEvents>()
   private activeSessionId: string | null = null
   private providerManager: import('../provider-manager.js').ProviderManager
+  private cachedPromptStore = new Map<string, { systemPrompt: string; hash: string }>()
+  private dynamicContextChangedStore = new Map<string, boolean>()
 
   constructor(providerManager: import('../provider-manager.js').ProviderManager) {
     this.providerManager = providerManager
@@ -541,6 +543,7 @@ export class SessionManager {
     const state = getSessionState(sessionId, this.providerManager.getCurrentModelContext())
     const maxTokens = this.providerManager.getCurrentModelContext()
     const compactionCount = state?.contextState.compactionCount ?? 0
+    const dynamicContextChanged = this.getDynamicContextChanged(sessionId)
 
     emitContextState(
       sessionId,
@@ -550,6 +553,7 @@ export class SessionManager {
       isInDangerZone(promptTokens, maxTokens),
       canCompact(promptTokens, maxTokens),
       subAgentId,
+      dynamicContextChanged,
     )
 
     logger.debug('Context state updated', { sessionId, promptTokens, maxTokens, subAgentId })
@@ -823,6 +827,22 @@ export class SessionManager {
     logger.debug('updateExecutionState called', { sessionId, updates })
   }
 
+  setCachedPrompt(sessionId: string, systemPrompt: string, hash: string): void {
+    this.cachedPromptStore.set(sessionId, { systemPrompt, hash })
+  }
+
+  getCachedPrompt(sessionId: string): { systemPrompt: string; hash: string } | undefined {
+    return this.cachedPromptStore.get(sessionId)
+  }
+
+  setDynamicContextChanged(sessionId: string, changed: boolean): void {
+    this.dynamicContextChangedStore.set(sessionId, changed)
+  }
+
+  getDynamicContextChanged(sessionId: string): boolean {
+    return this.dynamicContextChangedStore.get(sessionId) ?? false
+  }
+
   /**
    * @deprecated Use addMessage + compactContext instead
    */
@@ -892,6 +912,7 @@ export class SessionManager {
     }
 
     const state = getSessionState(sessionId, maxTokens)
+    const dynamicContextChanged = this.getDynamicContextChanged(sessionId)
     if (!state) {
       return {
         currentTokens: 0,
@@ -899,9 +920,10 @@ export class SessionManager {
         compactionCount: 0,
         dangerZone: false,
         canCompact: false,
+        dynamicContextChanged,
       }
     }
-    return state.contextState
+    return { ...state.contextState, dynamicContextChanged }
   }
 
   // ============================================================================
@@ -1002,6 +1024,20 @@ export class SessionManager {
     // Use database is_running as source of truth (more reliable than EventStore which may have missing events)
     const isRunning = dbSession.isRunning
 
+    const hasCachedPrompt = this.cachedPromptStore.has(dbSession.id)
+    const cachedData = this.cachedPromptStore.get(dbSession.id)
+
+    // Rehydrate in-memory stores from event state after server restart
+    if (!hasCachedPrompt && eventState.cachedSystemPrompt && eventState.dynamicContextHash) {
+      this.cachedPromptStore.set(dbSession.id, {
+        systemPrompt: eventState.cachedSystemPrompt,
+        hash: eventState.dynamicContextHash,
+      })
+    }
+    if (!this.dynamicContextChangedStore.has(dbSession.id) && eventState.contextState.dynamicContextChanged) {
+      this.dynamicContextChangedStore.set(dbSession.id, true)
+    }
+
     return {
       ...dbSession,
       mode: eventState.mode,
@@ -1010,11 +1046,14 @@ export class SessionManager {
       messages,
       criteria: eventState.criteria,
       contextWindows: [], // Derived from events, not stored separately
-      executionState: eventState.lastModeWithReminder
-        ? ({
-            lastModeWithReminder: eventState.lastModeWithReminder,
-          } as unknown as import('../../shared/types.js').ExecutionState)
-        : null,
+      executionState:
+        eventState.lastModeWithReminder || eventState.cachedSystemPrompt || hasCachedPrompt
+          ? ({
+              lastModeWithReminder: eventState.lastModeWithReminder,
+              cachedSystemPrompt: cachedData?.systemPrompt ?? eventState.cachedSystemPrompt,
+              dynamicContextHash: cachedData?.hash ?? eventState.dynamicContextHash,
+            } as import('../../shared/types.js').ExecutionState)
+          : null,
     }
   }
 }

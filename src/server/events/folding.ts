@@ -196,6 +196,8 @@ export interface FoldedSessionState {
   currentContextWindowId: string
   readFiles: ReadFileEntry[]
   lastModeWithReminder?: SessionMode
+  cachedSystemPrompt?: string
+  dynamicContextHash?: string
   pendingConfirmations: PendingPathConfirmation[]
   sessionInit?: {
     projectId: string
@@ -693,6 +695,7 @@ export function foldSessionState(
     compactionCount: contextResult.compactionCount,
     dangerZone: false,
     canCompact: false,
+    dynamicContextChanged: false,
   }
 
   // Ensure compactionCount is up-to-date from events (in case compaction happened after last context.state)
@@ -706,6 +709,8 @@ export function foldSessionState(
   // Priority: newer source wins (compare seq), snapshot field is fallback if no newer message
   let messageReminderMode: { seq: number; mode: SessionMode } | undefined
   let snapshotReminderMode: { seq: number; mode: SessionMode } | undefined
+  let cachedSystemPrompt: string | undefined
+  let dynamicContextHash: string | undefined
 
   for (let i = events.length - 1; i >= 0; i--) {
     const event = events[i]!
@@ -722,7 +727,7 @@ export function foldSessionState(
       }
     }
 
-    // Track latest snapshot's lastModeWithReminder field
+    // Track latest snapshot's lastModeWithReminder, cachedSystemPrompt, dynamicContextHash fields
     if (event.type === 'turn.snapshot') {
       const snapshotData = event.data as SessionSnapshot
       if (snapshotData.lastModeWithReminder) {
@@ -730,6 +735,12 @@ export function foldSessionState(
           seq: (event as unknown as { seq: number }).seq,
           mode: snapshotData.lastModeWithReminder,
         }
+      }
+      if (snapshotData.cachedSystemPrompt && !cachedSystemPrompt) {
+        cachedSystemPrompt = snapshotData.cachedSystemPrompt
+      }
+      if (snapshotData.dynamicContextHash && !dynamicContextHash) {
+        dynamicContextHash = snapshotData.dynamicContextHash
       }
     }
   }
@@ -851,6 +862,8 @@ export function foldSessionState(
     currentContextWindowId: contextResult.currentContextWindowId,
     readFiles: contextResult.readFiles,
     ...(lastModeWithReminder !== undefined && { lastModeWithReminder }),
+    ...(cachedSystemPrompt !== undefined && { cachedSystemPrompt }),
+    ...(dynamicContextHash !== undefined && { dynamicContextHash }),
     pendingConfirmations,
     ...(sessionInit !== undefined && { sessionInit }),
     ...(sessionTitle !== undefined && { sessionTitle }),
@@ -886,6 +899,8 @@ export function buildSnapshot(
     todos: foldedState.todos,
     readFiles: foldedState.readFiles,
     ...(foldedState.lastModeWithReminder !== undefined && { lastModeWithReminder: foldedState.lastModeWithReminder }),
+    ...(foldedState.cachedSystemPrompt !== undefined && { cachedSystemPrompt: foldedState.cachedSystemPrompt }),
+    ...(foldedState.dynamicContextHash !== undefined && { dynamicContextHash: foldedState.dynamicContextHash }),
     snapshotSeq: latestSeq,
     snapshotAt,
     ...(foldedState.sessionInit !== undefined && { sessionInit: foldedState.sessionInit }),
@@ -918,6 +933,8 @@ export function buildSnapshotFromSessionState(input: {
   latestSeq: number
   snapshotAt?: number
   maxTokens?: number
+  cachedSystemPrompt?: string
+  dynamicContextHash?: string
 }): SessionSnapshot {
   const { session, events, latestSeq, snapshotAt = Date.now(), maxTokens = 200000 } = input
 
@@ -962,6 +979,7 @@ export function buildSnapshotFromSessionState(input: {
       compactionCount: session.executionState?.compactionCount ?? foldedState.contextState.compactionCount,
       dangerZone: foldedState.contextState.dangerZone,
       canCompact: foldedState.contextState.canCompact,
+      dynamicContextChanged: foldedState.contextState.dynamicContextChanged,
     },
     currentContextWindowId: foldedState.currentContextWindowId,
     todos: foldedState.todos,
@@ -970,6 +988,16 @@ export function buildSnapshotFromSessionState(input: {
     snapshotAt,
     ...(foldedState.sessionInit !== undefined && { sessionInit: foldedState.sessionInit }),
     ...(foldedState.lastModeWithReminder !== undefined && { lastModeWithReminder: foldedState.lastModeWithReminder }),
+    ...(input.cachedSystemPrompt !== undefined
+      ? { cachedSystemPrompt: input.cachedSystemPrompt }
+      : foldedState.cachedSystemPrompt !== undefined
+        ? { cachedSystemPrompt: foldedState.cachedSystemPrompt }
+        : {}),
+    ...(input.dynamicContextHash !== undefined
+      ? { dynamicContextHash: input.dynamicContextHash }
+      : foldedState.dynamicContextHash !== undefined
+        ? { dynamicContextHash: foldedState.dynamicContextHash }
+        : {}),
   }
 }
 

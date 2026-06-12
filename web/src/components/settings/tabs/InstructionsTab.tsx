@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { Button } from '../../shared/Button'
-import { KvCacheWarning } from '../../shared/KvCacheWarning'
 import { SETTINGS_KEYS } from '../../../stores/settings'
 import { useSettingsStoreState } from '../useSettingsStore'
 
@@ -56,8 +55,6 @@ export function InstructionsTab({ isOpen }: { isOpen: boolean }) {
           disabled={isBusy}
         />
       </div>
-
-      {isDirty && <KvCacheWarning />}
 
       <div className="flex justify-end gap-2">
         <Button variant="secondary" onClick={handleDiscard} disabled={!isDirty}>

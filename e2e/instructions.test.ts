@@ -142,6 +142,9 @@ Never use any type.`,
       })
       expect(updateRes.status).toBe(200)
 
+      // Apply dynamic context to pick up the new instructions
+      await client.send('context.applyDynamic', {})
+
       // Second message should see new instructions
       await client.send('chat.send', { content: 'What is the magic word?' })
       const response2 = await client.waitForChatDone()
@@ -222,6 +225,9 @@ Never use any type.`,
 
       // Modify AGENTS.md
       await writeFile(join(testDir.path, 'AGENTS.md'), 'Updated instruction: say UPDATED')
+
+      // Apply dynamic context to pick up the changes
+      await client.send('context.applyDynamic', {})
 
       // Next turn should see updated instructions
       await client.send('chat.send', { content: 'What should you say now?' })

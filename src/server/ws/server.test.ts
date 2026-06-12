@@ -372,6 +372,7 @@ function createSessionManager(overrides: Record<string, unknown> = {}) {
       compactionCount: 0,
       dangerZone: false,
       canCompact: false,
+      dynamicContextChanged: false,
     })),
     listSessions: vi.fn(() => [
       {
@@ -817,6 +818,7 @@ describe('createWebSocketServer', () => {
         compactionCount: 0,
         dangerZone: true,
         canCompact: true,
+        dynamicContextChanged: false,
       })),
     })
 
@@ -1301,6 +1303,7 @@ describe('createWebSocketServer', () => {
         compactionCount: 0,
         dangerZone: false,
         canCompact: false,
+        dynamicContextChanged: false,
       })),
     })
 

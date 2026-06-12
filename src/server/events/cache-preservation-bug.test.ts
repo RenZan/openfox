@@ -61,6 +61,7 @@ describe('cache preservation bug - tool result output in snapshots', () => {
           maxTokens: 200000,
           dangerZone: false,
           canCompact: false,
+          dynamicContextChanged: false,
         },
         currentContextWindowId: 'window-1',
         readFiles: [],

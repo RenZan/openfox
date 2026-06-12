@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react'
 import type { Project, DangerLevel } from '@shared/types.js'
 import { Modal } from '../shared/SelfContainedModal'
 import { ModalFooter } from '../shared/ModalFooter'
-import { KvCacheWarning } from '../shared/KvCacheWarning'
 import { useProjectStore } from '../../stores/project'
+import { wsClient } from '../../lib/ws'
 
 interface ProjectSettingsModalProps {
   isOpen: boolean
@@ -13,6 +13,14 @@ interface ProjectSettingsModalProps {
 
 export function ProjectSettingsModal({ isOpen, onClose, project }: ProjectSettingsModalProps) {
   const updateProject = useProjectStore((state) => state.updateProject)
+  const handleClose = () => {
+    try {
+      wsClient.send('context.checkDynamic', {})
+    } catch {
+      // WS might not be connected
+    }
+    onClose()
+  }
 
   const [customInstructions, setCustomInstructions] = useState(project.customInstructions ?? '')
   const [dangerLevel, setDangerLevel] = useState<DangerLevel | ''>(project.dangerLevel ?? '')
@@ -49,7 +57,7 @@ export function ProjectSettingsModal({ isOpen, onClose, project }: ProjectSettin
     setSaving(false)
     setInstructionsDirty(false)
     setDangerLevelDirty(false)
-    onClose()
+    handleClose()
   }
 
   const handleCancel = () => {
@@ -57,7 +65,7 @@ export function ProjectSettingsModal({ isOpen, onClose, project }: ProjectSettin
     setDangerLevel(project.dangerLevel ?? '')
     setInstructionsDirty(false)
     setDangerLevelDirty(false)
-    onClose()
+    handleClose()
   }
 
   return (
@@ -135,8 +143,6 @@ export function ProjectSettingsModal({ isOpen, onClose, project }: ProjectSettin
             disabled={saving}
           />
         </div>
-
-        {instructionsDirty && <KvCacheWarning />}
       </div>
     </Modal>
   )

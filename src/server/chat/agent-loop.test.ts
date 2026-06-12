@@ -4,14 +4,54 @@ import type { SessionManager } from '../session/index.js'
 import type { ToolRegistry } from '../tools/types.js'
 import type { TurnMetrics } from './stream-pure.js'
 import type { EventStore } from '../events/store.js'
+import type { TopLevelLoopConfig } from './agent-loop.js'
 
 // Mock the event store module
 vi.mock('../events/store.js', () => ({
   getEventStore: vi.fn(),
 }))
 
-import { executeToolBatch } from './agent-loop.js'
+// Mock settings
+vi.mock('../db/settings.js', () => ({
+  getSetting: vi.fn(),
+  SETTINGS_KEYS: { LLM_DYNAMIC_SYSTEM_PROMPT: 'llm.dynamicSystemPrompt' },
+}))
+
+// Mock instructions
+vi.mock('../context/instructions.js', () => ({
+  getAllInstructions: vi.fn(),
+}))
+
+// Mock skills
+vi.mock('../skills/registry.js', () => ({
+  getEnabledSkillMetadata: vi.fn(),
+}))
+
+// Mock runtime config
+vi.mock('../runtime-config.js', () => ({
+  getRuntimeConfig: vi.fn().mockReturnValue({ mode: 'test', workdir: '/test' }),
+}))
+
+// Mock paths
+vi.mock('../../cli/paths.js', () => ({
+  getGlobalConfigDir: vi.fn().mockReturnValue('/test/config'),
+}))
+
+// Mock auto-compaction
+vi.mock('../context/auto-compaction.js', () => ({
+  maybeAutoCompactContext: vi.fn(),
+}))
+
+// Mock conversation history
+vi.mock('./conversation-history.js', () => ({
+  getConversationMessages: vi.fn().mockReturnValue([]),
+}))
+
+import { executeToolBatch, runTopLevelAgentLoop } from './agent-loop.js'
 import { getEventStore } from '../events/store.js'
+import { getSetting } from '../db/settings.js'
+import { getAllInstructions } from '../context/instructions.js'
+import { getEnabledSkillMetadata } from '../skills/registry.js'
 
 describe('executeToolBatch', () => {
   let mockSessionManager: SessionManager
@@ -218,5 +258,232 @@ describe('executeToolBatch', () => {
     expect(result.toolMessages[0]?.content).toBe('Tool 0 output')
     expect(result.toolMessages[1]?.content).toBe('Tool 1 output')
     expect(result.toolMessages[2]?.content).toBe('Tool 2 output')
+  })
+})
+
+// ============================================================================
+// runTopLevelAgentLoop — System Prompt Caching Tests
+// ============================================================================
+
+describe('runTopLevelAgentLoop caching', () => {
+  let mockEventStore: EventStore
+  let mockSessionManager: SessionManager
+  let mockLLMClient: any
+  let mockTurnMetrics: TurnMetrics
+  let assembleRequestMock: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+
+    mockEventStore = {
+      append: vi.fn(),
+      getEvents: vi.fn().mockReturnValue([]),
+      getLatestSeq: vi.fn().mockReturnValue(0),
+      cleanupOldEvents: vi.fn().mockReturnValue(0),
+    } as unknown as EventStore
+    ;(getEventStore as any).mockReturnValue(mockEventStore)
+
+    mockLLMClient = {
+      getModel: vi.fn().mockReturnValue('test-model'),
+    }
+
+    mockTurnMetrics = {
+      addToolTime: vi.fn(),
+      addLLMCall: vi.fn(),
+      buildStats: vi.fn().mockReturnValue({}),
+    } as unknown as TurnMetrics
+
+    assembleRequestMock = vi.fn().mockReturnValue({
+      systemPrompt: 'fresh-system-prompt',
+      messages: [],
+      promptContext: {
+        systemPrompt: 'fresh-system-prompt',
+        injectedFiles: [],
+        userMessage: '',
+        messages: [],
+        tools: [],
+        requestOptions: { toolChoice: 'auto', disableThinking: false },
+      },
+    })
+    ;(getAllInstructions as any).mockResolvedValue({ content: 'test instructions', files: [] })
+    ;(getEnabledSkillMetadata as any).mockResolvedValue([])
+  })
+
+  function makeConfig(overrides?: Partial<TopLevelLoopConfig>): TopLevelLoopConfig {
+    return {
+      mode: 'planner',
+      sessionManager: mockSessionManager,
+      sessionId: 'test-session',
+      llmClient: mockLLMClient,
+      statsIdentity: { providerId: 'test', providerName: 'Test', backend: 'unknown' as const, model: 'test-model' },
+      assembleRequest: assembleRequestMock as any,
+      getToolRegistry: () => ({ definitions: [], execute: vi.fn() }) as any,
+      ...overrides,
+    }
+  }
+
+  it('calls assembleRequest when no cached prompt exists (first turn)', async () => {
+    mockSessionManager = {
+      requireSession: vi.fn().mockReturnValue({
+        workdir: '/test',
+        projectId: 'test-project',
+        executionState: null,
+        criteria: [],
+        isRunning: false,
+      }),
+      getContextState: vi.fn().mockReturnValue({
+        currentTokens: 0,
+        maxTokens: 200000,
+        compactionCount: 0,
+        dangerZone: false,
+        canCompact: false,
+        dynamicContextChanged: false,
+      }),
+      getCurrentModelSettings: vi.fn().mockReturnValue({}),
+      setCurrentContextSize: vi.fn(),
+      getDynamicContextChanged: vi.fn().mockReturnValue(false),
+      setDynamicContextChanged: vi.fn(),
+      getCachedPrompt: vi.fn().mockReturnValue(undefined),
+      setCachedPrompt: vi.fn(),
+      getLspManager: vi.fn(),
+      drainAsapMessages: vi.fn().mockReturnValue([]),
+      getCurrentWindowMessages: vi.fn().mockReturnValue([]),
+      updateMessage: vi.fn(),
+    } as any
+    ;(getSetting as any).mockReturnValue('false')
+
+    const promise = runTopLevelAgentLoop(makeConfig(), mockTurnMetrics)
+
+    // The loop will try to stream LLM and fail, but we can check assembleRequest was called
+    // We need to handle the fact that streamLLMPure will fail
+    await expect(promise).rejects.toThrow()
+
+    expect(assembleRequestMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('reuses cached system prompt when hash matches', async () => {
+    const setDynamicContextChanged = vi.fn()
+    mockSessionManager = {
+      requireSession: vi.fn().mockReturnValue({
+        workdir: '/test',
+        projectId: 'test-project',
+        executionState: {
+          cachedSystemPrompt: 'cached-system-prompt',
+          dynamicContextHash: 'b399b639be88995bee3cc7b6a403fb2c171527d19b2cd957484dc80196e121d1', // sha256 of {"instructions":"test instructions","skills":[]}
+        },
+        criteria: [],
+        isRunning: false,
+      }),
+      getContextState: vi.fn().mockReturnValue({
+        currentTokens: 0,
+        maxTokens: 200000,
+        compactionCount: 0,
+        dangerZone: false,
+        canCompact: false,
+        dynamicContextChanged: false,
+      }),
+      getCurrentModelSettings: vi.fn().mockReturnValue({}),
+      setCurrentContextSize: vi.fn(),
+      getDynamicContextChanged: vi.fn().mockReturnValue(true),
+      setDynamicContextChanged,
+      getCachedPrompt: vi.fn().mockReturnValue(undefined),
+      setCachedPrompt: vi.fn(),
+      getLspManager: vi.fn(),
+      drainAsapMessages: vi.fn().mockReturnValue([]),
+      getCurrentWindowMessages: vi.fn().mockReturnValue([]),
+      updateMessage: vi.fn(),
+    } as any
+    ;(getSetting as any).mockReturnValue('false')
+
+    const promise = runTopLevelAgentLoop(makeConfig(), mockTurnMetrics)
+    await expect(promise).rejects.toThrow()
+
+    // assembleRequest should NOT be called — cached prompt reused
+    expect(assembleRequestMock).not.toHaveBeenCalled()
+    // dynamicContextChanged should be reset to false
+    expect(setDynamicContextChanged).toHaveBeenCalledWith('test-session', false)
+  })
+
+  it('uses cached prompt but sets dynamicContextChanged when hash differs', async () => {
+    const setDynamicContextChanged = vi.fn()
+    mockSessionManager = {
+      requireSession: vi.fn().mockReturnValue({
+        workdir: '/test',
+        projectId: 'test-project',
+        executionState: {
+          cachedSystemPrompt: 'cached-system-prompt',
+          dynamicContextHash: 'different-hash',
+        },
+        criteria: [],
+        isRunning: false,
+      }),
+      getContextState: vi.fn().mockReturnValue({
+        currentTokens: 0,
+        maxTokens: 200000,
+        compactionCount: 0,
+        dangerZone: false,
+        canCompact: false,
+        dynamicContextChanged: false,
+      }),
+      getCurrentModelSettings: vi.fn().mockReturnValue({}),
+      setCurrentContextSize: vi.fn(),
+      getDynamicContextChanged: vi.fn().mockReturnValue(false),
+      setDynamicContextChanged,
+      getCachedPrompt: vi.fn().mockReturnValue(undefined),
+      setCachedPrompt: vi.fn(),
+      getLspManager: vi.fn(),
+      drainAsapMessages: vi.fn().mockReturnValue([]),
+      getCurrentWindowMessages: vi.fn().mockReturnValue([]),
+      updateMessage: vi.fn(),
+    } as any
+    ;(getSetting as any).mockReturnValue('false')
+
+    const promise = runTopLevelAgentLoop(makeConfig(), mockTurnMetrics)
+    await expect(promise).rejects.toThrow()
+
+    // assembleRequest should NOT be called — cached prompt still used
+    expect(assembleRequestMock).not.toHaveBeenCalled()
+    // dynamicContextChanged should be set to true
+    expect(setDynamicContextChanged).toHaveBeenCalledWith('test-session', true)
+  })
+
+  it('skips caching and rebuilds every turn in dynamic mode', async () => {
+    mockSessionManager = {
+      requireSession: vi.fn().mockReturnValue({
+        workdir: '/test',
+        projectId: 'test-project',
+        executionState: {
+          cachedSystemPrompt: 'cached-system-prompt',
+          dynamicContextHash: 'some-hash',
+        },
+        criteria: [],
+        isRunning: false,
+      }),
+      getContextState: vi.fn().mockReturnValue({
+        currentTokens: 0,
+        maxTokens: 200000,
+        compactionCount: 0,
+        dangerZone: false,
+        canCompact: false,
+        dynamicContextChanged: false,
+      }),
+      getCurrentModelSettings: vi.fn().mockReturnValue({}),
+      setCurrentContextSize: vi.fn(),
+      getDynamicContextChanged: vi.fn().mockReturnValue(false),
+      setDynamicContextChanged: vi.fn(),
+      getCachedPrompt: vi.fn().mockReturnValue(undefined),
+      setCachedPrompt: vi.fn(),
+      getLspManager: vi.fn(),
+      drainAsapMessages: vi.fn().mockReturnValue([]),
+      getCurrentWindowMessages: vi.fn().mockReturnValue([]),
+      updateMessage: vi.fn(),
+    } as any
+    ;(getSetting as any).mockReturnValue('true')
+
+    const promise = runTopLevelAgentLoop(makeConfig(), mockTurnMetrics)
+    await expect(promise).rejects.toThrow()
+
+    // assembleRequest should be called even though cache exists
+    expect(assembleRequestMock).toHaveBeenCalledTimes(1)
   })
 })

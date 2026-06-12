@@ -50,7 +50,7 @@ export function minimalMessageToRequestContextMessage(
   }
 }
 
-function messageToMinimal(message: RequestContextMessage): MinimalMessage {
+export function messageToMinimal(message: RequestContextMessage): MinimalMessage {
   return {
     role: message.role,
     content: message.content,
@@ -72,7 +72,7 @@ export interface BaseAssemblyInput {
   modelName?: string
 }
 
-interface AssemblyResult {
+export interface AssemblyResult {
   systemPrompt: string
   messages: MinimalMessage[]
   promptContext: PromptContext
@@ -125,7 +125,7 @@ export function createPromptContext(input: {
   }
 }
 
-function createAssemblyResult(input: {
+export function createAssemblyResult(input: {
   systemPrompt: string
   messages: RequestContextMessage[]
   injectedFiles: InjectedFile[]

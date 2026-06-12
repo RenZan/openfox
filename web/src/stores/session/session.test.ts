@@ -119,7 +119,14 @@ describe('useSessionStore session isolation', () => {
         },
       ],
       currentTodos: [{ content: 'old todo', status: 'pending' }],
-      contextState: { currentTokens: 99, maxTokens: 200000, compactionCount: 0, dangerZone: false, canCompact: false },
+      contextState: {
+        currentTokens: 99,
+        maxTokens: 200000,
+        compactionCount: 0,
+        dangerZone: false,
+        canCompact: false,
+        dynamicContextChanged: false,
+      },
       pendingPathConfirmations: [
         {
           callId: 'path-old',

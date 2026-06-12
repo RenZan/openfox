@@ -6,6 +6,7 @@ import { InstructionsTab } from './tabs/InstructionsTab'
 import { DisplayTab } from './tabs/DisplayTab'
 import { KeybindingsTab } from './tabs/KeybindingsTab'
 import { AdvancedTab } from './tabs/AdvancedTab'
+import { wsClient } from '../../lib/ws'
 
 interface GlobalSettingsModalProps {
   isOpen: boolean
@@ -32,8 +33,17 @@ function TabButton({ label, active, onClick }: { label: string; active: boolean;
 export function GlobalSettingsModal({ isOpen, onClose }: GlobalSettingsModalProps) {
   const [activeTab, setActiveTab] = useState<Tab>('instructions')
 
+  const handleClose = () => {
+    try {
+      wsClient.send('context.checkDynamic', {})
+    } catch {
+      // WS might not be connected
+    }
+    onClose()
+  }
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Settings" size="xl" minHeight="500px">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Settings" size="xl" minHeight="500px">
       <div className="flex flex-col h-full">
         <div className="flex border-b border-border mb-4 -mt-1">
           <TabButton

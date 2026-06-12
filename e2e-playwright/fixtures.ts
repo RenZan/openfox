@@ -1,5 +1,5 @@
 import { test as base } from '@playwright/test'
-import { readFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -8,28 +8,37 @@ export interface TestFixtures {
   serverUrl: string
 }
 
+async function readConfig() {
+  const tempFile = join(tmpdir(), 'openfox-test-project-id.json')
+  const content = await readFile(tempFile, 'utf-8')
+  return JSON.parse(content) as { projectId: string; serverUrl: string; workdir: string }
+}
+
+async function writeConfig(data: { projectId: string; serverUrl: string; workdir: string }) {
+  const tempFile = join(tmpdir(), 'openfox-test-project-id.json')
+  await writeFile(tempFile, JSON.stringify(data))
+}
+
 export const test = base.extend<TestFixtures>({
   projectId: async ({}, use) => {
-    // Read project ID from temp file created by global setup
-    const tempFile = join(tmpdir(), 'openfox-test-project-id.json')
-    try {
-      const content = await readFile(tempFile, 'utf-8')
-      const data = JSON.parse(content)
-      await use(data.projectId)
-    } catch (error) {
-      throw new Error(`Failed to read test project ID. Did global setup run? ${error}`)
+    const config = await readConfig()
+    if (config.projectId === '__to_be_created__') {
+      // Create project via REST API
+      const res = await fetch(`${config.serverUrl}/api/projects`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Playwright Test Project', workdir: config.workdir }),
+      })
+      if (!res.ok) throw new Error(`Failed to create project: ${await res.text()}`)
+      const data = await res.json()
+      config.projectId = data.project.id
+      await writeConfig(config)
     }
+    await use(config.projectId)
   },
   serverUrl: async ({}, use) => {
-    // Read server URL from temp file created by global setup
-    const tempFile = join(tmpdir(), 'openfox-test-project-id.json')
-    try {
-      const content = await readFile(tempFile, 'utf-8')
-      const data = JSON.parse(content)
-      await use(data.serverUrl)
-    } catch (error) {
-      throw new Error(`Failed to read server URL. Did global setup run? ${error}`)
-    }
+    const config = await readConfig()
+    await use(config.serverUrl)
   },
 })
 

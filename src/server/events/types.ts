@@ -378,6 +378,8 @@ export interface SessionSnapshot {
   todos: Todo[]
   readFiles?: ReadFileEntry[]
   lastModeWithReminder?: SessionMode
+  cachedSystemPrompt?: string
+  dynamicContextHash?: string
   snapshotSeq: number
   snapshotAt: number
 

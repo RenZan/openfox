@@ -522,6 +522,7 @@ describe('getSessionState with missing session.initialized', () => {
         compactionCount: 0,
         dangerZone: false,
         canCompact: false,
+        dynamicContextChanged: false,
       },
       currentContextWindowId: 'recovered-window-id',
       todos: [],

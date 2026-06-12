@@ -225,6 +225,7 @@ function createSessionManager(state: Record<string, any>) {
       compactionCount: 0,
       dangerZone: false,
       canCompact: false,
+      dynamicContextChanged: false,
     })),
     setCurrentContextSize: vi.fn(),
     addTokensUsed: vi.fn(),
@@ -263,6 +264,10 @@ function createSessionManager(state: Record<string, any>) {
     updateExecutionState: vi.fn((_: string, updates: Record<string, unknown>) => {
       state['current'].executionState = { ...(state['current'].executionState ?? {}), ...updates }
     }),
+    getCachedPrompt: vi.fn(() => undefined),
+    setCachedPrompt: vi.fn(),
+    getDynamicContextChanged: vi.fn(() => false),
+    setDynamicContextChanged: vi.fn(),
   }
 }
 
@@ -394,6 +399,7 @@ describe('chat orchestrator', () => {
       compactionCount: 0,
       dangerZone: true,
       canCompact: true,
+      dynamicContextChanged: false,
     }))
 
     await runChatTurn({
@@ -2761,6 +2767,7 @@ describe('chat orchestrator', () => {
         compactionCount: 0,
         dangerZone: true,
         canCompact: true,
+        dynamicContextChanged: false,
       }))
 
       await runBuilderTurn(

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation } from 'wouter'
 import { Button } from '../../shared/Button'
 import { Toggle } from '../../shared/Toggle'
@@ -11,21 +11,45 @@ export function AdvancedTab({ onClose }: { onClose: () => void }) {
 
   const disableXmlProtection = settings[SETTINGS_KEYS.LLM_DISABLE_XML_PROTECTION] === 'true'
   const showOpenInEditor = settings[SETTINGS_KEYS.DISPLAY_SHOW_OPEN_IN_EDITOR] === 'true'
+  const dynamicSystemPrompt = settings[SETTINGS_KEYS.LLM_DYNAMIC_SYSTEM_PROMPT] === 'true'
   const isLoading = loading[SETTINGS_KEYS.LLM_DISABLE_XML_PROTECTION] ?? false
+
+  const [localToggles, setLocalToggles] = useState({
+    xmlProtection: disableXmlProtection,
+    openInEditor: showOpenInEditor,
+    dynamicPrompt: dynamicSystemPrompt,
+  })
+
+  useEffect(() => {
+    setLocalToggles({
+      xmlProtection: disableXmlProtection,
+      openInEditor: showOpenInEditor,
+      dynamicPrompt: dynamicSystemPrompt,
+    })
+  }, [disableXmlProtection, showOpenInEditor, dynamicSystemPrompt])
 
   useEffect(() => {
     getSetting(SETTINGS_KEYS.LLM_DISABLE_XML_PROTECTION)
     getSetting(SETTINGS_KEYS.DISPLAY_SHOW_OPEN_IN_EDITOR)
+    getSetting(SETTINGS_KEYS.LLM_DYNAMIC_SYSTEM_PROMPT)
   }, [getSetting])
 
-  const handleToggleXmlProtection = async () => {
-    const newValue = String(!disableXmlProtection)
-    await setSetting(SETTINGS_KEYS.LLM_DISABLE_XML_PROTECTION, newValue)
+  const handleToggleXmlProtection = () => {
+    const newValue = !localToggles.xmlProtection
+    setLocalToggles((prev) => ({ ...prev, xmlProtection: newValue }))
+    setSetting(SETTINGS_KEYS.LLM_DISABLE_XML_PROTECTION, String(newValue))
   }
 
-  const handleToggleOpenInEditor = async () => {
-    const newValue = String(!showOpenInEditor)
-    await setSetting(SETTINGS_KEYS.DISPLAY_SHOW_OPEN_IN_EDITOR, newValue)
+  const handleToggleOpenInEditor = () => {
+    const newValue = !localToggles.openInEditor
+    setLocalToggles((prev) => ({ ...prev, openInEditor: newValue }))
+    setSetting(SETTINGS_KEYS.DISPLAY_SHOW_OPEN_IN_EDITOR, String(newValue))
+  }
+
+  const handleToggleDynamicSystemPrompt = () => {
+    const newValue = !localToggles.dynamicPrompt
+    setLocalToggles((prev) => ({ ...prev, dynamicPrompt: newValue }))
+    setSetting(SETTINGS_KEYS.LLM_DYNAMIC_SYSTEM_PROMPT, String(newValue))
   }
 
   function handleLaunchOnboarding() {
@@ -41,6 +65,19 @@ export function AdvancedTab({ onClose }: { onClose: () => void }) {
     <div className="space-y-6">
       <div>
         <label className="flex items-center justify-between cursor-pointer">
+          <div className="flex-1 min-w-0 mr-3">
+            <div className="text-sm font-medium text-text-primary">Dynamic System Prompt</div>
+            <div className="text-xs text-text-muted mt-0.5">
+              Rebuild the system prompt on every turn. When disabled, changes are applied on demand via the context
+              header for better cache performance.
+            </div>
+          </div>
+          <Toggle enabled={localToggles.dynamicPrompt} onClick={handleToggleDynamicSystemPrompt} />
+        </label>
+      </div>
+      <hr className="border-border" />
+      <div>
+        <label className="flex items-center justify-between cursor-pointer">
           <div>
             <div className="text-sm font-medium text-text-primary">Disable XML Tool Call Protection</div>
             <div className="text-xs text-text-muted mt-0.5">
@@ -48,7 +85,7 @@ export function AdvancedTab({ onClose }: { onClose: () => void }) {
               may require this.
             </div>
           </div>
-          <Toggle enabled={disableXmlProtection} onClick={handleToggleXmlProtection} />
+          <Toggle enabled={localToggles.xmlProtection} onClick={handleToggleXmlProtection} />
         </label>
       </div>
       <hr className="border-border" />
@@ -61,7 +98,7 @@ export function AdvancedTab({ onClose }: { onClose: () => void }) {
               Display a link on file reads to open the file directly in VS Code.
             </div>
           </div>
-          <Toggle enabled={showOpenInEditor} onClick={handleToggleOpenInEditor} />
+          <Toggle enabled={localToggles.openInEditor} onClick={handleToggleOpenInEditor} />
         </label>
       </div>
       <hr className="border-border" />

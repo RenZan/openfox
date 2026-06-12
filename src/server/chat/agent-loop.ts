@@ -14,7 +14,8 @@ import type { LLMClientWithModel } from '../llm/client.js'
 import type { LLMToolDefinition } from '../llm/types.js'
 import type { SessionManager } from '../session/index.js'
 import type { ToolContext, ToolRegistry } from '../tools/types.js'
-import type { RequestContextMessage, MinimalMessage } from './request-context.js'
+import type { RequestContextMessage, MinimalMessage, AssemblyResult } from './request-context.js'
+import { createAssemblyResult } from './request-context.js'
 import { PathAccessDeniedError, AskUserInterrupt } from '../tools/index.js'
 import { createToolProgressHandler } from './tool-streaming.js'
 import { getEventStore } from '../events/index.js'
@@ -29,7 +30,7 @@ import {
   createChatDoneEvent,
   createFormatRetryEvent,
 } from './stream-pure.js'
-import { getSetting } from '../db/settings.js'
+import { getSetting, SETTINGS_KEYS } from '../db/settings.js'
 import { getCurrentContextWindowId } from '../events/index.js'
 import { maybeAutoCompactContext } from '../context/auto-compaction.js'
 import { getAllInstructions } from '../context/instructions.js'
@@ -44,6 +45,7 @@ import {
   createChatMessageUpdatedMessage,
 } from '../ws/protocol.js'
 import type { DangerLevel } from '../../shared/types.js'
+import { computeDynamicContextHash } from './dynamic-context.js'
 import stripAnsi from 'strip-ansi'
 import { getConversationMessages } from './conversation-history.js'
 
@@ -368,15 +370,59 @@ export async function runTopLevelAgentLoop(
     const skills = await getEnabledSkillMetadata(configDir, runtimeConfig.workdir)
     if (signal?.aborted) throw new Error('Aborted')
 
-    const assembledRequest = config.assembleRequest({
-      workdir: session.workdir,
-      messages: requestMessages,
-      injectedFiles,
-      promptTools: toolRegistry.definitions,
-      toolChoice: 'auto',
-      ...(instructionContent ? { customInstructions: instructionContent } : {}),
-      ...(skills.length > 0 ? { skills } : {}),
-    })
+    const isDynamicMode = getSetting(SETTINGS_KEYS.LLM_DYNAMIC_SYSTEM_PROMPT) === 'true'
+
+    const assembleFreshRequest = () =>
+      config.assembleRequest({
+        workdir: session.workdir,
+        messages: requestMessages,
+        injectedFiles,
+        promptTools: toolRegistry.definitions,
+        toolChoice: 'auto',
+        ...(instructionContent ? { customInstructions: instructionContent } : {}),
+        ...(skills.length > 0 ? { skills } : {}),
+      })
+
+    let assembledRequest: AssemblyResult
+
+    if (isDynamicMode) {
+      assembledRequest = assembleFreshRequest()
+    } else {
+      const dynamicHash = computeDynamicContextHash(instructionContent, skills)
+      const execState = session.executionState
+      const hashMatch = execState?.dynamicContextHash === dynamicHash
+      const hasCached = !!execState?.cachedSystemPrompt
+
+      if (hasCached && hashMatch) {
+        assembledRequest = createAssemblyResult({
+          systemPrompt: execState!.cachedSystemPrompt!,
+          messages: requestMessages,
+          injectedFiles,
+          requestTools: toolRegistry.definitions,
+          toolChoice: 'auto',
+          disableThinking: false,
+        })
+        if (sessionManager.getDynamicContextChanged(sessionId)) {
+          sessionManager.setDynamicContextChanged(sessionId, false)
+        }
+      } else if (hasCached) {
+        assembledRequest = createAssemblyResult({
+          systemPrompt: execState!.cachedSystemPrompt!,
+          messages: requestMessages,
+          injectedFiles,
+          requestTools: toolRegistry.definitions,
+          toolChoice: 'auto',
+          disableThinking: false,
+        })
+        if (!sessionManager.getDynamicContextChanged(sessionId)) {
+          sessionManager.setDynamicContextChanged(sessionId, true)
+        }
+      } else {
+        assembledRequest = assembleFreshRequest()
+        sessionManager.setCachedPrompt(sessionId, assembledRequest.systemPrompt, dynamicHash)
+        sessionManager.setDynamicContextChanged(sessionId, false)
+      }
+    }
 
     const assistantMsgId = crypto.randomUUID()
     eventStore.append(

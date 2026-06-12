@@ -13,7 +13,7 @@
         }
       ],
       "isActive": true,
-      "createdAt": "2026-06-10T12:31:10.227Z",
+      "createdAt": "2026-06-11T17:21:42.670Z",
       "status": "unknown"
     },
     {
@@ -29,7 +29,7 @@
         }
       ],
       "isActive": true,
-      "createdAt": "2026-06-10T12:31:04.567Z",
+      "createdAt": "2026-06-11T17:21:35.513Z",
       "status": "unknown"
     },
     {
@@ -45,7 +45,7 @@
         }
       ],
       "isActive": false,
-      "createdAt": "2026-06-10T12:31:03.519Z",
+      "createdAt": "2026-06-11T17:21:34.485Z",
       "status": "unknown"
     },
     {
@@ -334,6 +334,86 @@
       ],
       "isActive": false,
       "createdAt": "2026-06-10T12:31:06.205Z",
+      "status": "unknown"
+    },
+    {
+      "id": "2f124b23-eafc-4d2c-9b96-13c05452cdaa",
+      "name": "Test Config Reload Provider",
+      "url": "http://localhost:8000",
+      "backend": "vllm",
+      "models": [
+        {
+          "id": "test-model",
+          "contextWindow": 200000,
+          "source": "user"
+        }
+      ],
+      "isActive": false,
+      "createdAt": "2026-06-11T17:05:55.534Z",
+      "status": "unknown"
+    },
+    {
+      "id": "6f4b8f49-7772-478e-b7a2-4be0fdc75b18",
+      "name": "Test Config Reload Provider",
+      "url": "http://localhost:8000",
+      "backend": "vllm",
+      "models": [
+        {
+          "id": "test-model",
+          "contextWindow": 200000,
+          "source": "user"
+        }
+      ],
+      "isActive": false,
+      "createdAt": "2026-06-11T17:06:23.532Z",
+      "status": "unknown"
+    },
+    {
+      "id": "8b9f946f-419c-48c5-9617-8e03ce12b850",
+      "name": "Test Config Reload Provider",
+      "url": "http://localhost:8000",
+      "backend": "vllm",
+      "models": [
+        {
+          "id": "test-model",
+          "contextWindow": 200000,
+          "source": "user"
+        }
+      ],
+      "isActive": false,
+      "createdAt": "2026-06-11T17:08:00.992Z",
+      "status": "unknown"
+    },
+    {
+      "id": "8156f790-728b-4ebe-ace2-245f6eff984c",
+      "name": "Test Config Reload Provider",
+      "url": "http://localhost:8000",
+      "backend": "vllm",
+      "models": [
+        {
+          "id": "test-model",
+          "contextWindow": 200000,
+          "source": "user"
+        }
+      ],
+      "isActive": false,
+      "createdAt": "2026-06-11T17:16:27.465Z",
+      "status": "unknown"
+    },
+    {
+      "id": "81c98ddd-e3f1-4f5c-b163-60ca1546a256",
+      "name": "Test Config Reload Provider",
+      "url": "http://localhost:8000",
+      "backend": "vllm",
+      "models": [
+        {
+          "id": "test-model",
+          "contextWindow": 200000,
+          "source": "user"
+        }
+      ],
+      "isActive": false,
+      "createdAt": "2026-06-11T17:21:37.922Z",
       "status": "unknown"
     }
   ],

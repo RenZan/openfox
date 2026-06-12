@@ -11,6 +11,14 @@ type ContextState = {
   compactionCount: number
   dangerZone: boolean
   canCompact: boolean
+  dynamicContextChanged?: boolean
+}
+
+function updateSessionContextState(contextState: ContextState | null | undefined) {
+  if (contextState)
+    useSessionStore
+      .getState()
+      .updateContextState({ ...contextState, dynamicContextChanged: contextState.dynamicContextChanged ?? false })
 }
 
 async function postModelUpdate(
@@ -301,7 +309,7 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
       const data = await postModelUpdate(providerId, modelId, { contextWindow })
       const { providers } = get()
       set({ providers: applyModelUpdate(providers, providerId, modelId, { contextWindow }), activating: false })
-      if (data.contextState) useSessionStore.getState().updateContextState(data.contextState)
+      updateSessionContextState(data.contextState)
       return true
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Failed to update model context', activating: false })
@@ -336,7 +344,7 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
         ...(settings.supportsVision !== undefined && { supportsVision: settings.supportsVision }),
       }
       set({ providers: applyModelUpdate(providers, providerId, modelId, updated), activating: false })
-      if (data.contextState) useSessionStore.getState().updateContextState(data.contextState)
+      updateSessionContextState(data.contextState)
       return true
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Failed to update model settings', activating: false })

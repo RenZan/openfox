@@ -443,10 +443,12 @@ function buildSnapshot(sessionManager: SessionManager, sessionId: string, _lastS
   const session = sessionManager.requireSession(sessionId)
   const events = eventStore.getEvents(sessionId)
   const latestSeq = eventStore.getLatestSeq(sessionId) ?? 0
+  const cachedPrompt = sessionManager.getCachedPrompt(sessionId)
 
   return buildSnapshotFromSessionState({
     session,
     events,
     latestSeq,
+    ...(cachedPrompt ? { cachedSystemPrompt: cachedPrompt.systemPrompt, dynamicContextHash: cachedPrompt.hash } : {}),
   })
 }

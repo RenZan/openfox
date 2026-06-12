@@ -23,6 +23,8 @@ export type ClientMessageType =
   | 'session.load' // Load session and subscribe to events (WS subscription mechanism)
   // Context management
   | 'context.compact' // Manually trigger context compaction
+  | 'context.checkDynamic' // Check if dynamic context has changed and emit context.state if so
+  | 'context.applyDynamic' // Apply dynamic context changes to cached system prompt
   // Runner (auto-loop)
   | 'runner.launch' // Start the auto-loop runner (build → verify → done)
   // Path confirmation

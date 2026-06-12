@@ -289,6 +289,7 @@ describe('SessionManager', () => {
       compactionCount: 0,
       dangerZone: false,
       canCompact: false,
+      dynamicContextChanged: false,
     })
 
     expect(manager.requireSession(session.id).metadata).toMatchObject({
@@ -337,6 +338,21 @@ describe('SessionManager', () => {
     // New LLM call after compaction reports smaller context
     manager.setCurrentContextSize(session.id, 5000)
     expect(manager.getContextState(session.id).currentTokens).toBe(5000)
+  })
+
+  it('getContextState reflects setDynamicContextChanged from in-memory store', () => {
+    const session = manager.createSession(projectId)
+
+    // Default is false
+    expect(manager.getContextState(session.id).dynamicContextChanged).toBe(false)
+
+    // Set to true via in-memory store
+    manager.setDynamicContextChanged(session.id, true)
+    expect(manager.getContextState(session.id).dynamicContextChanged).toBe(true)
+
+    // Set back to false
+    manager.setDynamicContextChanged(session.id, false)
+    expect(manager.getContextState(session.id).dynamicContextChanged).toBe(false)
   })
 
   it('preserves subAgentId and subAgentType when adding messages', () => {

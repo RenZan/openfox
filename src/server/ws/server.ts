@@ -18,6 +18,13 @@ import { runChatTurn } from '../chat/orchestrator.js'
 
 import { runOrchestrator } from '../runner/index.js'
 import { performManualContextCompaction } from '../context/auto-compaction.js'
+import { getAllInstructions } from '../context/instructions.js'
+import { getEnabledSkillMetadata } from '../skills/registry.js'
+import { loadAllAgentsDefault, getSubAgents } from '../agents/registry.js'
+import { buildTopLevelSystemPrompt } from '../chat/prompts.js'
+import { computeDynamicContextHash } from '../chat/dynamic-context.js'
+import { getRuntimeConfig } from '../runtime-config.js'
+import { getGlobalConfigDir } from '../../cli/paths.js'
 import { provideAnswer } from '../tools/index.js'
 import { logger } from '../utils/logger.js'
 import { devServerManager } from '../dev-server/manager.js'
@@ -820,13 +827,40 @@ async function handleClientMessage(
 
       ensureEventStoreSubscription(session.id)
 
-      // Send context.state immediately after session.load
-      const contextState = sessionManager.getContextState(session.id)
-      send(createContextStateMessage(contextState))
-
       // Acknowledge without sending full session data
       // Frontend should use REST API to fetch session data
       send({ type: 'ack', payload: { sessionId: session.id }, id: message.id })
+
+      // Send context.state
+      const sendContextState = () => {
+        const contextState = sessionManager.getContextState(session.id)
+        send(createContextStateMessage(contextState))
+      }
+      sendContextState()
+
+      // Re-detect dynamic context changes on load (survives server restart)
+      const cachedHash = sessionManager.getCachedPrompt(session.id)?.hash
+      if (cachedHash) {
+        ;(async () => {
+          try {
+            const { content: instructionContent } = await getAllInstructions(session.workdir, session.projectId)
+            const runtimeConfig = getRuntimeConfig()
+            const configDir = getGlobalConfigDir(runtimeConfig.mode ?? 'production')
+            const skills = await getEnabledSkillMetadata(configDir, runtimeConfig.workdir)
+            const dynamicInputs = JSON.stringify({
+              instructions: instructionContent,
+              skills: skills.map((s) => s.id).sort(),
+            })
+            const currentHash = createHash('sha256').update(dynamicInputs).digest('hex')
+            if (currentHash !== cachedHash) {
+              sessionManager.setDynamicContextChanged(session.id, true)
+              sendContextState()
+            }
+          } catch {
+            // Non-critical — banner just won't appear on reload
+          }
+        })()
+      }
       break
     }
 
@@ -886,6 +920,103 @@ async function handleClientMessage(
               true,
             ),
           )
+        }
+      })()
+
+      break
+    }
+
+    case 'context.checkDynamic': {
+      if (!client.activeSessionId) {
+        send(createErrorMessage('NO_SESSION', 'No active session', message.id))
+        return
+      }
+
+      const sessionId = client.activeSessionId
+      const session = sessionManager.requireSession(sessionId)
+
+      ;(async () => {
+        try {
+          const { content: instructionContent } = await getAllInstructions(session.workdir, session.projectId)
+          const runtimeConfig = getRuntimeConfig()
+          const configDir = getGlobalConfigDir(runtimeConfig.mode ?? 'production')
+          const skills = await getEnabledSkillMetadata(configDir, runtimeConfig.workdir)
+
+          const currentHash = computeDynamicContextHash(instructionContent, skills)
+          const cachedHash = sessionManager.getCachedPrompt(sessionId)?.hash
+
+          if (cachedHash) {
+            if (currentHash !== cachedHash) {
+              if (!sessionManager.getDynamicContextChanged(sessionId)) {
+                sessionManager.setDynamicContextChanged(sessionId, true)
+                const newContextState = sessionManager.getContextState(sessionId)
+                sendForSession(sessionId, createContextStateMessage(newContextState))
+              }
+            } else if (sessionManager.getDynamicContextChanged(sessionId)) {
+              sessionManager.setDynamicContextChanged(sessionId, false)
+              const newContextState = sessionManager.getContextState(sessionId)
+              sendForSession(sessionId, createContextStateMessage(newContextState))
+            }
+          }
+
+          send({ type: 'ack', payload: {}, id: message.id })
+        } catch (error) {
+          logger.error('Failed to check dynamic context', { error, sessionId })
+          send({ type: 'ack', payload: {}, id: message.id })
+        }
+      })()
+
+      break
+    }
+
+    case 'context.applyDynamic': {
+      if (!client.activeSessionId) {
+        send(createErrorMessage('NO_SESSION', 'No active session', message.id))
+        return
+      }
+
+      const sessionId = client.activeSessionId
+      const session = sessionManager.requireSession(sessionId)
+
+      if (session.isRunning) {
+        send(createErrorMessage('SESSION_RUNNING', 'Cannot apply dynamic context while session is running', message.id))
+        return
+      }
+
+      ;(async () => {
+        try {
+          const { content: instructionContent } = await getAllInstructions(session.workdir, session.projectId)
+          const runtimeConfig = getRuntimeConfig()
+          const configDir = getGlobalConfigDir(runtimeConfig.mode ?? 'production')
+          const skills = await getEnabledSkillMetadata(configDir, runtimeConfig.workdir)
+
+          const dynamicHash = computeDynamicContextHash(instructionContent, skills)
+
+          const allAgents = await loadAllAgentsDefault()
+          const subAgentDefs = getSubAgents(allAgents)
+          const systemPrompt = buildTopLevelSystemPrompt(
+            session.workdir,
+            instructionContent || undefined,
+            skills,
+            subAgentDefs,
+          )
+
+          sessionManager.setCachedPrompt(sessionId, systemPrompt, dynamicHash)
+          sessionManager.setDynamicContextChanged(sessionId, false)
+
+          const newContextState = sessionManager.getContextState(sessionId)
+          sendForSession(sessionId, createContextStateMessage(newContextState))
+          send({ type: 'ack', payload: {}, id: message.id })
+        } catch (error) {
+          logger.error('Failed to apply dynamic context', { error, sessionId })
+          sendForSession(
+            sessionId,
+            createChatErrorMessage(
+              `Failed to apply dynamic context: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              true,
+            ),
+          )
+          send({ type: 'ack', payload: {}, id: message.id })
         }
       })()
 

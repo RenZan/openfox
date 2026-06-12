@@ -52,6 +52,7 @@ function createSessionManager(state: any) {
       compactionCount: 0,
       dangerZone: false,
       canCompact: false,
+      dynamicContextChanged: false,
     })),
     setCurrentContextSize: vi.fn(),
     addTokensUsed: vi.fn(),
