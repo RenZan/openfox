@@ -458,10 +458,10 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
       return res.status(400).json({ error: 'criteria is required and must be an array' })
     }
 
-    const entries = criteria.map((c: { id?: string; description: string }, i: number) => ({
+    const entries = criteria.map((c: { id?: string; description: string; status?: string }, i: number) => ({
       id: c.id ?? String(i),
       description: c.description,
-      status: 'pending',
+      status: c.status ?? 'pending',
     }))
     sessionManager.setMetadataEntries(sessionId, 'criteria', entries)
     res.json({ success: true })

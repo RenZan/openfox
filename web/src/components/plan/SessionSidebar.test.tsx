@@ -13,12 +13,12 @@ describe('SessionSidebar', () => {
   it('shows Criteria section header', () => {
     const html = renderToStaticMarkup(<SessionSidebar messages={[]} />)
 
-    expect(html).toContain('Criteria')
+    expect(html).toContain('Acceptance Criteria')
   })
 
   it('shows Criteria section in sidebar', () => {
     const html = renderToStaticMarkup(<SessionSidebar messages={[]} />)
 
-    expect(html).toContain('Criteria')
+    expect(html).toContain('Acceptance Criteria')
   })
 })

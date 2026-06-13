@@ -3,7 +3,7 @@ id: code_reviewer
 name: Code Reviewer
 description: Review code changes for quality, bugs, and best practices
 subagent: true
-color: '#3b82f6'
+color: '#ef4444'
 allowedTools:
   - read_file
   - web_fetch

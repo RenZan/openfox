@@ -6,6 +6,7 @@ import { useSessionStore } from '../../stores/session'
 import { formatTime, formatSpeed } from '../../lib/format-stats'
 import { StatsModal } from './StatsModal'
 import { MetadataEntries } from '../shared/MetadataEntries'
+import { CriteriaEditor } from './CriteriaEditor'
 import { DevServerFooter } from './DevServerFooter'
 import { BackgroundProcesses } from './BackgroundProcesses'
 import { BranchIcon, ReloadIcon } from '../shared/icons'
@@ -32,7 +33,7 @@ function CriteriaHeader({ entries }: { entries: MetadataEntry[] }) {
 
   return (
     <h3 className="text-sm font-semibold text-text-primary mb-2 flex items-center justify-between">
-      <span>Criteria</span>
+      <span>Acceptance Criteria</span>
       {Object.keys(counts).length > 0 && (
         <span className="font-normal text-xs flex items-center gap-1.5">
           {statusOrder.map((status) => {
@@ -127,7 +128,7 @@ export function SessionSidebar({ messages, workdir }: SessionSidebarProps) {
       <div className="flex flex-col flex-1 overflow-y-auto">
         <div className="mt-4">
           <CriteriaHeader entries={session?.metadataEntries?.['criteria'] ?? []} />
-          <MetadataEntries entries={session?.metadataEntries?.['criteria'] ?? []} compact />
+          {session && <CriteriaEditor entries={session.metadataEntries?.['criteria'] ?? []} sessionId={session.id} />}
           <MetadataEntries entries={session?.metadataEntries?.['review_findings'] ?? []} title="Review Findings" />
         </div>
       </div>
