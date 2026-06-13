@@ -39,7 +39,7 @@
       "type": "sub_agent",
       "phase": "verification",
       "subAgentType": "verifier",
-      "prompt": "## Task Summary\n{{summary}}\n\n## Criteria\n{{criteriaList}}\n\n## Modified Files\n{{modifiedFiles}}\n\nVerify each criterion marked [NEEDS VERIFICATION]. Read the code, run tests if applicable, then use session_metadata to update each criterion's status to passed or failed.",
+      "prompt": "## Criteria\n{{criteriaList}}\n\n## Modified Files\n{{modifiedFiles}}\n\nVerify each criterion marked [NEEDS VERIFICATION]. Read the code, run tests if applicable, then use session_metadata to update each criterion's status to passed or failed.",
       "transitions": [
         { "when": { "type": "any_criteria_blocked" }, "goto": "$blocked" },
         {
