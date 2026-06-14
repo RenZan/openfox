@@ -133,6 +133,22 @@ WantedBy=graphical-session.target
 }
 
 export async function runServiceCommand(_mode: Mode, subcommand?: string): Promise<void> {
+  if (process.platform === 'win32') {
+    console.log(`
+OpenFox Service Management (Windows)
+
+The Windows .exe launcher runs as a background process with a system tray icon.
+Use the launcher to start/stop OpenFox, or run it from the terminal directly.
+
+For the npm version, just run:
+  openfox
+
+To install the Windows .exe version, download it from:
+  https://github.com/co-l/openfox/releases
+`)
+    return
+  }
+
   if (!subcommand) {
     printServiceHelp()
     return

@@ -4,7 +4,7 @@ import { createServer as createHttpServer } from 'node:http'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve, join } from 'node:path'
 import { readFile } from 'node:fs/promises'
-import { createServer as createViteServer, type ViteDevServer } from 'vite'
+import type { ViteDevServer } from 'vite'
 
 import type { Config } from '../shared/types.js'
 import type { ServerHandle } from './context.js'
@@ -1158,7 +1158,8 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
   if (isDev) {
     logger.info('Dev mode: using Vite middleware')
 
-    // Create Vite server in middleware mode
+    // Create Vite server in middleware mode (dynamic import to avoid bundling vite)
+    const { createServer: createViteServer } = await import('vite')
     viteServer = await createViteServer({
       root: webDir,
       configFile: resolve(__dirname, '../../web/vite.config.ts'),
@@ -1389,7 +1390,7 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
           const { stopAllInspectProxies } = await import('./dev-server/inspect-proxy.js')
           stopAllInspectProxies()
           const { cleanupAllProcesses } = await import('./tools/background-process/store.js')
-          cleanupAllProcesses()
+          await cleanupAllProcesses()
           viteServer?.close()
 
           // Note: Not closing database here - it's a singleton shared across servers.

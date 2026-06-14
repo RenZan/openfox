@@ -1,0 +1,11 @@
+[package]
+name = "openfox-launcher"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+webview = "0.1"
+
+[profile.release]
+strip = true
+lto = true

@@ -3,6 +3,12 @@ node_modules/
 
 # Build outputs
 dist/
+dist-sea/
+dist-sea-bundle/
+out/
+
+# Rust build artifacts
+launcher/target/
 *.tsbuildinfo
 
 # Database
@@ -14,6 +20,10 @@ dist/
 # Environment
 .env
 .env.local
+
+# SEA build artifacts
+sea-config.json
+sea-prep.blob
 
 # Local vite config (local overrides only, not committed)
 web/vite.config.local.ts

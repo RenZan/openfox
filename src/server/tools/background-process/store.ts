@@ -149,12 +149,17 @@ export function getProcessById(processId: string): BackgroundProcess | undefined
   return undefined
 }
 
-export function cleanupAllProcesses(): void {
+export async function cleanupAllProcesses(): Promise<void> {
   for (const sessionProcesses of processesBySession.values()) {
     for (const proc of sessionProcesses.values()) {
       if (proc.status === 'running' && proc.pid) {
         try {
-          process.kill(-proc.pid, 'SIGTERM')
+          if (process.platform === 'win32') {
+            const { spawnSync } = await import('node:child_process')
+            spawnSync('taskkill', ['/pid', String(proc.pid), '/f', '/t'], { stdio: 'ignore' })
+          } else {
+            process.kill(-proc.pid, 'SIGTERM')
+          }
         } catch {
           try {
             process.kill(proc.pid, 'SIGTERM')

@@ -1,0 +1,88 @@
+name: Build OpenFox
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-x64
+            ext: ''
+          - os: windows-latest
+            target: win32-x64
+            ext: .exe
+          - os: macos-latest
+            target: darwin-arm64
+            ext: ''
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install system deps (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y libwebkit2gtk-4.1-dev
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install npm deps
+        run: npm ci
+
+      - name: Build SEA binary
+        run: npm run build:sea
+
+      - name: Build launcher (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: npm run build:launcher
+        env:
+          PKG_CONFIG_ALLOW_SYSTEM_LIBS: 1
+
+      - name: Build launcher (Windows)
+        if: runner.os == 'Windows'
+        run: npm run build:launcher
+
+      - name: Package
+        run: |
+          mkdir -p dist
+          cp launcher/target/release/openfox-launcher${{ matrix.ext }} dist/openfox-${{ matrix.target }}${{ matrix.ext }}
+          cd dist && tar -czf openfox-${{ matrix.target }}.tar.gz openfox-${{ matrix.target }}${{ matrix.ext }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openfox-${{ matrix.target }}
+          path: dist/openfox-${{ matrix.target }}.tar.gz
+
+  release:
+    needs: [build]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: openfox-*
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: openfox-*.tar.gz
+          generate_release_notes: true

@@ -1,6 +1,7 @@
 import { execSync, spawn } from 'node:child_process'
 import { join } from 'node:path'
 import { readFile, writeFile, access, mkdir } from 'node:fs/promises'
+import { get as httpGet } from 'node:http'
 import { platform } from 'node:os'
 import { confirm, isCancel, cancel, log } from '@clack/prompts'
 import type { Mode } from './main.js'
@@ -118,16 +119,17 @@ function probeInstalledApp(manifestUrl: string): { appId: string; profileId: str
   return null
 }
 
-function isServerReachable(port: number): boolean {
-  try {
-    const result = execSync(`curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:${port}/manifest.webmanifest`, {
-      encoding: 'utf-8',
-      timeout: 5000,
-    }) as string
-    return result.trim() === '200'
-  } catch {
-    return false
-  }
+function isServerReachable(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const req = httpGet(`http://127.0.0.1:${port}/manifest.webmanifest`, (res) => {
+      resolve(res.statusCode === 200)
+    })
+    req.on('error', () => resolve(false))
+    req.setTimeout(5000, () => {
+      req.destroy()
+      resolve(false)
+    })
+  })
 }
 
 export function printPwaHelp(): void {
@@ -191,7 +193,7 @@ async function pwaInstall(mode: Mode): Promise<void> {
     if (install) {
       log.info('Running: firefoxpwa runtime install')
       try {
-        spawn('firefoxpwa', ['runtime', 'install'], { stdio: 'inherit' })
+        execSync('firefoxpwa runtime install', { stdio: 'inherit' })
       } catch {
         log.error('Failed to install runtime.')
         process.exit(1)
@@ -203,7 +205,7 @@ async function pwaInstall(mode: Mode): Promise<void> {
   }
 
   const port = mode === 'development' ? 10469 : 10369
-  if (!isServerReachable(port)) {
+  if (!(await isServerReachable(port))) {
     log.error(`OpenFox server is not reachable on port ${port}.`)
     console.log(`\nStart OpenFox first:\n\n  openfox\n`)
     process.exit(1)
@@ -313,7 +315,9 @@ async function pwaLaunch(mode: Mode): Promise<void> {
   }
 
   log.info('Launching OpenFox PWA...')
-  spawn('firefoxpwa', ['site', 'launch', appId], { stdio: 'inherit' })
+  const result = spawn('firefoxpwa', ['site', 'launch', appId], { stdio: 'ignore', detached: true })
+  result.unref()
+  log.info('OpenFox PWA launched.')
 }
 
 async function pwaUpdate(mode: Mode): Promise<void> {

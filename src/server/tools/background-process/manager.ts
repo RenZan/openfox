@@ -1,7 +1,9 @@
 import { spawn } from 'node:child_process'
+import { setTimeout as sleep } from 'node:timers/promises'
 import type { ServerMessage, BackgroundProcess } from '../../../shared/protocol.js'
 import * as store from './store.js'
 import { getPlatformShell } from '../../utils/platform.js'
+import { killProcessOnWindows } from '../../utils/process-tree.js'
 
 const STOP_SIGNAL_TIMEOUT = 5000
 
@@ -21,6 +23,8 @@ function emitProcessEvent(processId: string, msg: ServerMessage): void {
   }
 }
 
+const processTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
+
 export function createProcess(
   sessionId: string,
   name: string,
@@ -32,15 +36,25 @@ export function createProcess(
   if (!process) return null
 
   if (timeout && timeout > 0) {
-    setTimeout(() => {
+    const timerId = setTimeout(() => {
+      processTimeouts.delete(process.id)
       const p = store.getProcess(process.id, sessionId)
       if (p && p.status === 'running') {
         stopProcess(process.id, sessionId)
       }
     }, timeout)
+    processTimeouts.set(process.id, timerId)
   }
 
   return process
+}
+
+export function clearProcessTimeout(processId: string): void {
+  const timerId = processTimeouts.get(processId)
+  if (timerId) {
+    clearTimeout(timerId)
+    processTimeouts.delete(processId)
+  }
 }
 
 export function startProcessCommand(processId: string, sessionId: string, command: string, cwd: string): number | null {
@@ -85,6 +99,7 @@ export function startProcessCommand(processId: string, sessionId: string, comman
   })
 
   child.on('exit', (code, signal) => {
+    clearProcessTimeout(processId)
     store.updateStatus(processId, sessionId, 'exited', code ?? (signal ? 1 : null))
     emitProcessEvent(processId, {
       type: 'backgroundProcess.exited',
@@ -106,6 +121,30 @@ export function startProcessCommand(processId: string, sessionId: string, comman
   return child.pid ?? null
 }
 
+function killProcessTree(pid: number): Promise<void> {
+  if (process.platform === 'win32') {
+    return killProcessOnWindows(pid)
+  }
+
+  try {
+    process.kill(-pid, 'SIGTERM')
+  } catch {
+    process.kill(pid, 'SIGTERM')
+  }
+
+  return sleep(STOP_SIGNAL_TIMEOUT).then(() => {
+    try {
+      process.kill(-pid, 'SIGKILL')
+    } catch {
+      try {
+        process.kill(pid, 'SIGKILL')
+      } catch {
+        // Process already dead
+      }
+    }
+  })
+}
+
 export async function stopProcess(processId: string, sessionId: string): Promise<void> {
   const proc = store.getProcess(processId, sessionId)
 
@@ -115,29 +154,8 @@ export async function stopProcess(processId: string, sessionId: string): Promise
 
   store.updateStatus(processId, sessionId, 'stopping')
 
-  const pid = proc.pid!
   try {
-    try {
-      process.kill(-pid, 'SIGTERM')
-    } catch {
-      process.kill(pid, 'SIGTERM')
-    }
-
-    await new Promise<void>((resolve) => {
-      setTimeout(() => {
-        try {
-          process.kill(-pid, 'SIGKILL')
-        } catch {
-          try {
-            process.kill(pid, 'SIGKILL')
-          } catch {
-            // Process already dead
-          }
-        }
-        resolve()
-      }, STOP_SIGNAL_TIMEOUT)
-    })
-
+    await killProcessTree(proc.pid!)
     store.updateStatus(processId, sessionId, 'exited', null)
     emitProcessEvent(processId, {
       type: 'backgroundProcess.removed',

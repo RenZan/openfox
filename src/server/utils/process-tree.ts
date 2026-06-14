@@ -3,6 +3,17 @@ import { setTimeout as sleep } from 'node:timers/promises'
 
 const SIGKILL_TIMEOUT_MS = 200
 
+export function killProcessOnWindows(pid: number): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const killer = spawn('taskkill', ['/pid', String(pid), '/f', '/t'], {
+      stdio: 'ignore',
+      windowsHide: true,
+    })
+    killer.once('exit', () => resolve())
+    killer.once('error', () => resolve())
+  })
+}
+
 export async function terminateProcessTree(proc: ChildProcess, options?: { exited?: () => boolean }): Promise<void> {
   const pid = proc.pid
   if (!pid || options?.exited?.()) {
@@ -10,14 +21,7 @@ export async function terminateProcessTree(proc: ChildProcess, options?: { exite
   }
 
   if (process.platform === 'win32') {
-    await new Promise<void>((resolve) => {
-      const killer = spawn('taskkill', ['/pid', String(pid), '/f', '/t'], {
-        stdio: 'ignore',
-        windowsHide: true,
-      })
-      killer.once('exit', () => resolve())
-      killer.once('error', () => resolve())
-    })
+    await killProcessOnWindows(pid)
     return
   }
 
