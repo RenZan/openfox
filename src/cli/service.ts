@@ -2,6 +2,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import { mkdir, writeFile, rm, access, constants } from 'node:fs/promises'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
+import type { Mode } from './main.js'
 
 const RUN_SCRIPT_PATH = '~/.local/state/openfox/bin/run.sh'
 const SERVICE_PATH = '~/.config/systemd/user/openfox.service'
@@ -334,5 +335,3 @@ async function serviceUninstall(): Promise<void> {
 
   console.log('\n✓ Service uninstalled')
 }
-
-type Mode = 'production' | 'development' | 'test'

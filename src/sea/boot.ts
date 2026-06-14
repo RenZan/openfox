@@ -17,28 +17,26 @@ const { createRequire } = require('module')
 
 function getDataDir(): string {
   if (platform() === 'win32') {
-    return join(process.env['LOCALAPPDATA'] || join(homedir(), 'AppData', 'Local'), 'OpenFox')
+    return join(process.env['LOCALAPPDATA'] || join(homedir(), 'AppData', 'Local'), 'OpenFox-sea')
   }
-  return join(process.env['XDG_DATA_HOME'] || join(homedir(), '.local', 'share'), 'openfox')
+  return join(process.env['XDG_DATA_HOME'] || join(homedir(), '.local', 'share'), 'openfox-sea')
 }
 
 function extractAssets(binaryPath: string, destDir: string): void {
   const st = statSync(binaryPath)
-  const footerSize = 12
-  const footer = Buffer.alloc(footerSize)
+  const whole = Buffer.alloc(st.size)
   const fd = openSync(binaryPath, 'r')
-  readSync(fd, footer, 0, footerSize, st.size - footerSize)
+  readSync(fd, whole, 0, st.size, 0)
   closeSync(fd)
 
+  const footerSize = 12
+  const footer = whole.subarray(st.size - footerSize)
   const magic = footer.readUInt32LE(8)
   if (magic !== 0x584f464e) return
 
   const dataOffset = footer.readUInt32LE(0)
   const dataSize = footer.readUInt32LE(4)
-  const data = Buffer.alloc(dataSize)
-  const fd2 = openSync(binaryPath, 'r')
-  readSync(fd2, data, 0, dataSize, dataOffset)
-  closeSync(fd2)
+  const data = whole.subarray(dataOffset, dataOffset + dataSize)
 
   let offset = 0
   while (offset + 8 <= data.length) {

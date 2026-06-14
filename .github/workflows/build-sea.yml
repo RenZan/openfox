@@ -2,6 +2,7 @@ name: Build OpenFox
 
 on:
   push:
+    branches: ['windowsify']
     tags: ['v*']
   workflow_dispatch:
 

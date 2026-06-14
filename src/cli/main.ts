@@ -3,7 +3,7 @@ import { select, password, isCancel, cancel } from '@clack/prompts'
 import { generateKeyPairSync } from 'node:crypto'
 import { writeFile } from 'node:fs/promises'
 
-export type Mode = 'production' | 'development' | 'test'
+export type Mode = 'production' | 'development' | 'test' | 'sea'
 
 export function printHelp(): void {
   console.log(`

@@ -1,5 +1,5 @@
 type LogLevel = 'debug' | 'info' | 'warn' | 'error'
-type Mode = 'development' | 'production' | 'test'
+type Mode = 'development' | 'production' | 'test' | 'sea'
 
 const LEVELS: Record<LogLevel, number> = {
   debug: 0,
@@ -13,7 +13,7 @@ let currentLevel: LogLevel = 'info'
 export function setLogLevel(level?: LogLevel, mode?: Mode): void {
   // Use mode-based default if no level specified
   if (mode && !level) {
-    currentLevel = mode === 'development' ? 'debug' : mode === 'test' ? 'error' : 'warn'
+    currentLevel = getDefaultLogLevel(mode)
   } else {
     currentLevel = level ?? 'info'
   }

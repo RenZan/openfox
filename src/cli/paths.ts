@@ -7,7 +7,7 @@ export function getGlobalConfigDir(mode: Mode): string {
   if (mode === 'test') {
     return join(process.cwd(), 'e2e', '.openfox-test')
   }
-  const suffix = mode === 'development' ? '-dev' : ''
+  const suffix = mode === 'development' ? '-dev' : mode === 'sea' ? '-sea' : ''
   const home = homedir()
 
   switch (platform()) {
@@ -33,7 +33,7 @@ export function getAuthKeyPath(mode: Mode): string {
 }
 
 export function getGlobalDataDir(mode: Mode): string {
-  const suffix = mode === 'development' ? '-dev' : ''
+  const suffix = mode === 'development' ? '-dev' : mode === 'sea' ? '-sea' : ''
   const home = homedir()
 
   switch (platform()) {
