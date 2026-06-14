@@ -66,6 +66,7 @@ jobs:
         run: npm run build:launcher
 
       - name: Package
+        shell: bash
         run: |
           mkdir -p dist
           cp launcher/target/release/openfox-launcher${{ matrix.ext }} dist/openfox-${{ matrix.target }}${{ matrix.ext }}
