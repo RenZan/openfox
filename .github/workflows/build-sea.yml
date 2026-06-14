@@ -34,7 +34,11 @@ jobs:
 
       - name: Install system deps (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get install -y libwebkit2gtk-4.1-dev
+        run: |
+          sudo apt-get install -y libwebkit2gtk-4.1-dev
+          # webview crate needs webkit2gtk-4.0 pkg-config, symlink from 4.1
+          sudo ln -sf /usr/lib/x86_64-linux-gnu/pkgconfig/webkit2gtk-4.1.pc \
+            /usr/lib/x86_64-linux-gnu/pkgconfig/webkit2gtk-4.0.pc
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
