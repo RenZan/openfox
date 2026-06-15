@@ -33,12 +33,14 @@ fn extract_sea() -> PathBuf {
     let path = sea_path();
     let parent = path.parent().unwrap();
     std::fs::create_dir_all(parent).ok();
-    std::fs::write(&path, SEA_BINARY).expect("Failed to extract SEA binary");
+    let tmp = parent.join("openfox-core.tmp");
+    std::fs::write(&tmp, SEA_BINARY).expect("Failed to extract SEA binary");
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).ok();
+        std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o755)).ok();
     }
+    std::fs::rename(&tmp, &path).ok();
     path
 }
 
@@ -53,7 +55,26 @@ fn wait_for_server(port: u16, timeout_secs: u64) -> bool {
     false
 }
 
+fn force_kill(child: &mut std::process::Child) {
+    let pid = child.id().to_string();
+    // SIGTERM first
+    let _ = Command::new("kill").arg(&pid).status();
+    // Wait up to 2s for graceful exit
+    for _ in 0..10 {
+        sleep(Duration::from_millis(200));
+        if let Ok(Some(_)) = child.try_wait() {
+            return;
+        }
+    }
+    // SIGKILL if still alive
+    let _ = Command::new("kill").arg("-9").arg(&pid).status();
+    let _ = child.wait();
+}
+
 fn main() {
+    // Clean up any leftover ghost processes from previous runs
+    let _ = Command::new("pkill").arg("-f").arg("openfox-core").status();
+
     let sea_path = extract_sea();
     let port: u16 = std::env::var("OPENFOX_PORT")
         .ok()
@@ -82,8 +103,7 @@ fn main() {
 
     if !wait_for_server(port, 30) {
         eprintln!("Server did not start within 30 seconds");
-        child.kill().ok();
-        child.wait().ok();
+        force_kill(&mut child);
         return;
     }
 
@@ -96,6 +116,7 @@ fn main() {
     .expect("Failed to create WebView window");
 
     webview.join();
-    child.kill().ok();
-    child.wait().ok();
+    force_kill(&mut child);
+    // Force exit to avoid webkit2gtk segfault on cleanup
+    std::process::exit(0);
 }
