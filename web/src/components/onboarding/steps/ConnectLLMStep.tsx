@@ -20,6 +20,7 @@ export function ConnectLLMStep({ onNext }: ConnectLLMStepProps) {
   const [customUrl, setCustomUrl] = useState('')
   const [customApiKey, setCustomApiKey] = useState('')
   const [customBackend, setCustomBackend] = useState<Backend>('auto')
+  const [customIsLocal, setCustomIsLocal] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ success: boolean; model?: string; error?: string } | null>(null)
   const [removing, setRemoving] = useState<string | null>(null)
@@ -35,7 +36,14 @@ export function ConnectLLMStep({ onNext }: ConnectLLMStepProps) {
       const response = await authFetch('/api/providers')
       if (response.ok) {
         const data = (await response.json()) as {
-          providers: Array<{ id: string; name: string; url: string; backend: Backend; apiKey?: string }>
+          providers: Array<{
+            id: string
+            name: string
+            url: string
+            backend: Backend
+            apiKey?: string
+            isLocal?: boolean
+          }>
         }
         const mapped = data.providers.map((p) => ({
           id: p.id,
@@ -44,6 +52,7 @@ export function ConnectLLMStep({ onNext }: ConnectLLMStepProps) {
           backend: p.backend,
           model: null,
           apiKey: p.apiKey,
+          isLocal: p.isLocal,
         }))
         setExistingProviders(mapped)
         setProviders(mapped)
@@ -98,6 +107,7 @@ export function ConnectLLMStep({ onNext }: ConnectLLMStepProps) {
       backend: testResult?.success ? customBackend : 'auto',
       model: testResult?.success ? (testResult.model ?? null) : null,
       apiKey: customApiKey || undefined,
+      isLocal: customIsLocal || undefined,
     }
 
     setProviders([...providers, newProvider])
@@ -139,6 +149,7 @@ export function ConnectLLMStep({ onNext }: ConnectLLMStepProps) {
             backend: provider.backend,
             model: provider.model,
             apiKey: provider.apiKey,
+            isLocal: provider.isLocal,
           }),
         })
         if (!response.ok) {
@@ -171,6 +182,29 @@ export function ConnectLLMStep({ onNext }: ConnectLLMStepProps) {
                     <span className="px-2 py-0.5 bg-accent-primary/25 text-accent-primary rounded text-xs font-medium">
                       {getBackendDisplayName(provider.backend)}
                     </span>
+                    <label className="flex items-center gap-1 cursor-pointer text-xs">
+                      <input
+                        type="checkbox"
+                        checked={provider.isLocal ?? false}
+                        onChange={(e) => {
+                          const newIsLocal = e.target.checked
+                          setProviders(
+                            providers.map((p) =>
+                              p.id === provider.id ? { ...p, isLocal: newIsLocal || undefined } : p,
+                            ),
+                          )
+                          if (!provider.id.startsWith('temp-')) {
+                            authFetch(`/api/providers/${provider.id}`, {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ isLocal: newIsLocal }),
+                            }).catch(() => {})
+                          }
+                        }}
+                        className="w-3.5 h-3.5 rounded border-border bg-bg-secondary accent-accent-primary"
+                      />
+                      <span className={provider.isLocal ? 'text-accent-success' : 'text-text-muted'}>local</span>
+                    </label>
                     {editingProviderId === provider.id ? (
                       <input
                         type="text"
@@ -333,6 +367,16 @@ export function ConnectLLMStep({ onNext }: ConnectLLMStepProps) {
               />
             </div>
 
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={customIsLocal}
+                onChange={(e) => setCustomIsLocal(e.target.checked)}
+                className="w-4 h-4 rounded border-border bg-bg-secondary accent-accent-primary"
+              />
+              <span className="text-sm text-text-secondary">This is a local provider</span>
+            </label>
+
             {testResult && (
               <div className={`p-3 rounded-lg ${testResult.success ? 'bg-accent-primary/10' : 'bg-red-500/10'}`}>
                 {testResult.success ? (
@@ -372,6 +416,8 @@ export function ConnectLLMStep({ onNext }: ConnectLLMStepProps) {
                 setShowAddForm(false)
                 setCustomName('')
                 setCustomUrl('')
+                setCustomApiKey('')
+                setCustomIsLocal(false)
                 setTestResult(null)
               }}
               className="w-full text-center text-text-muted hover:text-text-secondary text-sm"

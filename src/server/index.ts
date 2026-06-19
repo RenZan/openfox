@@ -858,12 +858,13 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
 
   // Onboarding: create provider
   app.post('/api/providers', async (req, res) => {
-    const { name, url, backend, apiKey, model } = req.body as {
+    const { name, url, backend, apiKey, model, isLocal } = req.body as {
       name: string
       url: string
       backend: string
       apiKey?: string
       model?: string
+      isLocal?: boolean
     }
 
     if (!name || !url || !backend) {
@@ -890,6 +891,7 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
         url,
         backend: providerBackend,
         apiKey,
+        ...(isLocal !== undefined ? { isLocal } : {}),
         models: model ? [{ id: model, contextWindow: 200000, source: 'user' as const }] : [],
         isActive: true,
       })
@@ -968,6 +970,27 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
     providerManager.setProviders(updatedConfig.providers, updatedConfig.defaultModelSelection ?? undefined)
 
     res.json({ success: true })
+  })
+
+  app.patch('/api/providers/:id', async (req, res) => {
+    const { id } = req.params
+    const { isLocal } = req.body as { isLocal?: boolean }
+    try {
+      const { loadGlobalConfig, saveGlobalConfig, updateProvider } = await import('../cli/config.js')
+      const globalConfig = await loadGlobalConfig(config.mode ?? 'production')
+      const provider = globalConfig.providers.find((p) => p.id === id)
+      if (!provider) {
+        return res.status(404).json({ error: 'Provider not found' })
+      }
+      const updates: Record<string, unknown> = {}
+      if (isLocal !== undefined) updates['isLocal'] = isLocal
+      const updatedConfig = updateProvider(globalConfig, id, updates)
+      await saveGlobalConfig(config.mode ?? 'production', updatedConfig)
+      providerManager.setProviders(updatedConfig.providers, updatedConfig.defaultModelSelection ?? undefined)
+      res.json({ success: true, provider: updatedConfig.providers.find((p) => p.id === id) })
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update provider' })
+    }
   })
 
   app.get('/api/providers/:id/models', async (req, res) => {

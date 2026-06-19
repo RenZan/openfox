@@ -79,6 +79,7 @@ interface Provider {
   isActive: boolean
   createdAt: string
   status?: ProviderStatus
+  isLocal?: boolean
 }
 
 interface ConfigState {

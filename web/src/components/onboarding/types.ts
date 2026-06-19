@@ -8,4 +8,5 @@ export interface ProviderInfo {
   backend: Backend
   model: string | null
   apiKey?: string
+  isLocal?: boolean
 }

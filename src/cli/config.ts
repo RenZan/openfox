@@ -79,6 +79,7 @@ const providerSchema = z.object({
   models: z.array(modelConfigSchema).default([]),
   isActive: z.boolean(),
   createdAt: z.string(),
+  isLocal: z.boolean().optional(),
   // Deprecated: model field kept for migration, will be removed after migration
   model: z.string().optional(),
   // Deprecated: maxContext kept for migration
@@ -428,6 +429,17 @@ export function addProvider(config: Partial<GlobalConfig>, provider: Omit<Provid
       model: 'qwen3.5:0.8b',
       timeout: 120,
     },
+  }
+}
+
+export function updateProvider(
+  config: GlobalConfig,
+  providerId: string,
+  updates: Partial<Omit<Provider, 'id' | 'createdAt'>>,
+): GlobalConfig {
+  return {
+    ...config,
+    providers: config.providers.map((p) => (p.id === providerId ? { ...p, ...updates } : p)),
   }
 }
 

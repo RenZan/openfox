@@ -505,6 +505,7 @@ export interface Provider {
   isActive: boolean // Currently selected provider
   createdAt: string // ISO timestamp
   status?: 'connected' | 'disconnected' | 'unknown' // Connection status
+  isLocal?: boolean | undefined // User-specified: true = local, false/undefined = API/cloud
 }
 
 export interface Config {

@@ -150,6 +150,23 @@ export async function runProviderAdd(mode: Mode): Promise<void> {
     }
   }
 
+  // Is this a local provider?
+  const localBackends = new Set(['vllm', 'sglang', 'ollama', 'llamacpp', 'opencode-go'])
+  const defaultIsLocal = localBackends.has(backend as string)
+  const isLocalChoice = await select({
+    message: 'Is this a local provider?',
+    options: [
+      { value: 'yes', label: 'Yes' },
+      { value: 'no', label: 'No' },
+    ],
+    initialValue: defaultIsLocal ? 'yes' : 'no',
+  })
+  if (isCancel(isLocalChoice)) {
+    cancel('Cancelled')
+    return
+  }
+  const isLocal = isLocalChoice === 'yes'
+
   // API Key (optional)
   let apiKey: string | undefined
   if (backend === 'openai' || backend === 'anthropic') {
@@ -270,6 +287,7 @@ export async function runProviderAdd(mode: Mode): Promise<void> {
     url: url as string,
     backend: finalBackend as ProviderBackend,
     apiKey,
+    isLocal,
     models,
     isActive: makeActive as boolean,
   })

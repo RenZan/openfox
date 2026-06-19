@@ -194,7 +194,18 @@ export function ProviderSelector() {
         {isLlmOffline ? (
           <span className="text-sm text-accent-error animate-pulse">LLM offline</span>
         ) : (
-          <span className="text-sm text-accent-primary">{shortModelName}</span>
+          <>
+            <span className="text-sm text-accent-primary">{shortModelName}</span>
+            <span
+              className={`text-xs px-1.5 py-0.5 rounded-full ${
+                activeProvider?.isLocal
+                  ? 'text-accent-success bg-accent-success/10'
+                  : 'text-accent-warning bg-accent-warning/10'
+              }`}
+            >
+              {activeProvider?.isLocal ? 'local' : 'api'}
+            </span>
+          </>
         )}
         <span className="text-text-muted opacity-0 group-hover:opacity-100 transition-opacity">↻</span>
       </button>
@@ -212,7 +223,18 @@ export function ProviderSelector() {
         {isLlmOffline ? (
           <span className="text-sm text-accent-error animate-pulse">offline</span>
         ) : (
-          <span className="text-sm text-accent-primary">{shortModelName}</span>
+          <>
+            <span className="text-sm text-accent-primary">{shortModelName}</span>
+            <span
+              className={`text-xs px-1.5 py-0.5 rounded-full ${
+                activeProvider?.isLocal
+                  ? 'text-accent-success bg-accent-success/10'
+                  : 'text-accent-warning bg-accent-warning/10'
+              }`}
+            >
+              {activeProvider?.isLocal ? 'local' : 'api'}
+            </span>
+          </>
         )}
         <ChevronDownIcon className={`w-3 h-3 text-text-muted transition-transform`} rotate={isOpen ? 180 : 0} />
       </button>
