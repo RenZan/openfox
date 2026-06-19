@@ -18,7 +18,7 @@ import { loadAllAgentsDefault, findAgentById } from '../agents/registry.js'
 import { buildSubAgentSystemPrompt } from '../chat/prompts.js'
 import { TurnMetrics, createMessageStartEvent } from '../chat/stream-pure.js'
 import { runTopLevelAgentLoop } from '../chat/agent-loop.js'
-import { assembleAgentRequest } from '../chat/request-context.js'
+import { createAssemblyResult } from '../chat/request-context.js'
 import { getAllInstructions } from '../context/instructions.js'
 import { getEnabledSkillMetadata } from '../skills/registry.js'
 import { getRuntimeConfig } from '../runtime-config.js'
@@ -185,13 +185,13 @@ export async function executeSubAgent(options: SubAgentExecutionOptions): Promis
       statsIdentity,
       signal,
       onMessage,
-      cachedSystemPrompt: systemPrompt,
       assembleRequest: (input) =>
-        assembleAgentRequest({
-          ...input,
-          agentDef,
-          subAgentDefs: [],
-          modelName: llmClient.getModel(),
+        createAssemblyResult({
+          systemPrompt,
+          messages: input.messages,
+          injectedFiles: input.injectedFiles,
+          requestTools: input.promptTools,
+          toolChoice: input.toolChoice,
           disableThinking: true,
           ...(instructionContent ? { customInstructions: instructionContent } : {}),
           ...(skills.length > 0 ? { skills } : {}),

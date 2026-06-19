@@ -14,9 +14,8 @@ import type { LLMClientWithModel } from '../llm/client.js'
 import type { LLMToolDefinition } from '../llm/types.js'
 import type { SessionManager } from '../session/index.js'
 import type { ToolRegistry } from '../tools/types.js'
-import type { RequestContextMessage, MinimalMessage, AssemblyResult } from './request-context.js'
+import type { RequestContextMessage, MinimalMessage } from './request-context.js'
 import type { RetryPatternConfig } from './auto-patterns.js'
-import { createAssemblyResult } from './request-context.js'
 import {
   streamLLMPure,
   consumeStreamGenerator,
@@ -25,7 +24,6 @@ import {
   createMessageDoneEvent,
   createChatDoneEvent,
 } from './stream-pure.js'
-import { getSetting, SETTINGS_KEYS } from '../db/settings.js'
 import { getCurrentContextWindowId, getCurrentWindowMessageOptions } from '../events/index.js'
 import { getAllInstructions } from '../context/instructions.js'
 import { getEnabledSkillMetadata } from '../skills/registry.js'
@@ -68,8 +66,6 @@ export interface TopLevelLoopConfig {
   maxRetriesPerTurn?: number
   /** Function to append events (provided by orchestrator) */
   append: (event: import('../events/types.js').TurnEvent) => void
-  /** If provided, use this cached system prompt instead of assembling fresh */
-  cachedSystemPrompt?: string
   sessionManager: SessionManager
   sessionId: string
   llmClient: LLMClientWithModel
@@ -178,33 +174,15 @@ export async function runTopLevelAgentLoop(
     const skills = await getEnabledSkillMetadata(configDir, runtimeConfig.workdir)
     if (signal?.aborted) throw new Error('Aborted')
 
-    const isDynamicMode = getSetting(SETTINGS_KEYS.LLM_DYNAMIC_SYSTEM_PROMPT) === 'true'
-
-    const assembleFreshRequest = () =>
-      config.assembleRequest({
-        workdir: session.workdir,
-        messages: requestMessages,
-        injectedFiles,
-        promptTools: toolRegistry.definitions,
-        toolChoice: 'auto',
-        ...(instructionContent ? { customInstructions: instructionContent } : {}),
-        ...(skills.length > 0 ? { skills } : {}),
-      })
-
-    let assembledRequest: AssemblyResult
-
-    if (config.cachedSystemPrompt && !isDynamicMode) {
-      assembledRequest = createAssemblyResult({
-        systemPrompt: config.cachedSystemPrompt,
-        messages: requestMessages,
-        injectedFiles,
-        requestTools: toolRegistry.definitions,
-        toolChoice: 'auto',
-        disableThinking: false,
-      })
-    } else {
-      assembledRequest = assembleFreshRequest()
-    }
+    const assembledRequest = config.assembleRequest({
+      workdir: session.workdir,
+      messages: requestMessages,
+      injectedFiles,
+      promptTools: toolRegistry.definitions,
+      toolChoice: 'auto',
+      ...(instructionContent ? { customInstructions: instructionContent } : {}),
+      ...(skills.length > 0 ? { skills } : {}),
+    })
 
     const assistantMsgId = crypto.randomUUID()
     append(

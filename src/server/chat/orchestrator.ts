@@ -28,9 +28,9 @@ import {
   createToolResultEvent,
   createChatDoneEvent,
 } from './stream-pure.js'
-import { assembleAgentRequest } from './request-context.js'
+import { assembleAgentRequest, createAssemblyResult } from './request-context.js'
 import type { RequestContextMessage } from './request-context.js'
-import { resolveCachedAssembly } from './system-prompt-cache.js'
+import { computeDynamicContextHash } from './dynamic-context.js'
 import { runTopLevelAgentLoop } from './agent-loop.js'
 import { executeSubAgent } from '../sub-agents/manager.js'
 import { loadAllAgentsDefault, findAgentById, getSubAgents } from '../agents/registry.js'
@@ -341,7 +341,6 @@ export async function runAgentTurn(
 
   const agentDef = findAgentById(agentId, allAgents) ?? findAgentById('planner', allAgents)!
   const subAgentDefs = getSubAgents(allAgents)
-  const toolRegistry = getToolRegistryForAgent(agentDef)
 
   const { content: instructionContent } = await getAllInstructions(
     options.sessionManager.requireSession(options.sessionId).workdir,
@@ -351,45 +350,43 @@ export async function runAgentTurn(
   const configDir = getGlobalConfigDir(runtimeConfig.mode ?? 'production')
   const skills = await getEnabledSkillMetadata(configDir, runtimeConfig.workdir)
 
-  const { assembledRequest: cachedResult } = resolveCachedAssembly({
-    sessionManager: options.sessionManager,
-    sessionId: options.sessionId,
-    workdir: options.sessionManager.requireSession(options.sessionId).workdir,
-    messages: [],
-    injectedFiles: [],
-    promptTools: toolRegistry.definitions,
-    instructionContent,
-    skills,
-    assembleFreshRequest: () =>
-      assembleAgentRequest({
-        agentDef,
-        subAgentDefs,
-        workdir: options.sessionManager.requireSession(options.sessionId).workdir,
-        messages: [],
-        injectedFiles: [],
-        promptTools: toolRegistry.definitions,
-        requestTools: toolRegistry.definitions,
-        toolChoice: 'auto',
-        ...(instructionContent ? { customInstructions: instructionContent } : {}),
-        ...(skills.length > 0 ? { skills } : {}),
-        modelName: options.llmClient.getModel(),
-      }),
-  })
-
   return runTopLevelAgentLoop(
     {
       mode: agentId,
       append,
       ...(await buildRetryPatterns()),
-      cachedSystemPrompt: cachedResult.systemPrompt,
       sessionManager: options.sessionManager,
       sessionId: options.sessionId,
       llmClient: options.llmClient,
       statsIdentity,
       signal: options.signal,
       onMessage: options.onMessage,
-      assembleRequest: (input) =>
-        assembleAgentRequest({ ...input, agentDef, subAgentDefs, modelName: options.llmClient.getModel() }),
+      assembleRequest: (input) => {
+        const cached = options.sessionManager.getCachedPrompt(options.sessionId)
+        if (cached) {
+          const currentHash = computeDynamicContextHash(instructionContent ?? '', skills)
+          if (cached.hash !== currentHash) {
+            options.sessionManager.setDynamicContextChanged(options.sessionId, true)
+          }
+          return createAssemblyResult({
+            systemPrompt: cached.systemPrompt,
+            messages: input.messages,
+            injectedFiles: input.injectedFiles,
+            requestTools: input.promptTools,
+            toolChoice: input.toolChoice,
+            disableThinking: false,
+          })
+        }
+        const result = assembleAgentRequest({
+          ...input,
+          agentDef,
+          subAgentDefs,
+          modelName: options.llmClient.getModel(),
+        })
+        const hash = computeDynamicContextHash(instructionContent ?? '', skills)
+        options.sessionManager.setCachedPrompt(options.sessionId, result.systemPrompt, hash)
+        return result
+      },
       getToolRegistry: () => getToolRegistryForAgent(agentDef),
       getConversationMessages: buildGetConversationMessages(options.sessionId, options.llmClient, append),
       injectModeReminder: () =>
