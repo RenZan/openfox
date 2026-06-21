@@ -21,6 +21,22 @@ describe('ProviderModal - thinkingLevel persistence', () => {
     document.body.removeChild(container)
   })
 
+  function makeEditProvider() {
+    return {
+      id: 'test-provider',
+      name: 'Test Provider',
+      url: 'http://localhost:8000/v1',
+      backend: 'vllm' as const,
+      models: [
+        {
+          id: 'test-model',
+          contextWindow: 200000,
+          thinkingEnabled: true,
+        },
+      ],
+    }
+  }
+
   async function renderAndSave(thinkingLevel?: string) {
     const modelId = 'test-model'
     await new Promise<void>((resolve) => {
@@ -30,19 +46,7 @@ describe('ProviderModal - thinkingLevel persistence', () => {
           onClose={vi.fn()}
           onSave={onSaveMock as (provider: ProviderFormData) => void}
           initialStep={2}
-          editProvider={{
-            id: 'test-provider',
-            name: 'Test Provider',
-            url: 'http://localhost:8000/v1',
-            backend: 'vllm',
-            models: [
-              {
-                id: modelId,
-                contextWindow: 200000,
-                thinkingEnabled: true,
-              },
-            ],
-          }}
+          editProvider={makeEditProvider()}
           editModelId={modelId}
         />,
       )
@@ -94,5 +98,49 @@ describe('ProviderModal - thinkingLevel persistence', () => {
     // DESIRED BEHAVIOR: when thinkingEnabled is true and the input shows 'max'
     // as default, the save payload should include thinkingLevel: 'max'
     expect(savedModel?.thinkingLevel).toBe('max')
+  })
+
+  it('does not reset form step when editProvider reference changes (parent re-render)', async () => {
+    await new Promise<void>((resolve) => {
+      root.render(
+        <ProviderModal
+          isOpen={true}
+          onClose={vi.fn()}
+          onSave={onSaveMock as (provider: ProviderFormData) => void}
+          initialStep={2}
+          editProvider={makeEditProvider()}
+          editModelId="test-model"
+        />,
+      )
+      setTimeout(resolve, 200)
+    })
+
+    // Click "Next — Review" to go to step 3
+    const nextButton = container.querySelector('[data-testid="provider-modal-next"]') as HTMLButtonElement | null
+    expect(nextButton).toBeTruthy()
+    nextButton!.click()
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    // Verify we're on step 3: save button visible
+    const saveButton1 = container.querySelector('[data-testid="provider-modal-save"]')
+    expect(saveButton1).toBeTruthy()
+    expect(container.querySelector('[data-testid="provider-modal-next"]')).toBeNull()
+
+    // Simulate parent re-render with new editProvider reference (identical data)
+    root.render(
+      <ProviderModal
+        isOpen={true}
+        onClose={vi.fn()}
+        onSave={onSaveMock as (provider: ProviderFormData) => void}
+        initialStep={2}
+        editProvider={makeEditProvider()}
+        editModelId="test-model"
+      />,
+    )
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    // MUST still be on step 3 — save button still visible
+    expect(container.querySelector('[data-testid="provider-modal-save"]')).toBeTruthy()
+    expect(container.querySelector('[data-testid="provider-modal-next"]')).toBeNull()
   })
 })

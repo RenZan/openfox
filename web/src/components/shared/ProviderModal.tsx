@@ -276,7 +276,7 @@ export function ProviderModal({
         setExpandedModelId(null)
       }
     }
-  }, [isOpen, initialStep, editProvider, editModelId])
+  }, [isOpen, initialStep, editProvider?.id, editModelId])
 
   // Auto-fetch models when entering step 2
   useEffect(() => {
