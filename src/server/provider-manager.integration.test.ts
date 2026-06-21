@@ -10,7 +10,6 @@ vi.mock('./llm/index.js', () => ({
     getModel: vi.fn(() => 'test-model'),
     getBackend: vi.fn(() => 'vllm'),
   })),
-  detectBackend: vi.fn(() => Promise.resolve('vllm')),
   detectModel: vi.fn(() => Promise.resolve('test-model')),
   clearModelCache: vi.fn(),
   setLlmStatus: vi.fn(),

@@ -1,12 +1,5 @@
 import type { Provider, Config, LlmBackend, ModelConfig } from '../shared/types.js'
-import {
-  createLLMClient,
-  detectBackend,
-  detectModel,
-  clearModelCache,
-  getModelProfile,
-  type LLMClientWithModel,
-} from './llm/index.js'
+import { createLLMClient, detectModel, clearModelCache, getModelProfile, type LLMClientWithModel } from './llm/index.js'
 import { logger } from './utils/logger.js'
 import { ensureVersionPrefix, stripVersionPrefix, buildModelsUrl } from './llm/url-utils.js'
 
@@ -294,7 +287,7 @@ export function createProviderManager(config: Config): ProviderManager {
         ...config.llm,
         baseUrl: ensureVersionPrefix(provider.url),
         model,
-        backend: provider.backend as LlmBackend | 'auto',
+        backend: provider.backend as LlmBackend,
         ...(provider.apiKey && { apiKey: provider.apiKey }),
         ...(provider.thinkingField && { thinkingField: provider.thinkingField }),
         ...(modelThinking.reasoningEffort && { reasoningEffort: modelThinking.reasoningEffort }),
@@ -401,12 +394,7 @@ export function createProviderManager(config: Config): ProviderManager {
           providers = providers.map((p) => (p.id === providerId ? { ...p, models: userModels } : p))
         }
 
-        if (provider.backend === 'auto') {
-          const detected = await detectBackend(provider.url)
-          newClient.setBackend(detected)
-        } else {
-          newClient.setBackend(provider.backend as LlmBackend)
-        }
+        newClient.setBackend(provider.backend as LlmBackend)
 
         if (targetModel === 'auto') {
           const detected = await detectModel(provider.url)

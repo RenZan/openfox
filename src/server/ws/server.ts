@@ -385,8 +385,8 @@ export function createWebSocketServer(
       },
     }
     const client = createLLMClient(sessionConfig)
-    // Set backend from provider (skip auto-detect for cached clients)
-    if (provider.backend !== 'auto') {
+    // Set backend from provider
+    if (provider.backend !== 'unknown') {
       client.setBackend(provider.backend as import('../llm/index.js').Backend)
     }
     client.setModel(session.providerModel!)

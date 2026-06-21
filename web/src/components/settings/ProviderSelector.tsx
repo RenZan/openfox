@@ -305,7 +305,7 @@ export function ProviderSelector() {
                       {provider.name}
                     </span>
                     <span className="text-xs text-text-muted truncate">
-                      {provider.backend !== 'auto' && getBackendDisplayName(provider.backend)}
+                      {provider.backend !== 'unknown' && getBackendDisplayName(provider.backend)}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
@@ -416,7 +416,7 @@ export function ProviderSelector() {
             id: editingModel.providerId,
             name: editingProvider?.name ?? '',
             url: editingProvider?.url ?? '',
-            backend: editingProvider?.backend ?? 'auto',
+            backend: editingProvider?.backend ?? 'unknown',
             apiKey: editingProvider?.apiKey,
             isLocal: editingProvider?.isLocal,
             thinkingField: editingProvider?.thinkingField,

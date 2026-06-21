@@ -31,14 +31,14 @@ export async function runServe(options: ServeOptions): Promise<void> {
   const envUrl = env.llm.baseUrl
 
   // Only use env values if they're not the defaults (meaning they were explicitly set)
-  const isEnvBackendExplicit = envBackend !== 'auto'
+  const isEnvBackendExplicit = envBackend !== 'unknown'
   const isEnvModelExplicit = envModel !== 'qwen3.5-122b-int4-autoround' // default in config.ts
   const isEnvUrlExplicit = envUrl !== 'http://localhost:8000/v1' // default in config.ts
 
   // Get provider values with fallbacks
   const providerUrl = activeProvider?.url ?? envUrl
   const defaultModel = getDefaultModel(globalConfig) ?? envModel
-  const providerBackend = (activeProvider?.backend ?? envBackend) as LlmBackend | 'auto'
+  const providerBackend = (activeProvider?.backend ?? envBackend) as LlmBackend
 
   const merged = {
     ...env,

@@ -473,7 +473,7 @@ export interface Diagnostic {
 export type LlmBackend = 'vllm' | 'sglang' | 'ollama' | 'llamacpp' | 'opencode-go' | 'unknown'
 
 /** Extended backend type including cloud providers */
-export type ProviderBackend = LlmBackend | 'openai' | 'anthropic' | 'auto'
+export type ProviderBackend = LlmBackend | 'openai' | 'anthropic'
 
 /** Model configuration with context window */
 export interface ModelConfig {
@@ -521,8 +521,8 @@ export interface Config {
     model: string
     timeout: number
     idleTimeout: number
-    /** Backend type - 'auto' for auto-detection, or explicit backend name */
-    backend: LlmBackend | 'auto'
+    /** Backend type */
+    backend: LlmBackend
     /** API key for cloud providers */
     apiKey?: string
     /** Reasoning effort level (none, low, medium, high, etc.) */

@@ -16,7 +16,7 @@ const mockConfig: Config = {
     model: 'test-model',
     timeout: 300000,
     idleTimeout: 300000,
-    backend: 'auto',
+    backend: 'unknown',
   },
   context: {
     maxTokens: 200000,

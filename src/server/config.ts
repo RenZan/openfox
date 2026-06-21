@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import type { Config, LlmBackend } from '../shared/types.js'
 
-const backendSchema = z.enum(['auto', 'vllm', 'sglang', 'ollama', 'llamacpp']).default('auto')
+const backendSchema = z.enum(['vllm', 'sglang', 'ollama', 'llamacpp', 'unknown']).default('unknown')
 
 const envSchema = z.object({
   // New env var name, with fallback to old name for backward compatibility
@@ -36,7 +36,7 @@ export function loadConfig(): Config {
       model: env.OPENFOX_MODEL_NAME,
       timeout: 300_000, // 5 minutes (deprecated, kept for backward compatibility)
       idleTimeout: 300_000, // 5 minutes of inactivity
-      backend: env.OPENFOX_BACKEND as LlmBackend | 'auto',
+      backend: env.OPENFOX_BACKEND as LlmBackend,
       ...(env.OPENFOX_REASONING_EFFORT
         ? { reasoningEffort: env.OPENFOX_REASONING_EFFORT }
         : env.OPENFOX_DISABLE_THINKING

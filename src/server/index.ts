@@ -6,11 +6,11 @@ import { dirname, resolve, join } from 'node:path'
 import { readFile } from 'node:fs/promises'
 import { createServer as createViteServer, type ViteDevServer } from 'vite'
 
-import type { Config } from '../shared/types.js'
+import type { Config, ProviderBackend } from '../shared/types.js'
 import type { ServerHandle } from './context.js'
 import { initDatabase } from './db/index.js'
 import { initEventStore } from './events/index.js'
-import { detectModel, getLlmStatus, detectBackend, getBackendDisplayName, type Backend } from './llm/index.js'
+import { detectModel, getLlmStatus, getBackendDisplayName } from './llm/index.js'
 import { ensureVersionPrefix, buildModelsUrl } from './llm/url-utils.js'
 import { createMockLLMClient } from './llm/mock.js'
 import { createProviderManager, parseDefaultModelSelection } from './provider-manager.js'
@@ -90,21 +90,10 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
   // Auto-detect backend and model from LLM server
   async function initLLM(): Promise<void> {
     const llmClient = getLLMClient()
-    let backend: Backend
-    const useMock = process.env['OPENFOX_MOCK_LLM'] === 'true'
-
-    if (config.llm.backend === 'auto') {
-      backend = await detectBackend(config.llm.baseUrl, undefined, useMock)
-      llmClient.setBackend(backend)
-      if (!useMock) {
-        logger.info('Auto-detected LLM backend', { backend: getBackendDisplayName(backend) })
-      }
-    } else {
-      backend = config.llm.backend
-      llmClient.setBackend(backend)
-      if (!useMock) {
-        logger.info('Using configured LLM backend', { backend: getBackendDisplayName(backend) })
-      }
+    const backend = config.llm.backend
+    llmClient.setBackend(backend)
+    if (!useMock) {
+      logger.info('Using configured LLM backend', { backend: getBackendDisplayName(backend) })
     }
 
     const detected = await detectModel(config.llm.baseUrl)
@@ -835,18 +824,17 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
 
   // Onboarding: test LLM connection without adding provider
   app.post('/api/providers/test', async (req, res) => {
-    const { url, skipBackendDetection } = req.body as { url: string; skipBackendDetection?: boolean }
+    const { url, backend: reqBackend } = req.body as { url: string; backend?: string }
     if (!url) {
       return res.status(400).json({ error: 'url is required' })
     }
 
     try {
-      const backend = skipBackendDetection ? 'auto' : await detectBackend(url)
       const model = await detectModel(url)
       res.json({
         success: true,
         url,
-        backend,
+        backend: reqBackend || 'unknown',
         model,
       })
     } catch (error) {
@@ -967,15 +955,7 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
         await import('../cli/config.js')
       const globalConfig = await loadGlobalConfig(config.mode ?? 'production')
 
-      const providerBackend = backend as
-        | 'auto'
-        | 'vllm'
-        | 'sglang'
-        | 'ollama'
-        | 'llamacpp'
-        | 'openai'
-        | 'anthropic'
-        | 'opencode-go'
+      const providerBackend = backend as ProviderBackend
 
       const configWithProvider = addProvider(globalConfig, {
         name,

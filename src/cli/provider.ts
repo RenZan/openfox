@@ -1,5 +1,5 @@
 import { select, text, password, spinner, log, outro, isCancel, cancel } from '@clack/prompts'
-import { detectBackend, detectModel } from '../server/llm/index.js'
+import { detectModel } from '../server/llm/index.js'
 import { fetchAvailableModelsFromBackend } from '../server/provider-manager.js'
 import {
   loadGlobalConfig,
@@ -13,7 +13,6 @@ import type { Mode } from './main.js'
 import type { ProviderBackend } from '../shared/types.js'
 
 const BACKEND_OPTIONS = [
-  { value: 'auto', label: 'Auto-detect' },
   { value: 'vllm', label: 'vLLM' },
   { value: 'sglang', label: 'SGLang' },
   { value: 'ollama', label: 'Ollama' },
@@ -91,11 +90,6 @@ export async function runProviderAdd(mode: Mode): Promise<void> {
 
   let availableModels: string[] = []
   try {
-    // Detect backend first if needed
-    if (backend === 'auto') {
-      await detectBackend(url as string)
-    }
-
     // Fetch available models
     availableModels = await fetchAvailableModelsFromBackend(url as string)
     s.stop(`Found ${availableModels.length} model(s)`)
@@ -206,13 +200,10 @@ export async function runProviderAdd(mode: Mode): Promise<void> {
   const testSpinner = spinner()
   testSpinner.start(`Testing connection to ${url}...`)
 
-  let finalBackend = backend as string
+  const finalBackend = backend as string
   let finalDetectedModel: string | null = null
 
   try {
-    if (backend === 'auto') {
-      finalBackend = await detectBackend(url as string)
-    }
     if (selectedModel === 'auto') {
       finalDetectedModel = (await detectModel(url as string)) ?? 'auto'
     }

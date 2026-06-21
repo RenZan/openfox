@@ -65,7 +65,7 @@ function applyModelUpdate(
   )
 }
 
-type Backend = 'vllm' | 'sglang' | 'ollama' | 'llamacpp' | 'openai' | 'anthropic' | 'opencode-go' | 'auto' | 'unknown'
+type Backend = 'vllm' | 'sglang' | 'ollama' | 'llamacpp' | 'openai' | 'anthropic' | 'opencode-go' | 'unknown'
 type ProviderStatus = 'connected' | 'disconnected' | 'unknown'
 
 interface ModelConfig {
@@ -155,8 +155,6 @@ function getBackendDisplayName(backend: Backend): string {
       return 'Anthropic'
     case 'opencode-go':
       return 'OpenCode Go'
-    case 'auto':
-      return 'Auto'
     case 'unknown':
       return ''
   }

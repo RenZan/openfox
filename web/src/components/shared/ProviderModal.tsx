@@ -120,7 +120,6 @@ function TestResultBlock({
 const COMMON_PORTS = [8000, 11434, 8080]
 
 const BACKEND_OPTIONS: { value: Backend; label: string }[] = [
-  { value: 'auto', label: 'Auto-detect' },
   { value: 'vllm', label: 'vLLM' },
   { value: 'sglang', label: 'SGLang' },
   { value: 'ollama', label: 'Ollama' },
@@ -215,7 +214,7 @@ export function ProviderModal({
   const [formStep, setFormStep] = useState(initialStep)
   const [formName, setFormName] = useState('')
   const [formUrl, setFormUrl] = useState('')
-  const [formBackend, setFormBackend] = useState<Backend>('auto')
+  const [formBackend, setFormBackend] = useState<Backend>('unknown')
   const [formApiKey, setFormApiKey] = useState('')
   const [formIsLocal, setFormIsLocal] = useState(false)
   const [fetchingModels, setFetchingModels] = useState(false)
@@ -242,7 +241,7 @@ export function ProviderModal({
       setFormStep(initialStep)
       setFormName(editProvider?.name ?? '')
       setFormUrl(editProvider?.url ?? '')
-      setFormBackend(editProvider?.backend ?? 'auto')
+      setFormBackend(editProvider?.backend ?? 'unknown')
       setFormApiKey(editProvider?.apiKey ?? '')
       setFormIsLocal(editProvider?.isLocal ?? false)
       setFetchError(null)
@@ -435,7 +434,7 @@ export function ProviderModal({
                     onClick={() => {
                       setFormName('')
                       setFormUrl(`http://localhost:${port}`)
-                      setFormBackend('auto')
+                      setFormBackend('unknown')
                       setFetchError(null)
                     }}
                     className={`p-2 rounded border text-center text-sm transition-colors ${

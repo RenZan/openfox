@@ -17,13 +17,7 @@ export {
   type StreamResult,
   type StreamTiming,
 } from './streaming.js'
-export {
-  detectBackend,
-  getBackendCapabilities,
-  getBackendDisplayName,
-  type Backend,
-  type BackendCapabilities,
-} from './backend.js'
+export { getBackendCapabilities, getBackendDisplayName, type Backend, type BackendCapabilities } from './backend.js'
 export type {
   LLMClient,
   LLMMessage,

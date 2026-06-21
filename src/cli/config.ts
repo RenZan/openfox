@@ -4,33 +4,7 @@ import { readFile, writeFile, mkdir, access } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import type { Mode } from './main.js'
 import { getGlobalConfigPath } from './paths.js'
-import { detectBackend, detectModel } from '../server/llm/index.js'
 import type { Provider, ProviderBackend, ModelConfig } from '../shared/types.js'
-
-const SMART_DEFAULTS = ['http://localhost:8000', 'http://localhost:11434', 'http://localhost:8080']
-
-export async function trySmartDefaults(_mode: Mode): Promise<{ url: string; backend: string; model: string } | null> {
-  // Try all URLs in parallel, no retries
-  const results = await Promise.all(
-    SMART_DEFAULTS.map(async (url) => {
-      try {
-        const [backend, model] = await Promise.all([
-          detectBackend(url, undefined, true),
-          detectModel(url, 1, true), // Only 1 retry attempt
-        ])
-        if (backend !== 'unknown' && model) {
-          return { url, backend, model }
-        }
-      } catch {
-        // Silent fail
-      }
-      return null
-    }),
-  )
-
-  // Return first successful detection
-  return results.find((r) => r !== null) || null
-}
 
 export async function configFileExists(mode: Mode): Promise<boolean> {
   const configPath = getGlobalConfigPath(mode)
@@ -46,17 +20,7 @@ export async function configFileExists(mode: Mode): Promise<boolean> {
 // Schema Definitions
 // ============================================================================
 
-const backendSchema = z.enum([
-  'auto',
-  'vllm',
-  'sglang',
-  'ollama',
-  'llamacpp',
-  'openai',
-  'anthropic',
-  'opencode-go',
-  'unknown',
-])
+const backendSchema = z.enum(['vllm', 'sglang', 'ollama', 'llamacpp', 'openai', 'anthropic', 'opencode-go', 'unknown'])
 
 const modelConfigSchema = z
   .object({
@@ -143,7 +107,7 @@ const oldLlmSchema = z
   .object({
     url: z.string().url().default('http://localhost:8000/v1'),
     model: z.string().default('auto'),
-    backend: z.enum(['auto', 'vllm', 'sglang', 'ollama', 'llamacpp']).default('auto'),
+    backend: z.enum(['vllm', 'sglang', 'ollama', 'llamacpp', 'unknown']).default('unknown'),
     maxContext: z.number().default(200000),
     // Deprecated: use reasoningEffort instead
     disableThinking: z.boolean().optional(),
@@ -211,7 +175,10 @@ export function migrateConfig(raw: unknown): { config: GlobalConfig; migrated: b
     // Migrate legacy maxContext to models array
     let migrationOccurred = false
     const providers = obj.providers.map((p) => {
-      const { model, maxContext, models: existingModels, ...rest } = p
+      const { model, maxContext, models: existingModels, backend, ...rest } = p
+
+      // Normalize 'auto' backend to 'unknown' for backward compatibility
+      const normalizedBackend = backend === 'auto' ? 'unknown' : backend
 
       // If provider has legacy maxContext but no existing models array, migrate to models array
       let models: Array<{ id: string; contextWindow: number; source: 'backend' | 'user' | 'default' }> =
@@ -230,6 +197,7 @@ export function migrateConfig(raw: unknown): { config: GlobalConfig; migrated: b
 
       return {
         ...rest,
+        backend: normalizedBackend,
         models,
       }
     })
@@ -272,6 +240,13 @@ export function migrateConfig(raw: unknown): { config: GlobalConfig; migrated: b
 
   // Check if it's the old format (has llm object)
   if (typeof raw === 'object' && raw !== null && 'llm' in raw) {
+    // Normalize 'auto' backend to 'unknown' for backward compatibility
+    const rawObj = raw as Record<string, unknown>
+    const llm = rawObj['llm'] as Record<string, unknown> | undefined
+    if (llm && llm['backend'] === 'auto') {
+      llm['backend'] = 'unknown'
+    }
+
     const oldConfig = oldConfigSchema.parse(raw)
     const providerId = randomUUID()
 
@@ -556,7 +531,7 @@ export function mergeConfigs(...configs: Array<Partial<OldGlobalConfig>>): OldGl
       llm: {
         url: 'http://localhost:8000/v1',
         model: 'auto',
-        backend: 'auto' as 'auto' | 'vllm' | 'sglang' | 'ollama' | 'llamacpp',
+        backend: 'unknown' as 'vllm' | 'sglang' | 'ollama' | 'llamacpp' | 'unknown',
         maxContext: 200000,
       },
       server: { port: 10369, host: '127.0.0.1', openBrowser: true },
