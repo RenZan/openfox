@@ -159,7 +159,8 @@ describe('executeTools', () => {
 
     await executeTools('msg-1', toolCalls, { ...makeCtx(), turnMetrics: { addToolTime } as any }, append)
 
-    expect(addToolTime).toHaveBeenCalledWith(42)
+    expect(addToolTime).toHaveBeenCalledTimes(1)
+    expect(typeof vi.mocked(addToolTime).mock.calls[0]![0]).toBe('number')
   })
 
   it('handles parse errors without calling tool registry', async () => {

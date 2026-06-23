@@ -110,7 +110,6 @@ export async function executeTools(
         durationMs: 0,
         truncated: false,
       }
-      ctx.turnMetrics.addToolTime(toolResult.durationMs)
       append(createToolResultEvent(assistantMsgId, toolCall.id, toolResult))
       return {
         toolCall,
@@ -148,8 +147,6 @@ export async function executeTools(
       toolResult = await handleToolExecutionError(error, ctx.sessionId, startTime)
     }
 
-    ctx.turnMetrics.addToolTime(toolResult.durationMs)
-
     ctx.onToolExecuted?.(toolCall, toolResult)
 
     if (toolCall.name === 'return_value' && !toolCall.parseError) {
@@ -185,8 +182,10 @@ export async function executeTools(
     }
   }
 
+  const batchStart = Date.now()
   const executionPromises = toolCalls.map((toolCall, index) => executeTool(toolCall, index))
   const results = await Promise.all(executionPromises)
+  ctx.turnMetrics.addToolTime(Date.now() - batchStart)
 
   results.sort((a, b) => a.index - b.index)
 
