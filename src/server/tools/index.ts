@@ -15,6 +15,7 @@ import { webFetchTool } from './web-fetch.js'
 import { devServerTool } from './dev-server.js'
 import { stepDoneTool } from './step-done.js'
 import { backgroundProcessTool } from './background-process/index.js'
+import { loadAllAgentsDefault, findAgentById } from '../agents/registry.js'
 import { logger } from '../utils/logger.js'
 
 // ============================================================================
@@ -87,6 +88,15 @@ export function validateToolAction(
 // Registry Creation
 // ============================================================================
 
+/**
+ * Extract a prompt string from tool call arguments, trying common keys.
+ * Only explicit keys are checked — no fallback loop to avoid picking up
+ * unrelated string fields like subAgentType.
+ */
+function extractSubAgentPrompt(args: Record<string, unknown>): string {
+  return (args['prompt'] as string) || (args['query'] as string) || (args['task'] as string) || ''
+}
+
 export function createRegistryFromTools(
   tools: Tool[],
   allowedTools?: string[],
@@ -107,6 +117,26 @@ export function createRegistryFromTools(
       const tool = toolMap.get(name)
 
       if (!tool) {
+        // Sub-agent alias: if the tool name matches a sub-agent ID and
+        // call_sub_agent is available, redirect transparently.
+        // This handles models that hallucinate direct tool names like "explorer"
+        // instead of using call_sub_agent(subAgentType: "explorer", ...).
+        if (toolMap.has('call_sub_agent')) {
+          try {
+            const agents = await loadAllAgentsDefault()
+            const agentDef = findAgentById(name, agents)
+            if (agentDef?.metadata.subagent) {
+              const prompt = extractSubAgentPrompt(args)
+              logger.warn('Sub-agent alias redirect', { from: name, to: 'call_sub_agent', subAgentType: name })
+              return callSubAgentTool.execute({ subAgentType: name, prompt }, context)
+            }
+          } catch (err) {
+            logger.warn('Sub-agent alias resolution failed', {
+              tool: name,
+              error: err instanceof Error ? err.message : String(err),
+            })
+          }
+        }
         return {
           success: false,
           error: `Unknown tool: ${name}. Available tools: ${tools.map((t) => t.name).join(', ')}`,

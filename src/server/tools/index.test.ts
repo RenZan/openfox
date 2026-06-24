@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, beforeEach } from 'vitest'
 
 const {
   readExecuteMock,
@@ -10,6 +10,7 @@ const {
   todoExecuteMock,
   loadSkillExecuteMock,
   webFetchExecuteMock,
+  callSubAgentExecuteMock,
 } = vi.hoisted(() => ({
   readExecuteMock: vi.fn(async () => ({ success: true, output: 'read', durationMs: 1, truncated: false })),
   writeExecuteMock: vi.fn(async () => ({ success: true, output: 'write', durationMs: 1, truncated: false })),
@@ -25,6 +26,12 @@ const {
   todoExecuteMock: vi.fn(async () => ({ success: true, output: 'todo', durationMs: 1, truncated: false })),
   loadSkillExecuteMock: vi.fn(async () => ({ success: true, output: 'skill', durationMs: 1, truncated: false })),
   webFetchExecuteMock: vi.fn(async () => ({ success: true, output: 'web_fetch', durationMs: 1, truncated: false })),
+  callSubAgentExecuteMock: vi.fn(async () => ({
+    success: true,
+    output: 'sub-agent result',
+    durationMs: 1,
+    truncated: false,
+  })),
 }))
 
 vi.mock('./read.js', () => ({
@@ -96,6 +103,23 @@ vi.mock('./web-fetch.js', () => ({
     definition: { type: 'function', function: { name: 'web_fetch', description: 'Web Fetch', parameters: {} } },
     execute: webFetchExecuteMock,
   },
+}))
+
+vi.mock('./sub-agent.js', () => ({
+  callSubAgentTool: {
+    name: 'call_sub_agent',
+    definition: {
+      type: 'function',
+      function: { name: 'call_sub_agent', description: 'Call Sub-Agent', parameters: {} },
+    },
+    execute: callSubAgentExecuteMock,
+  },
+}))
+
+vi.mock('../agents/registry.js', () => ({
+  loadAllAgentsDefault: vi.fn(),
+  findAgentById: vi.fn(),
+  getSubAgents: vi.fn(),
 }))
 
 import { AskUserInterrupt } from './ask.js'
@@ -320,5 +344,119 @@ describe('tool registries', () => {
     const result = await restrictedRegistry.execute('session_metadata', { action: 'get', key: 'criteria' }, context)
 
     expect(result.success).toBe(true)
+  })
+
+  describe('sub-agent alias resolution', () => {
+    const mockExplorerDef = {
+      metadata: {
+        id: 'explorer',
+        name: 'Explorer',
+        description: 'Explore',
+        subagent: true,
+        allowedTools: ['read_file', 'run_command', 'web_fetch'],
+      },
+      prompt: 'Explore.',
+    }
+    const mockVerifierDef = {
+      metadata: {
+        id: 'verifier',
+        name: 'Verifier',
+        description: 'Verify',
+        subagent: true,
+        allowedTools: ['read_file', 'run_command', 'session_metadata:get,add,update,remove', 'web_fetch'],
+      },
+      prompt: 'Verify.',
+    }
+    const mockAgents = [mockExplorerDef, mockVerifierDef]
+
+    beforeEach(async () => {
+      vi.clearAllMocks()
+      const { loadAllAgentsDefault, findAgentById } = await import('../agents/registry.js')
+      vi.mocked(loadAllAgentsDefault).mockResolvedValue(mockAgents)
+      vi.mocked(findAgentById).mockImplementation((id: string, agents: typeof mockAgents) =>
+        agents.find((a: (typeof mockAgents)[0]) => a.metadata.id === id),
+      )
+    })
+
+    it('redirects unknown tool name matching sub-agent ID to call_sub_agent', async () => {
+      const allToolsRegistry = createToolRegistry()
+      const context = { workdir: '/tmp/project', sessionId: 'session-1', sessionManager: {} as never }
+
+      const result = await allToolsRegistry.execute('explorer', { prompt: 'find the entry point' }, context)
+
+      expect(result.success).toBe(true)
+      expect(result.output).toBe('sub-agent result')
+      expect(callSubAgentExecuteMock).toHaveBeenCalledWith(
+        { subAgentType: 'explorer', prompt: 'find the entry point' },
+        context,
+      )
+    })
+
+    it('extracts prompt from query or task fallback keys', async () => {
+      const allToolsRegistry = createToolRegistry()
+      const context = { workdir: '/tmp/project', sessionId: 'session-1', sessionManager: {} as never }
+
+      await allToolsRegistry.execute('explorer', { query: 'find the entry point' }, context)
+      expect(callSubAgentExecuteMock).toHaveBeenCalledWith(
+        { subAgentType: 'explorer', prompt: 'find the entry point' },
+        expect.anything(),
+      )
+
+      callSubAgentExecuteMock.mockClear()
+      await allToolsRegistry.execute('explorer', { task: 'find the entry point' }, context)
+      expect(callSubAgentExecuteMock).toHaveBeenCalledWith(
+        { subAgentType: 'explorer', prompt: 'find the entry point' },
+        expect.anything(),
+      )
+    })
+
+    it('works for any sub-agent ID, not just explorer', async () => {
+      const allToolsRegistry = createToolRegistry()
+      const context = { workdir: '/tmp/project', sessionId: 'session-1', sessionManager: {} as never }
+
+      const result = await allToolsRegistry.execute('verifier', { prompt: 'verify the criteria' }, context)
+
+      expect(result.success).toBe(true)
+      expect(callSubAgentExecuteMock).toHaveBeenCalledWith(
+        { subAgentType: 'verifier', prompt: 'verify the criteria' },
+        expect.anything(),
+      )
+    })
+
+    it('returns unknown tool error if name does not match any sub-agent', async () => {
+      const allToolsRegistry = createToolRegistry()
+      const context = { workdir: '/tmp/project', sessionId: 'session-1', sessionManager: {} as never }
+
+      const result = await allToolsRegistry.execute('nonexistent_tool', { prompt: 'test' }, context)
+
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('Unknown tool: nonexistent_tool')
+      expect(callSubAgentExecuteMock).not.toHaveBeenCalled()
+    })
+
+    it('does not redirect if call_sub_agent is not in the tool map', async () => {
+      const allToolsRegistry = createToolRegistry()
+      const context = { workdir: '/tmp/project', sessionId: 'session-1', sessionManager: {} as never }
+
+      const tools = allToolsRegistry.tools.filter((t) => t.name !== 'call_sub_agent')
+      const registry = createRegistryFromTools(
+        tools,
+        tools.map((t) => t.name),
+      )
+
+      const result = await registry.execute('explorer', { prompt: 'test' }, context)
+
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('Unknown tool: explorer')
+      expect(callSubAgentExecuteMock).not.toHaveBeenCalled()
+    })
+
+    it('definitions array does not include sub-agent aliases', () => {
+      const allToolsRegistry = createToolRegistry()
+      const defNames = allToolsRegistry.definitions.map((d) => d.function.name)
+      expect(defNames).not.toContain('explorer')
+      expect(defNames).not.toContain('verifier')
+      expect(defNames).toContain('call_sub_agent')
+    })
   })
 })
