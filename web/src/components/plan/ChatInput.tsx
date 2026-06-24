@@ -5,7 +5,8 @@ import type { PromptHistoryItem } from '../../hooks/usePromptHistory'
 import { AttachmentPreview } from '../shared/AttachmentPreview.js'
 import { PromptHistoryList } from '../shared/PromptHistory.js'
 import { RunningIndicator } from '../shared/RunningIndicator'
-import { SearchIcon, ChevronDownIcon, StopIcon } from '../shared/icons'
+import { AutoScrollToggle } from '../shared/AutoScrollToggle'
+import { SearchIcon, StopIcon } from '../shared/icons'
 import { processImageFile } from '../../lib/image-processing.js'
 import { CHAT_TEXTAREA_ID } from '../../lib/focusChatTextarea'
 import { MoreMenu } from './MoreMenu'
@@ -283,18 +284,11 @@ export function ChatInput({
         </div>
       )}
       <div className="absolute -top-8 right-2 md:right-4 z-10 flex items-center gap-2">
-        <button
-          type="button"
+        <AutoScrollToggle
+          isActive={isAutoScrollActive}
+          onToggle={setAutoScroll}
           className="text-sm text-text-muted hover:text-text-primary flex items-center gap-1.5 px-2 py-0.5 rounded hover:bg-bg-tertiary transition-colors"
-          onClick={() => setAutoScroll(!isAutoScrollActive)}
-        >
-          {isAutoScrollActive ? (
-            <span className="w-1.5 h-1.5 rounded-full bg-accent-success" />
-          ) : (
-            <ChevronDownIcon className="w-3 h-3 text-text-muted" />
-          )}
-          {isAutoScrollActive ? 'live' : 'scroll to bottom'}
-        </button>
+        />
         <button
           type="button"
           onClick={onOpenMessageSearch}

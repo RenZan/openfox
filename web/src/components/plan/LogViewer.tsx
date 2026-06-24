@@ -1,6 +1,8 @@
-import { memo, useEffect, useRef } from 'react'
+import { memo, useRef } from 'react'
 import { Modal } from '../shared/Modal'
 import { LogRenderer } from '../shared/LogRenderer'
+import { AutoScrollToggle } from '../shared/AutoScrollToggle'
+import { useAutoScroll } from '../../hooks/useAutoScroll'
 
 interface LogViewerProps {
   title: string
@@ -10,17 +12,26 @@ interface LogViewerProps {
 }
 
 export const LogViewer = memo(function LogViewer({ title, logs, onClose, preClassName }: LogViewerProps) {
-  const logRef = useRef<HTMLPreElement>(null)
-
-  useEffect(() => {
-    if (logRef.current) {
-      logRef.current.scrollTop = logRef.current.scrollHeight
-    }
-  }, [logs])
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const { isAutoScrollActive, setAutoScroll } = useAutoScroll(scrollRef, null)
 
   return (
-    <Modal isOpen={true} onClose={onClose} title={title} size="full">
-      <LogRenderer logs={logs} preRef={logRef} preClassName={preClassName} />
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title={title}
+      size="full"
+      headerRight={
+        <AutoScrollToggle
+          isActive={isAutoScrollActive}
+          onToggle={setAutoScroll}
+          className="text-xs text-text-muted hover:text-text-primary flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-bg-tertiary transition-colors"
+        />
+      }
+    >
+      <div ref={scrollRef} className="h-full overflow-y-auto">
+        <LogRenderer logs={logs} preClassName={preClassName} />
+      </div>
     </Modal>
   )
 })

@@ -5,6 +5,7 @@ import { CloseButton } from './IconButton'
 interface ModalProps {
   label?: ReactNode
   title?: string
+  headerRight?: ReactNode
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'full'
   minHeight?: string
   children: ReactNode
@@ -28,6 +29,7 @@ const sizeClasses = {
 export function Modal({
   label,
   title,
+  headerRight,
   size = 'md',
   minHeight,
   children,
@@ -90,10 +92,13 @@ export function Modal({
                 <div
                   className={`relative w-full ${sizeClasses[size]} max-h-[90vh] bg-bg-secondary border border-border rounded shadow-xl flex flex-col`}
                 >
-                  {(title || showCloseButton) && (
+                  {(title || headerRight || showCloseButton) && (
                     <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                       {title && <h2 className="text-lg font-semibold text-text-primary">{title}</h2>}
-                      {showCloseButton && <CloseButton onClick={close} className="ml-auto" aria-label="Close" />}
+                      <div className="flex items-center gap-2 ml-auto">
+                        {headerRight}
+                        {showCloseButton && <CloseButton onClick={close} aria-label="Close" />}
+                      </div>
                     </div>
                   )}
                   <div className="p-4 overflow-y-auto flex-1 min-h-0" style={minHeight ? { minHeight } : undefined}>
