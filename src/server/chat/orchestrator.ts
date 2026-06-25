@@ -103,6 +103,9 @@ export interface OrchestratorOptions {
   signal?: AbortSignal
   /** Optional callback for WebSocket forwarding (temporary, until WS layer is refactored) */
   onMessage?: (msg: ServerMessage) => void
+  /** When true, the agent loop starts in compacting mode (manual compaction).
+   *  After compaction completes, the loop breaks. */
+  initialCompacting?: boolean
 }
 
 function resolveStatsIdentity(options: OrchestratorOptions): StatsIdentity {
@@ -370,6 +373,7 @@ export async function runAgentTurn(
       getToolRegistry: () => getToolRegistryForAgent(agentDef),
       getConversationMessages: buildGetConversationMessages(options.sessionId, options.llmClient, append),
       injectAgentReminder: () => injectAgentReminder(options.sessionId, agentDef),
+      ...(options.initialCompacting ? { initialCompacting: true } : {}),
       ...(callbacks?.injectKickoff ? { injectKickoff: callbacks.injectKickoff } : {}),
       ...(callbacks?.onToolExecuted ? { onToolExecuted: callbacks.onToolExecuted } : {}),
     },

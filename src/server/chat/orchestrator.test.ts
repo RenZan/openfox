@@ -248,7 +248,6 @@ function createSessionManager(state: Record<string, any>) {
       contextState.currentTokens = tokens
     }),
     addTokensUsed: vi.fn(),
-    compactContext: vi.fn(),
     getCurrentModelSettings: vi.fn(() => undefined),
     getLspManager: vi.fn(() => ({ name: 'lsp' })),
     setRunning: vi.fn(),

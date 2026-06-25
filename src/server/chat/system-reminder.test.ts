@@ -50,7 +50,6 @@ function createSessionManager(state: any) {
     })),
     setCurrentContextSize: vi.fn(),
     addTokensUsed: vi.fn(),
-    compactContext: vi.fn(),
     getLspManager: vi.fn(() => ({ name: 'lsp' })),
     setRunning: vi.fn(),
     updateExecutionState: vi.fn(),

@@ -901,24 +901,7 @@ describe('createWebSocketServer', () => {
     getToolRegistryForModeMock.mockReturnValue({
       definitions: [{ type: 'function', function: { name: 'read_file', description: 'Read', parameters: {} } }],
     })
-    streamLLMPureMock.mockReturnValue({ kind: 'stream' })
-    consumeStreamGeneratorMock
-      .mockResolvedValueOnce({
-        content: 'Compacted summary of the session including all file modifications and current progress on tasks',
-        toolCalls: [],
-        segments: [],
-        usage: { promptTokens: 10, completionTokens: 4 },
-        timing: { ttft: 1, completionTime: 1, tps: 4, prefillTps: 10 },
-        aborted: false,
-      })
-      .mockResolvedValueOnce({
-        content: 'Orchestrator summary',
-        toolCalls: [],
-        segments: [],
-        usage: { promptTokens: 15, completionTokens: 3 },
-        timing: { ttft: 1, completionTime: 1, tps: 3, prefillTps: 15 },
-        aborted: false,
-      })
+    runChatTurnMock.mockResolvedValue(undefined)
     runOrchestratorMock.mockResolvedValue({ success: true })
     providePathConfirmationMock.mockReturnValueOnce({ found: false }).mockReturnValueOnce({ found: true })
 
@@ -951,9 +934,6 @@ describe('createWebSocketServer', () => {
     expect(await harness.nextMessage((message) => message.id === 'compact')).toMatchObject({ type: 'ack' })
     expect(await harness.nextMessage((message) => message.type === 'context.state')).toMatchObject({
       type: 'context.state',
-    })
-    expect(await harness.nextMessage((message) => message.type === 'session.state')).toMatchObject({
-      type: 'session.state',
     })
 
     harness.send({ id: 'path-missing', type: 'path.confirm', payload: { callId: 'call-1', approved: true } })
@@ -1067,10 +1047,8 @@ describe('createWebSocketServer', () => {
         dynamicContextChanged: false,
       })),
     })
-    // Make getCachedPrompt throw to simulate compaction failure
-    sessionManager.getCachedPrompt = vi.fn(() => {
-      throw new Error('compact blew up')
-    })
+    // Make runChatTurn reject to simulate compaction failure
+    runChatTurnMock.mockRejectedValue(new Error('compact blew up'))
     const harness = await createHarness({ sessionManager })
 
     harness.send({ id: 'sl-ok', type: 'session.load', payload: { sessionId: 'session-1' } })

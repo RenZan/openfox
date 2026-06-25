@@ -10,7 +10,7 @@ import type { Config } from '../config.js'
 import type { LLMClientWithModel } from '../llm/client.js'
 import type { SessionManager } from '../session/index.js'
 import { getEventStore } from '../events/index.js'
-import { buildMessagesFromStoredEvents, foldPendingConfirmations } from '../events/folding.js'
+
 import type { Message, Provider, ProviderBackend, StatsIdentity, Attachment } from '../../shared/types.js'
 import type { ProviderManager } from '../provider-manager.js'
 import { createLLMClient } from '../llm/index.js'
@@ -18,7 +18,7 @@ import { ensureVersionPrefix } from '../llm/url-utils.js'
 import { runChatTurn } from '../chat/orchestrator.js'
 
 import { runOrchestrator } from '../runner/index.js'
-import { compactContext } from '../context/auto-compaction.js'
+import { appendCompactionPrompt } from '../context/compactor.js'
 import { getAllInstructions } from '../context/instructions.js'
 import { getEnabledSkillMetadata } from '../skills/registry.js'
 import { loadAllAgentsDefault, getSubAgents } from '../agents/registry.js'
@@ -36,7 +36,6 @@ import {
   parseClientMessage,
   serializeServerMessage,
   createErrorMessage,
-  createSessionStateMessage,
   createSessionRunningMessage,
   createChatMessageMessage,
   createChatErrorMessage,
@@ -896,33 +895,24 @@ async function handleClientMessage(
       // Acknowledge immediately
       send({ type: 'ack', payload: {}, id: message.id })
 
-      // Perform compaction (direct LLM call, no agent loop)
-      ;(async () => {
-        try {
-          await compactContext({
-            sessionManager,
-            sessionId,
-            llmClient: llmForSession(sessionId),
-            statsIdentity: statsForSession(sessionId),
-          })
+      // Append compaction prompt to event store (shared helper, same as agent-loop.ts auto-compaction trigger)
+      appendCompactionPrompt(sessionId, (event) => getEventStore().append(sessionId, event))
 
-          // Send updated context state
+      // Run through the agent loop — same path as auto-compaction and normal turns
+      runChatTurn({
+        sessionManager,
+        sessionId,
+        llmClient: llmForSession(sessionId),
+        statsIdentity: statsForSession(sessionId),
+        onMessage: (msg) => _broadcastForSession(sessionId, msg),
+        initialCompacting: true,
+      })
+        .then(() => {
           const newContextState = sessionManager.getContextState(sessionId)
           sendForSession(sessionId, createContextStateMessage(newContextState))
-
-          // Send updated session state so client sees the compaction summary
-          const updatedSession = sessionManager.requireSession(sessionId)
-          const compactEventStore = getEventStore()
-          const compactEvents = compactEventStore.getEvents(sessionId)
-          const compactMessages = buildMessagesFromStoredEvents(compactEvents)
-          const pendingConfirmations = foldPendingConfirmations(compactEvents)
-          const { getPendingQuestionsForSession } = await import('../tools/index.js')
-          const pendingQuestions = getPendingQuestionsForSession(sessionId)
-          sendForSession(
-            sessionId,
-            createSessionStateMessage(updatedSession, compactMessages, pendingConfirmations, pendingQuestions),
-          )
-        } catch (error) {
+        })
+        .catch((error) => {
+          if (error instanceof Error && error.message === 'Aborted') return
           logger.error('Compaction failed', { error, sessionId })
           sendForSession(
             sessionId,
@@ -931,8 +921,7 @@ async function handleClientMessage(
               true,
             ),
           )
-        }
-      })()
+        })
 
       break
     }

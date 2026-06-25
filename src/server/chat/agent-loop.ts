@@ -130,6 +130,9 @@ export interface TopLevelLoopConfig {
   /** Build conversation messages for the LLM, with image processing applied.
    *  Called each iteration to get fresh context. */
   getConversationMessages: () => Promise<RequestContextMessage[]>
+  /** When true, the loop starts in compacting mode (used for manual compaction).
+   *  After compaction completes, the loop breaks instead of continuing. */
+  initialCompacting?: boolean
 }
 
 // ============================================================================
@@ -152,7 +155,7 @@ export async function runTopLevelAgentLoop(
   let returnValueResult: string | undefined
   let currentMaxTokensOverride: number | undefined
   let lastPatternMatch: { pattern: string; field: string; matchedContent: string } | undefined
-  let compacting = false
+  let compacting = config.initialCompacting ?? false
   let returnValueNudgeCount = 0
 
   for (;;) {
@@ -307,20 +310,11 @@ export async function runTopLevelAgentLoop(
     // handle summarization — same agent, same loop, no nested call.
     if (!compacting) {
       const contextState = sessionManager.getContextState(sessionId)
-      const { shouldCompact } = await import('../context/compactor.js')
+      const { shouldCompact, appendCompactionPrompt } = await import('../context/compactor.js')
       if (
         shouldCompact(contextState.currentTokens, contextState.maxTokens, runtimeConfig.context.compactionThreshold)
       ) {
-        const compactPromptMsgId = crypto.randomUUID()
-        append(
-          createMessageStartEvent(compactPromptMsgId, 'user', COMPACTION_PROMPT, {
-            ...(currentWindowMessageOptions ?? {}),
-            isSystemGenerated: true,
-            messageKind: 'auto-prompt',
-            metadata: { type: 'compaction', name: 'Compaction', color: '#64748b' },
-          }),
-        )
-        append({ type: 'message.done', data: { messageId: compactPromptMsgId } })
+        appendCompactionPrompt(sessionId, append)
         compacting = true
         continue
       }
@@ -482,6 +476,7 @@ ${COMPACTION_PROMPT}`,
         })
         logger.warn('Compaction produced empty summary, continuing', { sessionId })
         compacting = false
+        if (config.initialCompacting) break
         continue
       }
 
@@ -507,9 +502,13 @@ ${COMPACTION_PROMPT}`,
       append(createMessageDoneEvent(assistantMsgId, { stats: turnMetrics.buildStats(statsIdentity, mode) }))
       append(createChatDoneEvent(assistantMsgId, 'complete'))
 
-      // Reinject the agent reminder into the new window and continue normally
+      // Reinject the agent reminder into the new window
       config.injectAgentReminder?.()
       compacting = false
+
+      // Manual compaction (initialCompacting) is a one-shot operation — break after done.
+      // Auto-compaction continues the loop for subsequent user messages.
+      if (config.initialCompacting) break
       continue
     }
 
