@@ -18,7 +18,7 @@ interface McpToolInfo {
 
 interface McpServerState {
   name: string
-  config: { transport: string; command?: string; args?: string[] }
+  config: { transport: string; command?: string; args?: string[]; url?: string; headers?: Record<string, string> }
   status: 'connected' | 'disconnected' | 'error'
   tools: McpToolInfo[]
   estimatedTokens: number
@@ -36,7 +36,15 @@ export function McpTab() {
   const [showAddForm, setShowAddForm] = useState(false)
   const [expandedServers, setExpandedServers] = useState<Set<string>>(new Set())
   const [expandedDescs, setExpandedDescs] = useState<Set<string>>(new Set())
-  const [formData, setFormData] = useState({ name: '', command: '', args: '', env: '' })
+  const [formData, setFormData] = useState({
+    name: '',
+    transport: 'stdio' as 'stdio' | 'http',
+    command: '',
+    args: '',
+    env: '',
+    url: '',
+    headers: '',
+  })
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
   const { requestDelete, clearConfirm, isConfirming } = useConfirmDialog()
@@ -67,41 +75,62 @@ export function McpTab() {
 
   const handleAdd = async () => {
     setFormError('')
-    if (!formData.name || !formData.command) {
-      setFormError('Name and command are required')
+    if (!formData.name) {
+      setFormError('Name is required')
+      return
+    }
+    if (formData.transport === 'stdio' && !formData.command) {
+      setFormError('Command is required for stdio transport')
+      return
+    }
+    if (formData.transport === 'http' && !formData.url) {
+      setFormError('URL is required for HTTP transport')
       return
     }
     setSaving(true)
     try {
-      const args = formData.args ? formData.args.split(' ').filter(Boolean) : undefined
-      const env: Record<string, string> = {}
-      if (formData.env) {
-        formData.env
+      const parseKeyValueLines = (text: string): Record<string, string> => {
+        const result: Record<string, string> = {}
+        text
           .split('\n')
           .filter(Boolean)
           .forEach((line) => {
             const eqIdx = line.indexOf('=')
             if (eqIdx > 0) {
-              env[line.slice(0, eqIdx).trim()] = line.slice(eqIdx + 1).trim()
+              result[line.slice(0, eqIdx).trim()] = line.slice(eqIdx + 1).trim()
             }
           })
+        return result
       }
+
+      const body: Record<string, unknown> = {
+        name: formData.name,
+        transport: formData.transport,
+      }
+
+      if (formData.transport === 'stdio') {
+        body.command = formData.command
+        const args = formData.args ? formData.args.split(' ').filter(Boolean) : undefined
+        if (args && args.length > 0) body.args = args
+        const env = parseKeyValueLines(formData.env)
+        if (Object.keys(env).length > 0) body.env = env
+      } else {
+        body.url = formData.url
+        const headers = parseKeyValueLines(formData.headers)
+        if (Object.keys(headers).length > 0) body.headers = headers
+      }
+
       const res = await authFetch('/api/mcp/servers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: formData.name,
-          command: formData.command,
-          args,
-          env: Object.keys(env).length > 0 ? env : undefined,
-        }),
+        body: JSON.stringify(body),
       })
       if (!res.ok) {
         const data = await res.json()
         throw new Error(data.error ?? 'Failed to add server')
       }
       setShowAddForm(false)
-      setFormData({ name: '', command: '', args: '', env: '' })
+      setFormData({ name: '', transport: 'stdio', command: '', args: '', env: '', url: '', headers: '' })
       await loadServers()
     } catch (err) {
       setFormError(err instanceof Error ? err.message : String(err))
@@ -210,6 +239,7 @@ export function McpTab() {
                     {server.config.command} {server.config.args?.join(' ') ?? ''}
                   </div>
                 )}
+                {server.config.url && <div className="text-xs text-text-muted font-mono">{server.config.url}</div>}
                 {server.tools.length === 0 ? (
                   <div className="text-xs text-text-muted">No tools available</div>
                 ) : (
@@ -316,30 +346,83 @@ export function McpTab() {
               onChange={(v) => setFormData({ ...formData, name: v })}
               placeholder="e.g. filesystem"
             />
-            <FormField
-              label="Command"
-              value={formData.command}
-              onChange={(v) => setFormData({ ...formData, command: v })}
-              placeholder="e.g. npx"
-            />
-            <FormField
-              label="Arguments"
-              value={formData.args}
-              onChange={(v) => setFormData({ ...formData, args: v })}
-              placeholder="space-separated args"
-            />
+
             <div>
-              <label className="block text-xs text-text-secondary mb-1">
-                Environment variables <span className="text-text-muted">(KEY=VALUE, one per line)</span>
-              </label>
-              <textarea
-                value={formData.env}
-                onChange={(e) => setFormData({ ...formData, env: e.target.value })}
-                placeholder="API_KEY=xxx"
-                className="w-full px-2 py-1.5 bg-bg-tertiary border border-border rounded text-sm font-mono resize-none focus:outline-none focus:ring-1 focus:ring-accent-primary"
-                rows={3}
-              />
+              <label className="block text-xs text-text-secondary mb-1">Transport</label>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setFormData({ ...formData, transport: 'stdio' })}
+                  className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                    formData.transport === 'stdio'
+                      ? 'bg-accent-primary text-white'
+                      : 'bg-bg-tertiary text-text-secondary hover:bg-bg-primary'
+                  }`}
+                >
+                  Stdio
+                </button>
+                <button
+                  onClick={() => setFormData({ ...formData, transport: 'http' })}
+                  className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                    formData.transport === 'http'
+                      ? 'bg-accent-primary text-white'
+                      : 'bg-bg-tertiary text-text-secondary hover:bg-bg-primary'
+                  }`}
+                >
+                  HTTP
+                </button>
+              </div>
             </div>
+
+            {formData.transport === 'stdio' ? (
+              <>
+                <FormField
+                  label="Command"
+                  value={formData.command}
+                  onChange={(v) => setFormData({ ...formData, command: v })}
+                  placeholder="e.g. npx"
+                />
+                <FormField
+                  label="Arguments"
+                  value={formData.args}
+                  onChange={(v) => setFormData({ ...formData, args: v })}
+                  placeholder="space-separated args"
+                />
+                <div>
+                  <label className="block text-xs text-text-secondary mb-1">
+                    Environment variables <span className="text-text-muted">(KEY=VALUE, one per line)</span>
+                  </label>
+                  <textarea
+                    value={formData.env}
+                    onChange={(e) => setFormData({ ...formData, env: e.target.value })}
+                    placeholder="API_KEY=xxx"
+                    className="w-full px-2 py-1.5 bg-bg-tertiary border border-border rounded text-sm font-mono resize-none focus:outline-none focus:ring-1 focus:ring-accent-primary"
+                    rows={3}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <FormField
+                  label="URL"
+                  value={formData.url}
+                  onChange={(v) => setFormData({ ...formData, url: v })}
+                  placeholder="e.g. https://mcp.example.com/mcp"
+                />
+                <div>
+                  <label className="block text-xs text-text-secondary mb-1">
+                    Headers <span className="text-text-muted">(KEY=VALUE, one per line)</span>
+                  </label>
+                  <textarea
+                    value={formData.headers}
+                    onChange={(e) => setFormData({ ...formData, headers: e.target.value })}
+                    placeholder="X-API-Key=xxx"
+                    className="w-full px-2 py-1.5 bg-bg-tertiary border border-border rounded text-sm font-mono resize-none focus:outline-none focus:ring-1 focus:ring-accent-primary"
+                    rows={3}
+                  />
+                </div>
+              </>
+            )}
+
             {formError && <ErrorBanner message={formError} />}
             <div className="flex justify-end gap-2 pt-2 border-t border-border">
               <Button
@@ -348,6 +431,7 @@ export function McpTab() {
                   setShowAddForm(false)
                   setFormError('')
                   setSaving(false)
+                  setFormData({ name: '', transport: 'stdio', command: '', args: '', env: '', url: '', headers: '' })
                 }}
                 disabled={saving}
               >

@@ -81,6 +81,7 @@ const mcpServerSchema = z.object({
   args: z.array(z.string()).optional(),
   env: z.record(z.string(), z.string()).optional(),
   url: z.string().optional(),
+  headers: z.record(z.string(), z.string()).optional(),
   disabledTools: z.array(z.string()).optional(),
 })
 

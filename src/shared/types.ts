@@ -579,6 +579,7 @@ export interface Config {
           args?: string[]
           env?: Record<string, string>
           url?: string
+          headers?: Record<string, string>
           disabledTools?: string[]
         }
       >

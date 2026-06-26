@@ -1223,22 +1223,34 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
   })
 
   app.post('/api/mcp/servers/test', async (req, res) => {
-    const { name, command, args, env } = req.body as {
+    const { name, transport, command, args, env, url, headers } = req.body as {
       name?: string
+      transport?: string
       command?: string
       args?: string[]
       env?: Record<string, string>
+      url?: string
+      headers?: Record<string, string>
     }
-    if (!command) {
-      return res.status(400).json({ error: 'command is required' })
+    if (transport !== undefined && transport !== 'stdio' && transport !== 'http') {
+      return res.status(400).json({ error: `Invalid transport '${transport}'. Must be 'stdio' or 'http'.` })
+    }
+    if (transport !== 'http' && !command) {
+      return res.status(400).json({ error: 'command is required for stdio transport' })
+    }
+    if (transport === 'http' && !url) {
+      return res.status(400).json({ error: 'url is required for http transport' })
     }
     try {
       const testManager = new McpManager()
+      const resolvedTransport: 'stdio' | 'http' = transport === 'http' ? 'http' : 'stdio'
       const testConfig: import('./mcp/types.js').McpServerConfig = {
-        transport: 'stdio',
-        command,
+        transport: resolvedTransport,
+        ...(command ? { command } : {}),
         ...(args && args.length > 0 ? { args } : {}),
         ...(env && Object.keys(env).length > 0 ? { env } : {}),
+        ...(url ? { url } : {}),
+        ...(headers && Object.keys(headers).length > 0 ? { headers } : {}),
       }
       await testManager.addServer(name ?? 'test', testConfig)
       const server = testManager.getServer(name ?? 'test')
@@ -1254,24 +1266,30 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
   })
 
   app.post('/api/mcp/servers', async (req, res) => {
-    const { name, transport, command, args, env, url } = req.body as {
+    const { name, transport, command, args, env, url, headers } = req.body as {
       name?: string
       transport?: string
       command?: string
       args?: string[]
       env?: Record<string, string>
       url?: string
+      headers?: Record<string, string>
     }
     if (!name) {
       return res.status(400).json({ error: 'name is required' })
     }
+    if (transport !== undefined && transport !== 'stdio' && transport !== 'http') {
+      return res.status(400).json({ error: `Invalid transport '${transport}'. Must be 'stdio' or 'http'.` })
+    }
     try {
+      const resolvedTransport: 'stdio' | 'http' = transport === 'http' ? 'http' : 'stdio'
       const serverCfg: import('./mcp/types.js').McpServerConfig = {
-        transport: (transport as 'stdio' | 'http') ?? 'stdio',
+        transport: resolvedTransport,
         ...(command ? { command } : {}),
         ...(args && args.length > 0 ? { args } : {}),
         ...(env && Object.keys(env).length > 0 ? { env } : {}),
         ...(url ? { url } : {}),
+        ...(headers && Object.keys(headers).length > 0 ? { headers } : {}),
       }
       await mcpManager.addServer(name, serverCfg)
       const server = mcpManager.getServer(name)

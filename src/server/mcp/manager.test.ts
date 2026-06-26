@@ -43,6 +43,17 @@ vi.mock('@modelcontextprotocol/sdk/client/stdio.js', () => ({
   }),
 }))
 
+const mockHttpTransportInstance = {
+  start: vi.fn().mockResolvedValue(undefined),
+  close: vi.fn().mockResolvedValue(undefined),
+}
+
+vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', () => ({
+  StreamableHTTPClientTransport: vi.fn(function () {
+    return mockHttpTransportInstance
+  }),
+}))
+
 describe('McpManager', () => {
   let manager: McpManager
 
@@ -69,6 +80,41 @@ describe('McpManager', () => {
     it('should reject duplicate server names', async () => {
       await manager.addServer('test', { transport: 'stdio', command: 'node' })
       await expect(manager.addServer('test', { transport: 'stdio', command: 'node' })).rejects.toThrow('already exists')
+    })
+
+    it('should connect to an HTTP server and discover tools', async () => {
+      await manager.addServer('http-server', {
+        transport: 'http',
+        url: 'https://mcp.example.com/mcp',
+        headers: { 'X-API-Key': 'secret123' },
+      })
+
+      const server = manager.getServer('http-server')
+      expect(server).toBeDefined()
+      expect(server!.status).toBe('connected')
+      expect(server!.tools).toHaveLength(2)
+      expect(server!.tools[0]!.name).toBe('get_weather')
+
+      const { StreamableHTTPClientTransport } = await import('@modelcontextprotocol/sdk/client/streamableHttp.js')
+      expect(StreamableHTTPClientTransport).toHaveBeenCalledWith(
+        new URL('https://mcp.example.com/mcp'),
+        expect.objectContaining({
+          requestInit: expect.objectContaining({
+            headers: { 'X-API-Key': 'secret123' },
+          }),
+        }),
+      )
+    })
+
+    it('should set server to error state when HTTP transport is missing url', async () => {
+      await manager.addServer('bad-http', {
+        transport: 'http',
+      } as any)
+
+      const server = manager.getServer('bad-http')
+      expect(server).toBeDefined()
+      expect(server!.status).toBe('error')
+      expect(server!.error).toContain('url is required')
     })
 
     it('should apply disabledTools filter', async () => {

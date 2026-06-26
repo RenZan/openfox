@@ -1,5 +1,8 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
+import type { StreamableHTTPClientTransportOptions } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 import type { McpServerConfig, McpServerState, McpToolInfo, McpManagerOptions } from './types.js'
 import type { LLMToolDefinition } from '../llm/types.js'
 import { logger } from '../utils/logger.js'
@@ -20,7 +23,7 @@ export function estimateToolTokens(
 interface ServerEntry {
   config: McpServerConfig
   client: Client | undefined
-  transport: StdioClientTransport | null
+  transport: Transport | null
   state: McpServerState
 }
 
@@ -57,7 +60,7 @@ export class McpManager {
       await this.disconnectServer(name)
 
       const client = new Client({ name: 'openfox-mcp', version: '2.0.0' })
-      let transport: StdioClientTransport | null = null
+      let transport: Transport | null = null
 
       if (entry.config.transport === 'stdio') {
         if (!entry.config.command) throw new Error('command is required for stdio transport')
@@ -67,10 +70,19 @@ export class McpManager {
           ...(entry.config.env ? { env: entry.config.env } : {}),
           stderr: 'pipe',
         })
-        await client.connect(transport)
+      } else if (entry.config.transport === 'http') {
+        if (!entry.config.url) throw new Error('url is required for http transport')
+        const httpOpts: StreamableHTTPClientTransportOptions = {}
+        if (entry.config.headers) {
+          httpOpts.requestInit = { headers: entry.config.headers }
+        }
+        transport = new StreamableHTTPClientTransport(new URL(entry.config.url), httpOpts) as unknown as Transport
       } else {
-        throw new Error('Only stdio transport is supported in this version')
+        throw new Error(`Unsupported transport: ${entry.config.transport}`)
       }
+
+      if (!transport) throw new Error('Failed to create transport')
+      await client.connect(transport)
 
       const { tools: mcpTools } = await client.listTools()
 
