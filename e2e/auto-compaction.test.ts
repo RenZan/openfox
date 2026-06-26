@@ -297,6 +297,48 @@ describe('Auto-Compaction', () => {
     })
   })
 
+  describe('Manual Compaction State Cleanup', () => {
+    it('resets isRunning after manual compaction and allows new messages to be processed', async () => {
+      // Build some context first
+      await client.send('chat.send', { content: 'Building context for compaction state test.' })
+      await client.waitForChatDone()
+
+      await client.send('chat.send', { content: 'Adding more content to ensure compaction is possible.' })
+      await client.waitForChatDone()
+
+      client.clearEvents()
+
+      // Trigger manual compaction
+      const response = await client.send('context.compact', {})
+
+      expect(response.type).toBe('ack')
+
+      // Wait for compaction to complete
+      await client.waitForChatDone(5000)
+
+      // Verify session.running: false was received
+      const runningEvents = client.allEvents().filter((e) => e.type === 'session.running')
+      const lastRunning = runningEvents[runningEvents.length - 1]
+      if (lastRunning) {
+        expect((lastRunning.payload as { isRunning: boolean }).isRunning).toBe(false)
+      }
+
+      // Verify client-side session state (tracked via session.running events)
+      expect(client.getSession()?.isRunning).toBe(false)
+
+      // Verify via REST API that DB is_running is false
+      const sessionId = client.getSession()!.id
+      const restRes = await fetch(`${server.url}/api/sessions/${sessionId}`)
+      const restData = (await restRes.json()) as { session: { isRunning: boolean } }
+      expect(restData.session.isRunning).toBe(false)
+
+      // Send a new message and verify it gets processed (not stuck in queue)
+      await client.send('chat.send', { content: 'Message after compaction should be processed normally.' })
+      const chatResult = await client.waitForChatDone(5000)
+      expect(chatResult.reason).toBe('complete')
+    }, 15000)
+  })
+
   describe('Context State Emission', () => {
     it('emits context.state after each chat turn', async () => {
       client.clearEvents()

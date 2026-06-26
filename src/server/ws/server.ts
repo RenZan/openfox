@@ -922,6 +922,13 @@ async function handleClientMessage(
             ),
           )
         })
+        .finally(() => {
+          // runChatTurn sets isRunning=true but its finally only appends to EventStore.
+          // We must update the DB and broadcast so the QueueProcessor can process
+          // subsequent messages.
+          sessionManager.setRunning(sessionId, false)
+          sendForSession(sessionId, createSessionRunningMessage(false))
+        })
 
       break
     }
