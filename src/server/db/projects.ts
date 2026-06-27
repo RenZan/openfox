@@ -7,6 +7,13 @@ import { getDatabase } from './index.js'
 
 export function createProject(name: string, workdir: string): Project {
   const db = getDatabase()
+
+  // If project with this workdir already exists, return it idempotently
+  const existing = getProjectByWorkdir(workdir)
+  if (existing) {
+    return existing
+  }
+
   const now = new Date().toISOString()
   const id = crypto.randomUUID()
 

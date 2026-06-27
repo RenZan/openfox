@@ -27,7 +27,6 @@ export function OpenProjectModal({ isOpen, onClose }: OpenProjectModalProps) {
   const listProjects = useProjectStore((state) => state.listProjects)
   const deleteProject = useProjectStore((state) => state.deleteProject)
   const [projectToDelete, setProjectToDelete] = useState<{ id: string; name: string } | null>(null)
-  const [creatingPath, setCreatingPath] = useState<string | null>(null)
   const [permissionDeniedPath, setPermissionDeniedPath] = useState<string | null>(null)
 
   useEffect(() => {
@@ -54,15 +53,7 @@ export function OpenProjectModal({ isOpen, onClose }: OpenProjectModalProps) {
   }
 
   const handleDirectorySelect = async (path: string): Promise<boolean> => {
-    const basename = path.split('/').filter(Boolean).pop() ?? ''
-    const result = await createProject(basename, path)
-    listProjects()
-    setCreatingPath(path)
-    if (isPermissionDenied(result)) {
-      setPermissionDeniedPath((result.error as { path?: string }).path || path)
-      return false
-    }
-    return true
+    return handleProjectCreation(path)
   }
 
   function isPermissionDenied(result: unknown): result is { error: { code: string; path?: string } } {
@@ -77,33 +68,33 @@ export function OpenProjectModal({ isOpen, onClose }: OpenProjectModalProps) {
     )
   }
 
+  async function handleProjectCreation(path: string): Promise<boolean> {
+    const basename = path.split('/').filter(Boolean).pop() ?? ''
+    const result = await createProject(basename, path)
+    listProjects()
+    if (isPermissionDenied(result)) {
+      setPermissionDeniedPath((result.error as { path?: string }).path || path)
+      return false
+    }
+    if (result && 'id' in result) {
+      navigate(`/p/${result.id}`)
+      onClose()
+      return true
+    }
+    return false
+  }
+
   const handlePermissionDeniedClose = useCallback(() => {
     setPermissionDeniedPath(null)
   }, [])
 
   const handleRetry = useCallback(async () => {
+    const path = permissionDeniedPath
     setPermissionDeniedPath(null)
-    if (creatingPath) {
-      const basename = creatingPath.split('/').filter(Boolean).pop() ?? ''
-      const result = await createProject(basename, creatingPath)
-      listProjects()
-      setCreatingPath(creatingPath)
-      if (isPermissionDenied(result)) {
-        setPermissionDeniedPath((result.error as { path?: string }).path || creatingPath)
-      }
+    if (path) {
+      await handleProjectCreation(path)
     }
-  }, [creatingPath, createProject, listProjects, setPermissionDeniedPath])
-
-  useEffect(() => {
-    if (creatingPath) {
-      const newProject = projects.find((p) => p.workdir === creatingPath)
-      if (newProject) {
-        navigate(`/p/${newProject.id}`)
-        onClose()
-        setCreatingPath(null)
-      }
-    }
-  }, [projects, creatingPath, navigate, onClose])
+  }, [permissionDeniedPath])
 
   if (!isOpen) return null
 
@@ -192,9 +183,7 @@ export function OpenProjectModal({ isOpen, onClose }: OpenProjectModalProps) {
         <DirectoryBrowser
           initialPath={baseWorkdir ?? undefined}
           onSelect={(path) => {
-            handleDirectorySelect(path).then((success) => {
-              if (success) setShowBrowser(false)
-            })
+            handleDirectorySelect(path)
           }}
           onClose={() => setShowBrowser(false)}
         />

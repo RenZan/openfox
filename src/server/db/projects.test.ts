@@ -70,4 +70,17 @@ describe('db projects', () => {
     expect(getProject(projectA.id)).toBeNull()
     expect(listProjects()).toHaveLength(1)
   })
+
+  it('returns existing project when creating with duplicate workdir', () => {
+    const original = createProject('Original', workdirA)
+    const duplicate = createProject('Duplicate', workdirA)
+
+    // Should return the original project, not create a new one
+    expect(duplicate.id).toBe(original.id)
+    expect(duplicate.name).toBe(original.name) // Original name preserved
+    expect(duplicate.workdir).toBe(workdirA)
+
+    // Only one project in the database
+    expect(listProjects()).toHaveLength(1)
+  })
 })
