@@ -107,6 +107,12 @@ export function Header({ onMenuClick, onCriteriaToggle }: HeaderProps) {
             </span>
           </>
         )}
+
+        {!project && (
+          <span className="hidden md:inline">
+            <ProjectDropdown projects={projects} />
+          </span>
+        )}
       </div>
 
       <div className="flex items-center gap-2 flex-shrink-0">

@@ -9,7 +9,7 @@ import { useWorkdir } from '../../hooks/useWorkdir.js'
 
 interface ProjectDropdownProps {
   projects: Array<{ id: string; name: string; workdir: string; isStarred?: boolean }>
-  currentProject: { id: string; name: string; workdir: string; isStarred?: boolean }
+  currentProject?: { id: string; name: string; workdir: string; isStarred?: boolean }
 }
 
 export function ProjectDropdown({ projects, currentProject }: ProjectDropdownProps) {
@@ -65,7 +65,7 @@ export function ProjectDropdown({ projects, currentProject }: ProjectDropdownPro
         </button>
       </div>
     ),
-    icon: proj.id === currentProject.id ? <CheckIcon /> : undefined,
+    icon: proj.id === currentProject?.id ? <CheckIcon /> : undefined,
     href: `/p/${proj.id}`,
     closeOnClick: true,
     onClick: () => {
@@ -101,10 +101,10 @@ export function ProjectDropdown({ projects, currentProject }: ProjectDropdownPro
         footerItems={footerItems}
         trigger={
           <button
-            className="text-text-secondary hover:text-text-primary hover:underline text-sm truncate flex items-center gap-1"
-            title={currentProject.name}
+            className={`text-text-secondary hover:text-text-primary text-sm truncate flex items-center gap-1 ${currentProject ? 'hover:underline' : ''}`}
+            title={currentProject?.name ?? 'Select project'}
           >
-            {currentProject.name}
+            {currentProject?.name ?? <span className="text-text-muted">Select project...</span>}
             <ChevronDownIcon />
           </button>
         }
