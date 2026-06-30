@@ -1,4 +1,3 @@
-import OpenAI from 'openai'
 import type { Config } from '../config.js'
 import type {
   LLMClient,
@@ -19,10 +18,7 @@ import {
   mapFinishReason,
   getThinking,
 } from './client-pure.js'
-import { Agent, setGlobalDispatcher } from 'undici'
-
-const agent = new Agent({ allowH2: true })
-setGlobalDispatcher(agent)
+import { OpenAIHttpClient } from './http-client.js'
 
 export interface LLMClientWithModel extends LLMClient {
   getModel(): string
@@ -35,7 +31,7 @@ export interface LLMClientWithModel extends LLMClient {
 export function createLLMClient(config: Config, initialBackend: Backend = 'unknown'): LLMClientWithModel {
   const baseURL = ensureVersionPrefix(config.llm.baseUrl)
 
-  const openai = new OpenAI({
+  const httpClient = new OpenAIHttpClient({
     baseURL,
     apiKey: config.llm.apiKey ?? 'not-needed',
   })
@@ -98,7 +94,7 @@ export function createLLMClient(config: Config, initialBackend: Backend = 'unkno
           ...(resolvedEffort ? { reasoningEffort: resolvedEffort } : {}),
           ...(thinkingField ? { thinkingField } : {}),
         })
-        const response = await openai.chat.completions.create(createParams, {
+        const response = await httpClient.createChatCompletion(createParams, {
           signal: request.signal,
         })
 
@@ -165,7 +161,7 @@ export function createLLMClient(config: Config, initialBackend: Backend = 'unkno
         })
 
         const { params: streamingParams } = createParams
-        const stream = await openai.chat.completions.create(streamingParams, {
+        const stream = httpClient.createChatCompletionStream(streamingParams, {
           signal: request.signal,
         })
 

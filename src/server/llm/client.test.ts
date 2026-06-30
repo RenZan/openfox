@@ -1,20 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { openAiCreateMock, openAiCtorArgs } = vi.hoisted(() => ({
-  openAiCreateMock: vi.fn(),
-  openAiCtorArgs: [] as Array<Record<string, unknown>>,
+const { httpClientCreateMock, httpClientCtorArgs } = vi.hoisted(() => ({
+  httpClientCreateMock: vi.fn(),
+  httpClientCtorArgs: [] as Array<Record<string, unknown>>,
 }))
 
-vi.mock('openai', () => ({
-  default: class MockOpenAI {
-    chat = {
-      completions: {
-        create: openAiCreateMock,
-      },
-    }
+vi.mock('./http-client.js', () => ({
+  OpenAIHttpClient: class MockOpenAIHttpClient {
+    createChatCompletion = httpClientCreateMock
+    createChatCompletionStream = httpClientCreateMock
 
     constructor(args: Record<string, unknown>) {
-      openAiCtorArgs.push(args)
+      httpClientCtorArgs.push(args)
     }
   },
 }))
@@ -42,12 +39,12 @@ function createChunk(chunk: Record<string, unknown>) {
 
 describe('llm client', () => {
   beforeEach(() => {
-    openAiCtorArgs.length = 0
-    openAiCreateMock.mockReset()
+    httpClientCtorArgs.length = 0
+    httpClientCreateMock.mockReset()
   })
 
   it('normalizes the base url and maps complete responses with reasoning and tool calls', async () => {
-    openAiCreateMock.mockResolvedValueOnce({
+    httpClientCreateMock.mockResolvedValueOnce({
       id: 'resp-1',
       choices: [
         {
@@ -78,12 +75,12 @@ describe('llm client', () => {
       toolChoice: 'auto',
     })
 
-    expect(openAiCtorArgs[0]).toMatchObject({
+    expect(httpClientCtorArgs[0]).toMatchObject({
       baseURL: 'http://localhost:8000/v1',
       apiKey: 'not-needed',
     })
-    expect(openAiCtorArgs[0]).not.toHaveProperty('timeout')
-    expect(openAiCreateMock).toHaveBeenCalledWith(
+    expect(httpClientCtorArgs[0]).not.toHaveProperty('timeout')
+    expect(httpClientCreateMock).toHaveBeenCalledWith(
       expect.objectContaining({
         model: 'qwen3-32b',
         stream: false,
@@ -103,7 +100,7 @@ describe('llm client', () => {
   })
 
   it('extracts reasoning_content field from response', async () => {
-    openAiCreateMock.mockResolvedValueOnce({
+    httpClientCreateMock.mockResolvedValueOnce({
       id: 'resp-2',
       choices: [
         {
@@ -136,7 +133,7 @@ describe('llm client', () => {
   })
 
   it('wraps completion failures in LLMError', async () => {
-    openAiCreateMock.mockRejectedValueOnce(new Error('network down'))
+    httpClientCreateMock.mockRejectedValueOnce(new Error('network down'))
 
     const client = createLLMClient(createConfig(), 'vllm')
 
@@ -147,7 +144,7 @@ describe('llm client', () => {
   })
 
   it('updates model/backend getters and extracts reasoning from response', async () => {
-    openAiCreateMock.mockResolvedValueOnce({
+    httpClientCreateMock.mockResolvedValueOnce({
       id: 'resp-3',
       choices: [
         {
@@ -187,7 +184,7 @@ describe('llm client', () => {
   })
 
   it('throws when no completion choice is returned', async () => {
-    openAiCreateMock.mockResolvedValueOnce({ id: 'resp-4', choices: [], usage: undefined })
+    httpClientCreateMock.mockResolvedValueOnce({ id: 'resp-4', choices: [], usage: undefined })
 
     const client = createLLMClient(createConfig(), 'vllm')
 
@@ -198,7 +195,7 @@ describe('llm client', () => {
   })
 
   it('streams reasoning, text, and tool calls and emits a done event with parsed tool calls', async () => {
-    openAiCreateMock.mockResolvedValueOnce(
+    httpClientCreateMock.mockReturnValueOnce(
       (async function* () {
         yield createChunk({
           choices: [
@@ -245,7 +242,7 @@ describe('llm client', () => {
       events.push(event as Record<string, unknown>)
     }
 
-    expect(openAiCreateMock).toHaveBeenCalledWith(
+    expect(httpClientCreateMock).toHaveBeenCalledWith(
       expect.objectContaining({
         stream: true,
         reasoning_effort: 'none',
@@ -272,7 +269,7 @@ describe('llm client', () => {
   })
 
   it('streams reasoning_content as thinking_delta', async () => {
-    openAiCreateMock.mockResolvedValueOnce(
+    httpClientCreateMock.mockReturnValueOnce(
       (async function* () {
         yield createChunk({
           choices: [
@@ -322,7 +319,7 @@ describe('llm client', () => {
   })
 
   it('treats reasoning field as thinking_delta and includes tool calls with parseError for invalid tool args', async () => {
-    openAiCreateMock.mockResolvedValueOnce(
+    httpClientCreateMock.mockReturnValueOnce(
       (async function* () {
         yield createChunk({
           choices: [
@@ -381,7 +378,9 @@ describe('llm client', () => {
   })
 
   it('yields error events when streaming fails', async () => {
-    openAiCreateMock.mockRejectedValueOnce(new Error('stream failed'))
+    httpClientCreateMock.mockImplementationOnce(() => {
+      throw new Error('stream failed')
+    })
 
     const client = createLLMClient(createConfig(), 'vllm')
     const events = [] as Array<Record<string, unknown>>
@@ -394,7 +393,7 @@ describe('llm client', () => {
   })
 
   it('includes tool calls with parseError when JSON arguments are malformed', async () => {
-    openAiCreateMock.mockResolvedValueOnce(
+    httpClientCreateMock.mockReturnValueOnce(
       (async function* () {
         yield createChunk({
           choices: [
@@ -452,7 +451,7 @@ describe('llm client', () => {
   })
 
   it('does not include timeout in OpenAI client constructor when idleTimeout is configured', async () => {
-    openAiCreateMock.mockResolvedValueOnce({
+    httpClientCreateMock.mockResolvedValueOnce({
       id: 'resp-1',
       choices: [
         {
@@ -466,8 +465,8 @@ describe('llm client', () => {
     const client = createLLMClient(createConfig({ idleTimeout: 30_000 }), 'vllm')
     await client.complete({ messages: [{ role: 'user', content: 'hello' }] })
 
-    expect(openAiCtorArgs[0]).not.toHaveProperty('timeout')
-    expect(openAiCtorArgs[0]).toMatchObject({
+    expect(httpClientCtorArgs[0]).not.toHaveProperty('timeout')
+    expect(httpClientCtorArgs[0]).toMatchObject({
       baseURL: 'http://localhost:8000/v1',
       apiKey: 'not-needed',
     })
@@ -476,7 +475,7 @@ describe('llm client', () => {
   it('triggers idle timeout when no chunks arrive for the configured duration', async () => {
     const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-    openAiCreateMock.mockResolvedValueOnce(
+    httpClientCreateMock.mockReturnValueOnce(
       (async function* () {
         yield createChunk({
           choices: [{ delta: { content: 'first chunk' }, finish_reason: null }],
@@ -508,7 +507,7 @@ describe('llm client', () => {
   })
 
   it('streams reasoning_content when reasoningEffort is set', async () => {
-    openAiCreateMock.mockResolvedValueOnce(
+    httpClientCreateMock.mockReturnValueOnce(
       (async function* () {
         yield createChunk({
           choices: [{ delta: { reasoning_content: 'step by step ' }, finish_reason: null }],
@@ -531,7 +530,7 @@ describe('llm client', () => {
     }
 
     // Should use streaming (not non-streaming fallback)
-    const callArgs = openAiCreateMock.mock.calls[0]?.[0] as Record<string, unknown> | undefined
+    const callArgs = httpClientCreateMock.mock.calls[0]?.[0] as Record<string, unknown> | undefined
     expect(callArgs).toHaveProperty('stream', true)
     expect(callArgs).toHaveProperty('reasoning_effort', 'high')
     expect(callArgs).toHaveProperty('model', 'qwen3-32b')
@@ -555,7 +554,7 @@ describe('llm client', () => {
   it('allows active streams to continue beyond the idle timeout when chunks arrive frequently', async () => {
     const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-    openAiCreateMock.mockResolvedValueOnce(
+    httpClientCreateMock.mockReturnValueOnce(
       (async function* () {
         for (let i = 0; i < 10; i++) {
           yield createChunk({

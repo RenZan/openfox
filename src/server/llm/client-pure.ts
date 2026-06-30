@@ -1,9 +1,11 @@
-import type OpenAI from 'openai'
 import type {
   ChatCompletionMessageParam,
   ChatCompletionTool,
   ChatCompletionToolChoiceOption,
-} from 'openai/resources/chat/completions'
+  ChatCompletionMessageToolCall,
+  ChatCompletionCreateParamsNonStreaming,
+  ChatCompletionCreateParamsStreaming,
+} from './openai-types.js'
 import type {
   LLMCompletionRequest,
   LLMCompletionResponse,
@@ -57,7 +59,7 @@ type MinimalProfile = Pick<ModelProfile, 'temperature' | 'defaultMaxTokens' | 't
 
 function convertToolCalls(
   toolCalls: { id: string; name: string; arguments: Record<string, unknown> }[],
-): OpenAI.ChatCompletionMessageToolCall[] {
+): ChatCompletionMessageToolCall[] {
   return toolCalls.map((toolCall) => ({
     id: toolCall.id,
     type: 'function' as const,
@@ -175,7 +177,7 @@ async function buildChatCompletionCreateParams(
   isStreaming: boolean,
   thinkingField?: string,
 ): Promise<{
-  params: OpenAI.ChatCompletionCreateParamsNonStreaming | OpenAI.ChatCompletionCreateParamsStreaming
+  params: ChatCompletionCreateParamsNonStreaming | ChatCompletionCreateParamsStreaming
   modelParams: ModelParams
 }> {
   const userVisionOverride = request.modelSettings?.supportsVision
@@ -187,7 +189,7 @@ async function buildChatCompletionCreateParams(
   const topP = request.modelSettings?.topP ?? profile.topP
   const topK = capabilities.supportsTopK ? profile.topK : undefined
 
-  const params: OpenAI.ChatCompletionCreateParamsNonStreaming | OpenAI.ChatCompletionCreateParamsStreaming = {
+  const params: ChatCompletionCreateParamsNonStreaming | ChatCompletionCreateParamsStreaming = {
     model,
     messages: convertedMessages,
     ...(request.tools?.length ? { tools: convertTools(request.tools) } : {}),
@@ -231,7 +233,7 @@ async function buildChatCompletionCreateParams(
 }
 
 async function buildCreateParamsFromInput<
-  T extends OpenAI.ChatCompletionCreateParamsNonStreaming | OpenAI.ChatCompletionCreateParamsStreaming,
+  T extends ChatCompletionCreateParamsNonStreaming | ChatCompletionCreateParamsStreaming,
 >(
   input: {
     model: string
@@ -256,10 +258,10 @@ async function buildCreateParamsFromInput<
 }
 
 export const buildNonStreamingCreateParams = (input: Parameters<typeof buildCreateParamsFromInput>[0]) =>
-  buildCreateParamsFromInput<OpenAI.ChatCompletionCreateParamsNonStreaming>(input, false)
+  buildCreateParamsFromInput<ChatCompletionCreateParamsNonStreaming>(input, false)
 
 export const buildStreamingCreateParams = (input: Parameters<typeof buildCreateParamsFromInput>[0]) =>
-  buildCreateParamsFromInput<OpenAI.ChatCompletionCreateParamsStreaming>(input, true)
+  buildCreateParamsFromInput<ChatCompletionCreateParamsStreaming>(input, true)
 
 export function mapFinishReason(reason: string | null): LLMCompletionResponse['finishReason'] {
   switch (reason) {

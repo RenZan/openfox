@@ -12,7 +12,9 @@ describe('run_command output streaming', () => {
   beforeEach(() => {
     db = new Database(':memory:')
     eventStore = new EventStore(db)
-    append = (event) => { eventStore.append(sessionId, event) }
+    append = (event) => {
+      eventStore.append(sessionId, event)
+    }
   })
 
   afterEach(() => {

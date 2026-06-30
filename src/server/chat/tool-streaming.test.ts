@@ -11,7 +11,9 @@ describe('tool streaming', () => {
   beforeEach(() => {
     db = new Database(':memory:')
     eventStore = new EventStore(db)
-    append = (event) => { eventStore.append('test-session', event) }
+    append = (event) => {
+      eventStore.append('test-session', event)
+    }
     ;(global as any).__eventStore = eventStore
   })
 
