@@ -9,7 +9,6 @@ const {
   createToolProgressHandlerMock,
   streamLLMPureMock,
   consumeStreamGeneratorMock,
-  streamLLMResponseMock,
   getConversationMessagesMock,
 } = vi.hoisted(() => ({
   getEventStoreMock: vi.fn(),
@@ -20,30 +19,6 @@ const {
   createToolProgressHandlerMock: vi.fn(() => undefined),
   streamLLMPureMock: vi.fn(),
   consumeStreamGeneratorMock: vi.fn(),
-  streamLLMResponseMock: vi.fn(async (_options?: any) => {
-    const consumeResult = await consumeStreamGeneratorMock()
-    if (!consumeResult) {
-      return {
-        messageId: 'verifier-msg',
-        content: 'done',
-        toolCalls: [],
-        segments: [],
-        usage: { promptTokens: 5, completionTokens: 1 },
-        timing: { ttft: 1, completionTime: 1, tps: 1, prefillTps: 5 },
-      }
-    }
-    if (consumeResult.aborted) {
-      throw new Error('Aborted')
-    }
-    return {
-      messageId: 'verifier-msg',
-      content: consumeResult.content,
-      toolCalls: consumeResult.toolCalls,
-      segments: consumeResult.segments ?? [],
-      usage: consumeResult.usage,
-      timing: consumeResult.timing,
-    }
-  }),
   getConversationMessagesMock: vi.fn((): import('./request-context.js').RequestContextMessage[] => []),
 }))
 
@@ -117,14 +92,6 @@ vi.mock('./stream-pure.js', async (importOriginal) => {
     ...actual,
     streamLLMPure: streamLLMPureMock,
     consumeStreamGenerator: consumeStreamGeneratorMock,
-  }
-})
-
-vi.mock('./stream.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./stream.js')>()
-  return {
-    ...actual,
-    streamLLMResponse: streamLLMResponseMock,
   }
 })
 
@@ -304,8 +271,8 @@ describe('chat orchestrator', () => {
     createToolProgressHandlerMock.mockClear()
     streamLLMPureMock.mockReset()
     consumeStreamGeneratorMock.mockReset()
-    streamLLMResponseMock.mockReset()
-    streamLLMResponseMock.mockResolvedValue({
+    streamLLMPureMock.mockReset()
+    streamLLMPureMock.mockResolvedValue({
       messageId: 'verifier-msg',
       content: 'done',
       toolCalls: [],

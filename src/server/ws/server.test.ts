@@ -18,7 +18,6 @@ const {
   runOrchestratorMock,
   streamLLMPureMock,
   consumeStreamGeneratorMock,
-  streamLLMResponseMock,
   getEventStoreMock,
   getContextMessagesMock,
   getCurrentContextWindowIdMock,
@@ -41,7 +40,6 @@ const {
   runOrchestratorMock: vi.fn(),
   streamLLMPureMock: vi.fn(),
   consumeStreamGeneratorMock: vi.fn(),
-  streamLLMResponseMock: vi.fn(),
   getEventStoreMock: vi.fn(),
   getContextMessagesMock: vi.fn(),
   getCurrentContextWindowIdMock: vi.fn(),
@@ -175,10 +173,6 @@ vi.mock('../agents/registry.js', () => {
 
 vi.mock('../runner/index.js', () => ({
   runOrchestrator: runOrchestratorMock,
-}))
-
-vi.mock('../chat/stream.js', () => ({
-  streamLLMResponse: streamLLMResponseMock,
 }))
 
 vi.mock('../chat/stream-pure.js', async (importOriginal) => {
@@ -536,7 +530,6 @@ describe('createWebSocketServer', () => {
     runOrchestratorMock.mockReset()
     streamLLMPureMock.mockReset()
     consumeStreamGeneratorMock.mockReset()
-    streamLLMResponseMock.mockReset()
     getEventStoreMock.mockReset()
     getContextMessagesMock.mockReset()
     getContextMessagesMock.mockReturnValue([])
