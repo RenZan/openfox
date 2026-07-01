@@ -41,6 +41,7 @@ export function buildSparklineChart(data: SparklinePoint[], width: number): Spar
   const rawMinY = Math.min(...sorted.map((point) => point.y))
   const rawMaxY = Math.max(...sorted.map((point) => point.y))
   const { minY, maxY } = padYRange(rawMinY, rawMaxY)
+  const clampedMinY = Math.max(0, minY)
 
   const columns = Array.from({ length: width }, () => ' ')
   const columnValues = new Map<number, number[]>()
@@ -60,7 +61,7 @@ export function buildSparklineChart(data: SparklinePoint[], width: number): Spar
     blocks: columns.join(''),
     minX,
     maxX,
-    minY,
+    minY: clampedMinY,
     maxY,
   }
 }

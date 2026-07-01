@@ -32,4 +32,30 @@ describe('buildSparklineChart', () => {
     expect(chart.maxY).toBeGreaterThan(31.1)
     expect(chart.blocks.trim().length).toBeGreaterThan(0)
   })
+
+  it('clamps minY to zero for near-zero data', () => {
+    const chart = buildSparklineChart(
+      [
+        { x: 1, y: 0.5 },
+        { x: 2, y: 1.2 },
+        { x: 3, y: 0.8 },
+      ],
+      9,
+    )
+
+    expect(chart.minY).toBeGreaterThanOrEqual(0)
+  })
+
+  it('clamps minY to zero when all values are zero', () => {
+    const chart = buildSparklineChart(
+      [
+        { x: 1, y: 0 },
+        { x: 2, y: 0 },
+        { x: 3, y: 0 },
+      ],
+      9,
+    )
+
+    expect(chart.minY).toBeGreaterThanOrEqual(0)
+  })
 })
