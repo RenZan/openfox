@@ -283,7 +283,9 @@ export function ChatInput({
           <RunningIndicator />
         </div>
       )}
-      <div className="absolute -top-8 right-2 md:right-4 z-10 flex items-center gap-2">
+      <div
+        className={`absolute -top-8 right-2 md:right-4 z-10 flex items-center gap-2 border${!isAutoScrollActive ? ' rounded backdrop-blur-xl saturate-150 border-border' : ' border-transparent'}`}
+      >
         <AutoScrollToggle
           isActive={isAutoScrollActive}
           onToggle={setAutoScroll}
