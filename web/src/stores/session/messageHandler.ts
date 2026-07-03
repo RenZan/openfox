@@ -160,6 +160,24 @@ export function handleServerMessage(
     set((state) => ({ unreadSessionIds: addUnreadSessionId(state.unreadSessionIds, eventSessionId) }))
   }
 
+  const updateToolState = (
+    state: SessionState,
+    messageId: string,
+    apply: (m: Message) => Message,
+  ): Partial<SessionState> => {
+    const sm = state.streamingMessage
+    if (sm && sm.id === messageId) {
+      const updated = apply(sm)
+      return {
+        streamingMessage: updated,
+        messages: state.messages.map((m) => (m.id === messageId ? updated : m)),
+      }
+    }
+    return {
+      messages: state.messages.map((m) => (m.id === messageId ? apply(m) : m)),
+    }
+  }
+
   switch (message.type) {
     case 'session.state': {
       const payload = message.payload as SessionStatePayload
@@ -355,6 +373,9 @@ export function handleServerMessage(
             ...state.streamingMessage!,
             preparingToolCalls,
           },
+          messages: state.messages.map((m) =>
+            m.id === state.streamingMessage!.id ? { ...state.streamingMessage!, preparingToolCalls } : m,
+          ),
         }
       })
       break
@@ -406,15 +427,7 @@ export function handleServerMessage(
         }
       }
 
-      set((state) => {
-        const sm = state.streamingMessage
-        if (sm && sm.id === payload.messageId) {
-          return { streamingMessage: applyToolCall(sm) }
-        }
-        return {
-          messages: state.messages.map((m) => (m.id === payload.messageId ? applyToolCall(m) : m)),
-        }
-      })
+      set((state) => updateToolState(state, payload.messageId, applyToolCall))
       break
     }
 
@@ -449,15 +462,7 @@ export function handleServerMessage(
         return { ...m, toolCalls }
       }
 
-      set((state) => {
-        const sm = state.streamingMessage
-        if (sm && sm.id === payload.messageId) {
-          return { streamingMessage: applyToolResult(sm) }
-        }
-        return {
-          messages: state.messages.map((m) => (m.id === payload.messageId ? applyToolResult(m) : m)),
-        }
-      })
+      set((state) => updateToolState(state, payload.messageId, applyToolResult))
       break
     }
 

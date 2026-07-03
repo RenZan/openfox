@@ -617,6 +617,105 @@ describe('useSessionStore session isolation', () => {
     expect(useSessionStore.getState().streamingMessageId).toBeNull()
   })
 
+  it('keeps tool calls in messages[] when streamingMessage is replaced (sync fix)', async () => {
+    const useSessionStore = await loadSessionStore()
+
+    useSessionStore.setState((state) => ({
+      ...state,
+      currentSession: {
+        id: 'session-1',
+        projectId: 'project-1',
+        workdir: '/tmp/project-1',
+        mode: 'builder',
+        phase: 'build',
+        isRunning: true,
+        criteria: [],
+        summary: null,
+      } as any,
+      messages: [
+        {
+          id: 'msg-a',
+          role: 'assistant',
+          content: 'hello',
+          timestamp: '2024-01-01T00:00:00.000Z',
+          tokenCount: 0,
+          isStreaming: true,
+        } as any,
+      ],
+      streamingMessageId: 'msg-a',
+      streamingMessage: {
+        id: 'msg-a',
+        role: 'assistant',
+        content: 'hello',
+        timestamp: '2024-01-01T00:00:00.000Z',
+        tokenCount: 0,
+        isStreaming: true,
+      } as any,
+    }))
+
+    // Simulate the desync: streamingMessageId is null but streamingMessage is set
+    useSessionStore.setState((state) => ({
+      ...state,
+      streamingMessageId: null,
+    }))
+
+    // chat.message_updated with isEndingStreaming=false (desync)
+    useSessionStore.getState().handleServerMessage({
+      type: 'chat.message_updated',
+      sessionId: 'session-1',
+      payload: {
+        messageId: 'msg-a',
+        updates: { isStreaming: false },
+      },
+    })
+
+    // Tool events — without fix these only update streamingMessage
+    useSessionStore.getState().handleServerMessage({
+      type: 'chat.tool_call',
+      sessionId: 'session-1',
+      payload: {
+        messageId: 'msg-a',
+        callId: 'call-1',
+        tool: 'run_command',
+        args: { command: 'echo hi' },
+      },
+    })
+
+    useSessionStore.getState().handleServerMessage({
+      type: 'chat.tool_result',
+      sessionId: 'session-1',
+      payload: {
+        messageId: 'msg-a',
+        callId: 'call-1',
+        tool: 'run_command',
+        result: { success: true, output: 'hi', durationMs: 10, truncated: false },
+      },
+    })
+
+    // New assistant message replaces streamingMessage
+    useSessionStore.getState().handleServerMessage({
+      type: 'chat.message',
+      sessionId: 'session-1',
+      payload: {
+        message: {
+          id: 'msg-b',
+          role: 'assistant',
+          content: '',
+          timestamp: '2024-01-01T00:00:01.000Z',
+          tokenCount: 0,
+          isStreaming: true,
+        } as any,
+      },
+    })
+
+    // msg-a should still have its tool call with result in messages[]
+    const msgA = useSessionStore.getState().messages.find((m) => m.id === 'msg-a')
+    expect(msgA).toBeDefined()
+    expect(msgA!.toolCalls).toHaveLength(1)
+    expect(msgA!.toolCalls![0]!.result).toBeDefined()
+    expect(msgA!.toolCalls![0]!.result!.success).toBe(true)
+  })
+
   it('merges session.state into sidebar summaries so running status appears immediately after load', async () => {
     const useSessionStore = await loadSessionStore()
 
