@@ -16,6 +16,7 @@ class WebSocketClient {
   private lastCloseCode: number = 0
   private reconnectAttempts: number = 0
   private manualReconnectScheduled = false // User triggered reconnect pending
+  private pwaRecoveryAttempted = false
 
   constructor(url: string) {
     this.baseUrl = url
@@ -85,6 +86,7 @@ class WebSocketClient {
         this.ws.onopen = () => {
           clearTimeout(timeout)
           this.isReconnecting = false
+          this.reconnectAttempts = 0
           this.connectingPromise = null
           this.statusHandler?.('connected')
           resolve()
@@ -130,6 +132,20 @@ class WebSocketClient {
     return this.connectingPromise
   }
 
+  private async recoverPwaStuckConnection(): Promise<void> {
+    if (this.pwaRecoveryAttempted) return
+    const isPwa = window.matchMedia('(display-mode: standalone)').matches
+    if (!isPwa || !('serviceWorker' in navigator)) return
+
+    this.pwaRecoveryAttempted = true
+    const registrations = await navigator.serviceWorker.getRegistrations()
+    if (registrations.length === 0) return
+
+    console.warn('[WS] PWA mode detected with stale service worker — unregistering and reloading')
+    await Promise.all(registrations.map((r) => r.unregister()))
+    window.location.reload()
+  }
+
   private attemptReconnect(): void {
     const authFailureCodes = [1000, 1005, 1006, 4000]
     const isAuthFailure = authFailureCodes.includes(this.lastCloseCode) || this.lastCloseCode === 0
@@ -151,7 +167,10 @@ class WebSocketClient {
       this.isReconnecting = false
       this.manualReconnectScheduled = false
       this.connect().catch(() => {
-        // Failed - connectionStatus will be 'disconnected', user can click reconnect
+        // After several failed attempts, try PWA recovery
+        if (this.reconnectAttempts >= 3) {
+          this.recoverPwaStuckConnection()
+        }
       })
     }, delay)
   }
@@ -162,7 +181,7 @@ class WebSocketClient {
     this.lastCloseCode = 0
     this.connectingPromise = null
     this.connect().catch(() => {
-      // Failed - connectionStatus will be 'disconnected'
+      this.recoverPwaStuckConnection()
     })
   }
 
