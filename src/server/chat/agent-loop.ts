@@ -43,6 +43,7 @@ function emitPartialDoneEvents(
   mode: import('../../shared/types.js').ToolMode,
   turnMetrics: TurnMetrics,
   append: (event: import('../events/types.js').TurnEvent) => void,
+  agentType?: 'sub-agent',
 ): void {
   const stats = turnMetrics.buildStats(statsIdentity, mode)
   append(
@@ -51,7 +52,7 @@ function emitPartialDoneEvents(
       partial: true,
     }),
   )
-  append(createChatDoneEvent(assistantMsgId, 'stopped', stats))
+  append(createChatDoneEvent(assistantMsgId, 'stopped', stats, agentType))
 }
 
 function emitDoneAndBreak(
@@ -63,6 +64,7 @@ function emitDoneAndBreak(
   append: (event: import('../events/types.js').TurnEvent) => void,
   onMessage: ((msg: ServerMessage) => void) | undefined,
   reason: 'complete' | 'stopped' | 'error' | 'waiting_for_user' | 'truncated' | 'step_done',
+  agentType?: 'sub-agent',
 ): void {
   const stats = turnMetrics.buildStats(statsIdentity, mode)
   append(
@@ -71,7 +73,7 @@ function emitDoneAndBreak(
       stats,
     }),
   )
-  append(createChatDoneEvent(assistantMsgId, reason, stats))
+  append(createChatDoneEvent(assistantMsgId, reason, stats, agentType))
   if (onMessage) {
     onMessage(
       createChatMessageUpdatedMessage(assistantMsgId, {
@@ -79,7 +81,7 @@ function emitDoneAndBreak(
         stats,
       }),
     )
-    onMessage(createChatDoneMessage(assistantMsgId, reason, stats))
+    onMessage(createChatDoneMessage(assistantMsgId, reason, stats, agentType))
   }
 }
 
@@ -149,6 +151,7 @@ export async function runTopLevelAgentLoop(
 ): Promise<{ returnValueContent?: string; returnValueResult?: string }> {
   const { mode, sessionManager, sessionId, llmClient, signal, onMessage, statsIdentity } = config
   const append = config.append
+  const agentType = config.subAgentMetadata ? ('sub-agent' as const) : undefined
 
   const retryLimiter: RetryLimiter = createRetryLimiter(config.maxRetriesPerTurn ?? 10)
   let truncationRetryCount = 0
@@ -263,7 +266,7 @@ export async function runTopLevelAgentLoop(
           type: 'chat.error',
           data: { error: `Auto-retry limit exceeded after ${retryLimiter.maxRetries()} retries`, recoverable: false },
         })
-        append(createChatDoneEvent(assistantMsgId, 'error'))
+        append(createChatDoneEvent(assistantMsgId, 'error', undefined, agentType))
         throw new Error('Auto-retry limit exceeded')
       }
       retryLimiter.increment()
@@ -302,7 +305,7 @@ export async function runTopLevelAgentLoop(
     }
 
     if (result.aborted) {
-      emitPartialDoneEvents(sessionId, assistantMsgId, statsIdentity, mode, turnMetrics, append)
+      emitPartialDoneEvents(sessionId, assistantMsgId, statsIdentity, mode, turnMetrics, append, agentType)
       throw new Error('Aborted')
     }
 
@@ -374,7 +377,7 @@ export async function runTopLevelAgentLoop(
             partial: true,
           }),
         )
-        append(createChatDoneEvent(assistantMsgId, 'truncated', stats))
+        append(createChatDoneEvent(assistantMsgId, 'truncated', stats, agentType))
         break
       }
     }
@@ -435,6 +438,7 @@ ${COMPACTION_PROMPT}`,
             append,
             onMessage,
             'step_done',
+            agentType,
           )
           break
         }
@@ -451,6 +455,7 @@ ${COMPACTION_PROMPT}`,
               append,
               onMessage,
               'complete',
+              agentType,
             )
             break
           }
@@ -460,14 +465,14 @@ ${COMPACTION_PROMPT}`,
         }
       } catch (error) {
         if (error instanceof Error && error.message === 'Aborted') {
-          emitPartialDoneEvents(sessionId, assistantMsgId, statsIdentity, mode, turnMetrics, append)
+          emitPartialDoneEvents(sessionId, assistantMsgId, statsIdentity, mode, turnMetrics, append, agentType)
           throw error
         }
         throw error
       }
 
       if (signal?.aborted) {
-        emitPartialDoneEvents(sessionId, assistantMsgId, statsIdentity, mode, turnMetrics, append)
+        emitPartialDoneEvents(sessionId, assistantMsgId, statsIdentity, mode, turnMetrics, append, agentType)
         throw new Error('Aborted')
       }
 
@@ -510,7 +515,7 @@ ${COMPACTION_PROMPT}`,
         },
       })
       append(createMessageDoneEvent(assistantMsgId, { stats: turnMetrics.buildStats(statsIdentity, mode) }))
-      append(createChatDoneEvent(assistantMsgId, 'complete'))
+      append(createChatDoneEvent(assistantMsgId, 'complete', undefined, agentType))
 
       // Reinject the agent reminder into the new window
       config.injectAgentReminder?.()
@@ -555,7 +560,7 @@ ${COMPACTION_PROMPT}`,
         stats,
       }),
     )
-    append(createChatDoneEvent(assistantMsgId, 'complete', stats))
+    append(createChatDoneEvent(assistantMsgId, 'complete', stats, agentType))
 
     break
   }
