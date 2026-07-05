@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, expect } from 'vitest'
-import { formatTimestamp, getItemIcon, getItemLabel } from './MessageSearchModal'
+import { formatTimestamp, getItemIcon, getItemLabel, getItemCategory, FILTER_CATEGORIES } from './MessageSearchModal'
 import type { Message } from '@shared/types.js'
 import type { DisplayItem } from './groupMessages'
 
@@ -39,6 +39,47 @@ describe('getItemIcon', () => {
     }
     const icon = getItemIcon(item)
     expect(icon).toBeDefined()
+  })
+})
+
+describe('FILTER_CATEGORIES', () => {
+  it('defines user, thinking, and response categories', () => {
+    expect(FILTER_CATEGORIES).toEqual([
+      { key: 'user', label: 'User prompts' },
+      { key: 'thinking', label: 'Thinking' },
+      { key: 'response', label: 'Responses' },
+    ])
+  })
+})
+
+describe('getItemCategory', () => {
+  it('returns "user" for user messages', () => {
+    const item: DisplayItem = {
+      type: 'message',
+      message: { id: '1', role: 'user', content: 'hello', timestamp: '' } as Message,
+    }
+    expect(getItemCategory(item)).toBe('user')
+  })
+
+  it('returns "response" for assistant messages with content', () => {
+    const item: DisplayItem = {
+      type: 'message',
+      message: { id: '1', role: 'assistant', content: 'hi', thinkingContent: 'hmm', timestamp: '' } as Message,
+    }
+    expect(getItemCategory(item)).toBe('response')
+  })
+
+  it('returns "thinking" for assistant messages with only thinking content', () => {
+    const item: DisplayItem = {
+      type: 'message',
+      message: { id: '1', role: 'assistant', content: '', thinkingContent: 'thinking...', timestamp: '' } as Message,
+    }
+    expect(getItemCategory(item)).toBe('thinking')
+  })
+
+  it('returns null for non-message items', () => {
+    const item: DisplayItem = { type: 'subagent', subAgentId: 's1', subAgentType: 'code_reviewer', messages: [] }
+    expect(getItemCategory(item)).toBeNull()
   })
 })
 

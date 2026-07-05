@@ -5,6 +5,44 @@ import { SearchIcon, XCloseIcon, UserIcon, ThinkingIcon, AgentIcon } from '../sh
 import { fuzzyMatch, handleModalNavigation } from '../../lib/modal-utils'
 import type { DisplayItem } from './groupMessages'
 
+const STORAGE_KEY = 'openfox-message-search-filters'
+
+export const FILTER_CATEGORIES = [
+  { key: 'user', label: 'User prompts' },
+  { key: 'thinking', label: 'Thinking' },
+  { key: 'response', label: 'Responses' },
+] as const
+
+type FilterKey = (typeof FILTER_CATEGORIES)[number]['key']
+
+function loadFilters(): Set<FilterKey> {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (stored) {
+      const parsed = JSON.parse(stored) as FilterKey[]
+      return new Set(parsed)
+    }
+  } catch {
+    /* ignore */
+  }
+  return new Set(['user', 'thinking', 'response'])
+}
+
+function saveFilters(filters: Set<FilterKey>) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify([...filters]))
+}
+
+export function getItemCategory(item: DisplayItem): FilterKey | null {
+  if (item.type !== 'message') return null
+  const msg = item.message
+  if (msg.role === 'user') return 'user'
+  if (msg.role === 'assistant') {
+    if (msg.content?.trim()) return 'response'
+    if (msg.thinkingContent?.trim()) return 'thinking'
+  }
+  return null
+}
+
 interface MessageSearchModalProps {
   isOpen: boolean
   onClose: () => void
@@ -98,22 +136,48 @@ export function getItemLabel(item: DisplayItem): string {
 export function MessageSearchModal({ isOpen, onClose, displayItems, onNavigate }: MessageSearchModalProps) {
   const [search, setSearch] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const [activeFilters, setActiveFilters] = useState<Set<FilterKey>>(loadFilters)
   const searchRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  const selectedItemRef = useRef<HTMLButtonElement>(null)
 
-  const visibleItems = useMemo(() => {
+  const toggleFilter = (key: FilterKey) => {
+    setActiveFilters((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) {
+        next.delete(key)
+      } else {
+        next.add(key)
+      }
+      saveFilters(next)
+      return next
+    })
+  }
+
+  const baseItems = useMemo(() => {
     return displayItems.filter((item) => {
       if (item.type === 'context-divider') return false
-      if (item.type === 'message' && item.message.role === 'assistant') {
-        if (!item.message.content?.trim() && !item.message.thinkingContent?.trim()) return false
+      if (item.type === 'message') {
+        if (item.message.messageKind === 'auto-prompt') return false
+        if (item.message.role === 'assistant') {
+          if (!item.message.content?.trim() && !item.message.thinkingContent?.trim()) return false
+        }
       }
       return true
     })
   }, [displayItems])
 
+  const visibleItems = useMemo(() => {
+    return baseItems.filter((item) => {
+      const category = getItemCategory(item)
+      if (category && !activeFilters.has(category)) return false
+      return true
+    })
+  }, [baseItems, activeFilters])
+
   const filteredItems = useMemo(() => {
     if (!search) return visibleItems
-    return visibleItems.filter((item) => {
+    return baseItems.filter((item) => {
       const label = getItemLabel(item)
       return fuzzyMatch(label, search)
     })
@@ -135,6 +199,12 @@ export function MessageSearchModal({ isOpen, onClose, displayItems, onNavigate }
       listRef.current.scrollTop = listRef.current.scrollHeight
     }
   }, [isOpen])
+
+  useEffect(() => {
+    if (selectedItemRef.current) {
+      selectedItemRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    }
+  }, [selectedIndex])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     handleModalNavigation(
@@ -189,6 +259,25 @@ export function MessageSearchModal({ isOpen, onClose, displayItems, onNavigate }
                 <XCloseIcon className="w-4 h-4" />
               </button>
             </div>
+            <div className="flex gap-1.5 px-4 py-2 border-b border-border">
+              {FILTER_CATEGORIES.map((cat) => {
+                const isActive = activeFilters.has(cat.key)
+                return (
+                  <button
+                    key={cat.key}
+                    type="button"
+                    onClick={() => toggleFilter(cat.key)}
+                    className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                      isActive
+                        ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/40'
+                        : 'bg-bg-tertiary text-text-muted border border-border hover:text-text-secondary'
+                    }`}
+                  >
+                    {cat.label}
+                  </button>
+                )
+              })}
+            </div>
             <div ref={listRef} className="overflow-y-auto max-h-[60vh] p-2">
               {filteredItems.length === 0 ? (
                 <div className="px-3 py-4 text-center text-text-muted text-sm">
@@ -205,6 +294,7 @@ export function MessageSearchModal({ isOpen, onClose, displayItems, onNavigate }
 
                   return (
                     <button
+                      ref={index === selectedIndex ? selectedItemRef : null}
                       key={`${realIndex}-${item.type}`}
                       type="button"
                       onClick={() => handleSelect(item)}

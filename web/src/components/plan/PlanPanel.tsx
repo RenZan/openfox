@@ -73,6 +73,17 @@ export function PlanPanel({
     useWorkflowsStore.getState().fetchWorkflows()
   }, [])
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault()
+        setShowMessageSearch(true)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
+
   const { maxVisibleItems } = useDisplaySettings()
 
   const previousDisplayItemsRef = useRef<DisplayItem[]>([])
@@ -251,7 +262,10 @@ export function PlanPanel({
       {showMessageSearch && (
         <MessageSearchModal
           isOpen={showMessageSearch}
-          onClose={() => setShowMessageSearch(false)}
+          onClose={() => {
+            setShowMessageSearch(false)
+            focusChatTextarea()
+          }}
           displayItems={displayItems}
           onNavigate={handleTimelineNavigate}
         />
