@@ -189,7 +189,7 @@ export async function executeSubAgent(options: SubAgentExecutionOptions): Promis
       statsIdentity,
       signal,
       onMessage,
-      assembleRequest: (input) =>
+      assembleRequest: async (input) =>
         createAssemblyResult({
           systemPrompt,
           messages: input.messages,

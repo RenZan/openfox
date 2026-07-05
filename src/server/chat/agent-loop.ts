@@ -107,11 +107,11 @@ export interface TopLevelLoopConfig {
     toolChoice: 'auto' | 'none' | 'required'
     customInstructions?: string
     skills?: import('../skills/types.js').SkillMetadata[]
-  }) => {
+  }) => Promise<{
     systemPrompt: string
     messages: MinimalMessage[]
     tools: LLMToolDefinition[]
-  }
+  }>
   getToolRegistry: () => ToolRegistry
   onToolExecuted?: ((toolCall: ToolCall, result: ToolResult) => void) | undefined
   injectKickoff?: (() => void | Promise<void>) | undefined
@@ -204,7 +204,7 @@ export async function runTopLevelAgentLoop(
     const skills = await getEnabledSkillMetadata(configDir, runtimeConfig.workdir)
     if (signal?.aborted) throw new Error('Aborted')
 
-    const assembledRequest = config.assembleRequest({
+    const assembledRequest = await config.assembleRequest({
       workdir: session.workdir,
       messages: requestMessages,
       injectedFiles,

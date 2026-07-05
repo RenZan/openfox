@@ -28,6 +28,8 @@ import {
   updateSessionProvider,
   updateSessionDangerLevel,
   updateSessionRunning,
+  updateSessionCachedPrompt,
+  getSessionCachedPrompt,
   type DangerLevel,
 } from '../db/sessions.js'
 import { getProject } from '../db/projects.js'
@@ -90,10 +92,6 @@ export class SessionManager {
   private events = new EventEmitter<SessionEvents>()
   private activeSessionId: string | null = null
   private providerManager: import('../provider-manager.js').ProviderManager
-  private cachedPromptStore = new Map<
-    string,
-    { systemPrompt: string; tools: import('../llm/types.js').LLMToolDefinition[]; hash: string }
-  >()
   private dynamicContextChangedStore = new Map<string, boolean>()
   private debugDumpStore = new Map<string, { cachedPrompt: string; cachedTools: string[]; liveTools: string[] }>()
 
@@ -830,13 +828,14 @@ export class SessionManager {
     tools: import('../llm/types.js').LLMToolDefinition[],
     hash: string,
   ): void {
-    this.cachedPromptStore.set(sessionId, { systemPrompt, tools, hash })
+    updateSessionCachedPrompt(sessionId, systemPrompt, tools, hash)
   }
 
   getCachedPrompt(
     sessionId: string,
   ): { systemPrompt: string; tools: import('../llm/types.js').LLMToolDefinition[]; hash: string } | undefined {
-    return this.cachedPromptStore.get(sessionId)
+    const result = getSessionCachedPrompt(sessionId)
+    return result ?? undefined
   }
 
   setDynamicContextChanged(sessionId: string, changed: boolean): void {
@@ -1019,21 +1018,7 @@ export class SessionManager {
     // Use database is_running as source of truth (more reliable than EventStore which may have missing events)
     const isRunning = dbSession.isRunning
 
-    const hasCachedPrompt = this.cachedPromptStore.has(dbSession.id)
-    const cachedData = this.cachedPromptStore.get(dbSession.id)
-
-    // Rehydrate in-memory stores from event state after server restart
-    if (!hasCachedPrompt && eventState.cachedSystemPrompt && eventState.dynamicContextHash) {
-      this.cachedPromptStore.set(dbSession.id, {
-        systemPrompt: eventState.cachedSystemPrompt,
-        tools: [],
-        hash: eventState.dynamicContextHash,
-      })
-    }
-    if (!this.dynamicContextChangedStore.has(dbSession.id) && eventState.contextState.dynamicContextChanged) {
-      // Don't restore stale flag — the session load re-detection in ws/server.ts
-      // runs an async hash comparison that will determine the correct state.
-    }
+    const cachedPrompt = getSessionCachedPrompt(dbSession.id)
 
     return {
       ...dbSession,
@@ -1045,10 +1030,10 @@ export class SessionManager {
       metadataEntries: eventState.metadataEntries,
       contextWindows: [], // Derived from events, not stored separately
       executionState:
-        eventState.cachedSystemPrompt || hasCachedPrompt
+        eventState.cachedSystemPrompt || cachedPrompt
           ? ({
-              cachedSystemPrompt: cachedData?.systemPrompt ?? eventState.cachedSystemPrompt,
-              dynamicContextHash: cachedData?.hash ?? eventState.dynamicContextHash,
+              cachedSystemPrompt: cachedPrompt?.systemPrompt ?? eventState.cachedSystemPrompt,
+              dynamicContextHash: cachedPrompt?.hash ?? eventState.dynamicContextHash,
             } as import('../../shared/types.js').ExecutionState)
           : null,
     }

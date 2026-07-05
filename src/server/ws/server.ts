@@ -19,11 +19,7 @@ import { runChatTurn } from '../chat/orchestrator.js'
 
 import { runOrchestrator } from '../runner/index.js'
 import { appendCompactionPrompt } from '../context/compactor.js'
-import { getAllInstructions } from '../context/instructions.js'
-import { getEnabledSkillMetadata } from '../skills/registry.js'
-import { computeDynamicContextHash, getToolFingerprint, applyDynamicContext } from '../chat/dynamic-context.js'
-import { getRuntimeConfig } from '../runtime-config.js'
-import { getGlobalConfigDir } from '../../cli/paths.js'
+import { computeSessionHash, applyDynamicContext } from '../chat/dynamic-context.js'
 import { provideAnswer } from '../tools/index.js'
 import { logger } from '../utils/logger.js'
 import { devServerManager } from '../dev-server/manager.js'
@@ -863,14 +859,7 @@ async function handleClientMessage(
         ;(async () => {
           try {
             await mcpReadyPromise
-            const { content: instructionContent } = await getAllInstructions(session.workdir, session.projectId)
-            const runtimeConfig = getRuntimeConfig()
-            const configDir = getGlobalConfigDir(runtimeConfig.mode ?? 'production')
-            const skills = await getEnabledSkillMetadata(configDir, runtimeConfig.workdir)
-            const { createToolRegistry } = await import('../tools/index.js')
-            const allTools = createToolRegistry().definitions
-            const toolFingerprint = getToolFingerprint(allTools)
-            const currentHash = computeDynamicContextHash(instructionContent, skills, toolFingerprint)
+            const currentHash = await computeSessionHash(sessionManager, session.id)
             if (currentHash !== cachedHash) {
               sessionManager.setDynamicContextChanged(session.id, true)
               sendContextState()
@@ -953,20 +942,11 @@ async function handleClientMessage(
       }
 
       const sessionId = client.activeSessionId
-      const session = sessionManager.requireSession(sessionId)
 
       ;(async () => {
         try {
           await mcpReadyPromise
-          const { content: instructionContent } = await getAllInstructions(session.workdir, session.projectId)
-          const runtimeConfig = getRuntimeConfig()
-          const configDir = getGlobalConfigDir(runtimeConfig.mode ?? 'production')
-          const skills = await getEnabledSkillMetadata(configDir, runtimeConfig.workdir)
-
-          const { createToolRegistry } = await import('../tools/index.js')
-          const allTools = createToolRegistry().definitions
-          const toolFingerprint = getToolFingerprint(allTools)
-          const currentHash = computeDynamicContextHash(instructionContent, skills, toolFingerprint)
+          const currentHash = await computeSessionHash(sessionManager, sessionId)
           const cachedHash = sessionManager.getCachedPrompt(sessionId)?.hash
 
           if (cachedHash) {
@@ -975,7 +955,6 @@ async function handleClientMessage(
                 sessionId,
                 cachedHash,
                 currentHash,
-                toolCount: allTools.length,
               })
               if (!sessionManager.getDynamicContextChanged(sessionId)) {
                 sessionManager.setDynamicContextChanged(sessionId, true)

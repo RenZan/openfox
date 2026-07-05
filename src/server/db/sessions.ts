@@ -192,6 +192,50 @@ export function updateSessionMetadata(id: string, metadata: Partial<Session['met
   ).run(...values)
 }
 
+export function updateSessionCachedPrompt(
+  id: string,
+  systemPrompt: string,
+  tools: import('../llm/types.js').LLMToolDefinition[],
+  hash: string,
+): void {
+  const db = getDatabase()
+  const now = new Date().toISOString()
+
+  db.prepare(
+    `
+    UPDATE sessions SET cached_system_prompt = ?, cached_tools = ?, cached_hash = ?, updated_at = ? WHERE id = ?
+  `,
+  ).run(systemPrompt, JSON.stringify(tools), hash, now, id)
+}
+
+export function getSessionCachedPrompt(id: string): {
+  systemPrompt: string
+  tools: import('../llm/types.js').LLMToolDefinition[]
+  hash: string
+} | null {
+  const db = getDatabase()
+  const row = db
+    .prepare(
+      `
+    SELECT cached_system_prompt, cached_tools, cached_hash FROM sessions WHERE id = ?
+  `,
+    )
+    .get(id) as
+    | { cached_system_prompt: string | null; cached_tools: string | null; cached_hash: string | null }
+    | undefined
+
+  if (!row || !row.cached_system_prompt || !row.cached_tools || !row.cached_hash) {
+    return null
+  }
+
+  try {
+    const tools = JSON.parse(row.cached_tools) as import('../llm/types.js').LLMToolDefinition[]
+    return { systemPrompt: row.cached_system_prompt, tools, hash: row.cached_hash }
+  } catch {
+    return null
+  }
+}
+
 export function updateSessionMessageCount(id: string, delta: number): void {
   try {
     const db = getDatabase()
@@ -348,6 +392,9 @@ interface SessionRow {
   total_tool_calls: number
   iteration_count: number
   danger_level: string
+  cached_system_prompt: string | null
+  cached_tools: string | null
+  cached_hash: string | null
 }
 
 interface SessionSummaryRow {

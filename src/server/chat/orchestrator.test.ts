@@ -103,7 +103,7 @@ vi.mock('../agents/registry.js', () => {
         name: 'Planner',
         description: 'Plans work',
         subagent: false,
-        tools: [
+        allowedTools: [
           'read_file',
           'glob',
           'grep',
@@ -127,7 +127,7 @@ vi.mock('../agents/registry.js', () => {
         name: 'Builder',
         description: 'Builds work',
         subagent: false,
-        tools: [
+        allowedTools: [
           'read_file',
           'glob',
           'grep',
@@ -152,7 +152,7 @@ vi.mock('../agents/registry.js', () => {
         name: 'Verifier',
         description: 'Verify criteria',
         subagent: true,
-        tools: ['read_file', 'run_command', 'pass_criterion', 'fail_criterion'],
+        allowedTools: ['read_file', 'run_command', 'pass_criterion', 'fail_criterion'],
       },
       prompt: 'You are a verifier',
     },
@@ -1477,7 +1477,6 @@ describe('chat orchestrator', () => {
         vi.fn(),
       )
 
-      expect(getToolRegistryForModeMock).toHaveBeenCalled()
       expect(streamLLMPureMock).toHaveBeenCalledWith(
         expect.objectContaining({
           tools: expect.arrayContaining([
@@ -1486,8 +1485,11 @@ describe('chat orchestrator', () => {
         }),
       )
       const calledTools = streamLLMPureMock.mock.calls[0]?.[0]?.tools
+      // return_value should never be exposed to top-level agents
       expect(calledTools).not.toEqual(
-        expect.arrayContaining([expect.objectContaining({ function: expect.objectContaining({ name: 'step_done' }) })]),
+        expect.arrayContaining([
+          expect.objectContaining({ function: expect.objectContaining({ name: 'return_value' }) }),
+        ]),
       )
     })
 

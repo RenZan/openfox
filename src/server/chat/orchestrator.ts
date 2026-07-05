@@ -18,7 +18,7 @@ import type { AgentDefinition } from '../agents/types.js'
 import { getEventStore, getCurrentContextWindowId, getCurrentWindowMessageOptions } from '../events/index.js'
 import { buildSnapshotFromSessionState } from '../events/folding.js'
 import type { SessionManager } from '../session/index.js'
-import { getToolRegistryForAgent, createToolRegistry, PathAccessDeniedError } from '../tools/index.js'
+import { getToolRegistryForAgent, PathAccessDeniedError } from '../tools/index.js'
 import { WORKFLOW_KICKOFF_PROMPT, buildAgentReminder, buildAgentSmallReminder } from './prompts.js'
 import {
   TurnMetrics,
@@ -28,11 +28,11 @@ import {
   createToolResultEvent,
   createChatDoneEvent,
 } from './stream-pure.js'
-import { assembleAgentRequest, createAssemblyResult } from './request-context.js'
+import { createAssemblyResult } from './request-context.js'
 import type { RequestContextMessage } from './request-context.js'
-import { computeDynamicContextHash, getToolFingerprint } from './dynamic-context.js'
+import { buildCachedPrompt, computeDynamicContextHash, getToolFingerprint } from './dynamic-context.js'
 import { runTopLevelAgentLoop } from './agent-loop.js'
-import { loadAllAgentsDefault, findAgentById, getSubAgents } from '../agents/registry.js'
+import { loadAllAgentsDefault, findAgentById } from '../agents/registry.js'
 import { getAllInstructions } from '../context/instructions.js'
 import { getEnabledSkillMetadata } from '../skills/registry.js'
 import { getRuntimeConfig } from '../runtime-config.js'
@@ -324,7 +324,6 @@ export async function runAgentTurn(
 
   // Inject agent reminder (full definition or small reminder based on latest agent message)
   injectAgentReminder(options.sessionId, agentDef)
-  const subAgentDefs = getSubAgents(allAgents)
 
   const { content: instructionContent } = await getAllInstructions(
     options.sessionManager.requireSession(options.sessionId).workdir,
@@ -345,11 +344,10 @@ export async function runAgentTurn(
       statsIdentity,
       signal: options.signal,
       onMessage: options.onMessage,
-      assembleRequest: (input) => {
+      assembleRequest: async (input) => {
         const cached = options.sessionManager.getCachedPrompt(options.sessionId)
-        const liveTools = createToolRegistry().definitions
-        const toolFingerprint = getToolFingerprint(liveTools)
         if (cached) {
+          const toolFingerprint = getToolFingerprint(cached.tools)
           const currentHash = computeDynamicContextHash(instructionContent ?? '', skills, toolFingerprint)
           if (cached.hash !== currentHash) {
             logger.debug('assembleRequest: hash mismatch', {
@@ -357,32 +355,26 @@ export async function runAgentTurn(
               cachedHash: cached.hash,
               currentHash,
               cachedTools: cached.tools.map((t) => t.function.name),
-              liveTools: liveTools.map((t) => t.function.name),
             })
             options.sessionManager.setDynamicContextChanged(options.sessionId, true)
-            options.sessionManager.setDebugDump(options.sessionId, {
-              cachedPrompt: cached.systemPrompt.slice(0, 5000),
-              cachedTools: cached.tools.map((t) => t.function.name),
-              liveTools: liveTools.map((t) => t.function.name),
-            })
           }
           return createAssemblyResult({
             systemPrompt: cached.systemPrompt,
             messages: input.messages,
             injectedFiles: input.injectedFiles,
-            requestTools: cached.tools.length > 0 ? cached.tools : liveTools,
+            requestTools: cached.tools,
             toolChoice: input.toolChoice,
           })
         }
-        const result = assembleAgentRequest({
-          ...input,
-          agentDef,
-          subAgentDefs,
-          modelName: options.llmClient.getModel(),
+        const result = await buildCachedPrompt(options.sessionManager, options.sessionId, agentDef)
+        options.sessionManager.setCachedPrompt(options.sessionId, result.systemPrompt, result.tools, result.hash)
+        return createAssemblyResult({
+          systemPrompt: result.systemPrompt,
+          messages: input.messages,
+          injectedFiles: input.injectedFiles,
+          requestTools: result.tools,
+          toolChoice: input.toolChoice,
         })
-        const hash = computeDynamicContextHash(instructionContent ?? '', skills, toolFingerprint)
-        options.sessionManager.setCachedPrompt(options.sessionId, result.systemPrompt, result.tools, hash)
-        return result
       },
       getToolRegistry: () => getToolRegistryForAgent(agentDef),
       getConversationMessages: buildGetConversationMessages(options.sessionId, options.llmClient, append),

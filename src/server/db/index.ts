@@ -220,5 +220,21 @@ function runMigrations(db: Database.Database): void {
     logger.info('Backfilled message counts', { count: backfillResult.changes })
   }
 
+  // Migration: Add cached prompt columns for persistent prefix cache across restarts
+  if (!columnNames.includes('cached_system_prompt')) {
+    logger.info('Migrating sessions table: adding cached_system_prompt column')
+    db.exec(`ALTER TABLE sessions ADD COLUMN cached_system_prompt TEXT`)
+  }
+
+  if (!columnNames.includes('cached_tools')) {
+    logger.info('Migrating sessions table: adding cached_tools column')
+    db.exec(`ALTER TABLE sessions ADD COLUMN cached_tools TEXT`)
+  }
+
+  if (!columnNames.includes('cached_hash')) {
+    logger.info('Migrating sessions table: adding cached_hash column')
+    db.exec(`ALTER TABLE sessions ADD COLUMN cached_hash TEXT`)
+  }
+
   logger.info('Database migrations completed')
 }
