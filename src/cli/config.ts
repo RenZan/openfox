@@ -73,6 +73,7 @@ const visionFallbackSchema = z.object({
   url: z.string().default('http://localhost:11434'),
   model: z.string().default('qwen3.5:0.8b'),
   timeout: z.number().default(120),
+  backend: z.enum(['ollama', 'openai']).default('ollama'),
 })
 
 const mcpServerSchema = z.object({
@@ -85,7 +86,13 @@ const mcpServerSchema = z.object({
   disabledTools: z.array(z.string()).optional(),
 })
 
-const defaultVisionFallback = { enabled: false, url: 'http://localhost:11434', model: 'qwen3.5:0.8b', timeout: 120 }
+const defaultVisionFallback = {
+  enabled: false,
+  url: 'http://localhost:11434',
+  model: 'qwen3.5:0.8b',
+  timeout: 120,
+  backend: 'ollama' as const,
+}
 
 // New config schema with providers array
 const configSchema = z
@@ -317,12 +324,7 @@ export async function saveGlobalConfig(mode: Mode, config: Partial<GlobalConfig>
     logging: config.logging ?? { level: 'error' },
     database: config.database ?? { path: '' },
     workspace: config.workspace ?? { workdir: process.cwd() },
-    visionFallback: config.visionFallback ?? {
-      enabled: false,
-      url: 'http://localhost:11434',
-      model: 'qwen3.5:0.8b',
-      timeout: 120,
-    },
+    visionFallback: config.visionFallback ?? defaultVisionFallback,
   }
   await mkdir(dirname(configPath), { recursive: true })
   await writeFile(configPath, JSON.stringify(fullConfig, null, 2))
@@ -367,12 +369,7 @@ export function setDefaultModelSelection(
     logging: config.logging ?? { level: 'error' },
     database: config.database ?? { path: '' },
     workspace: config.workspace ?? { workdir: process.cwd() },
-    visionFallback: config.visionFallback ?? {
-      enabled: false,
-      url: 'http://localhost:11434',
-      model: 'qwen3.5:0.8b',
-      timeout: 120,
-    },
+    visionFallback: config.visionFallback ?? defaultVisionFallback,
   }
 }
 
@@ -401,12 +398,7 @@ export function addProvider(config: Partial<GlobalConfig>, provider: Omit<Provid
     logging: config.logging ?? { level: 'error' },
     database: config.database ?? { path: '' },
     workspace: config.workspace ?? { workdir: process.cwd() },
-    visionFallback: config.visionFallback ?? {
-      enabled: false,
-      url: 'http://localhost:11434',
-      model: 'qwen3.5:0.8b',
-      timeout: 120,
-    },
+    visionFallback: config.visionFallback ?? defaultVisionFallback,
   }
 }
 
@@ -454,12 +446,7 @@ export function removeProvider(config: Partial<GlobalConfig>, providerId: string
     logging: config.logging ?? { level: 'error' },
     database: config.database ?? { path: '' },
     workspace: config.workspace ?? { workdir: process.cwd() },
-    visionFallback: config.visionFallback ?? {
-      enabled: false,
-      url: 'http://localhost:11434',
-      model: 'qwen3.5:0.8b',
-      timeout: 120,
-    },
+    visionFallback: config.visionFallback ?? defaultVisionFallback,
   }
 }
 
@@ -476,12 +463,7 @@ export function activateProvider(config: Partial<GlobalConfig>, providerId: stri
       logging: config.logging ?? { level: 'error' },
       database: config.database ?? { path: '' },
       workspace: config.workspace ?? { workdir: process.cwd() },
-      visionFallback: config.visionFallback ?? {
-        enabled: false,
-        url: 'http://localhost:11434',
-        model: 'qwen3.5:0.8b',
-        timeout: 120,
-      },
+      visionFallback: config.visionFallback ?? defaultVisionFallback,
     }
   }
 
@@ -495,12 +477,7 @@ export function activateProvider(config: Partial<GlobalConfig>, providerId: stri
     logging: config.logging ?? { level: 'error' },
     database: config.database ?? { path: '' },
     workspace: config.workspace ?? { workdir: process.cwd() },
-    visionFallback: config.visionFallback ?? {
-      enabled: false,
-      url: 'http://localhost:11434',
-      model: 'qwen3.5:0.8b',
-      timeout: 120,
-    },
+    visionFallback: config.visionFallback ?? defaultVisionFallback,
   }
 }
 

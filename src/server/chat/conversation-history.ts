@@ -12,6 +12,7 @@
 
 import type { StoredEvent, TurnEvent } from '../events/types.js'
 import type { ContextMessage } from '../events/folding.js'
+import type { VisionBackend } from '../llm/vision-fallback.js'
 import {
   handleMessageThinking,
   handleMessageDelta,
@@ -222,7 +223,12 @@ export async function processEventsForConversation(
   const modelVision = modelSupportsVision(llmClient.getModel())
   const runtimeConfig = getRuntimeConfig()
   const visionModel = runtimeConfig.llm?.visionModel
-    ? { baseUrl: runtimeConfig.llm.baseUrl, model: runtimeConfig.llm.visionModel, timeout: runtimeConfig.llm.timeout }
+    ? {
+        baseUrl: runtimeConfig.llm.baseUrl,
+        model: runtimeConfig.llm.visionModel,
+        timeout: runtimeConfig.llm.timeout,
+        backend: (runtimeConfig.llm.backend === 'ollama' ? 'ollama' : 'openai') as VisionBackend,
+      }
     : await loadVisionModelFromGlobalConfig()
   const { events: processedEvents } = await processContextImages(rawEvents, {
     modelSupportsVision: modelVision,

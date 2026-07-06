@@ -113,12 +113,12 @@ describe('processContextImages', () => {
 
     const result = await processContextImages(events, {
       modelSupportsVision: false,
-      visionModel: { baseUrl: 'http://localhost:11434', model: 'llava', timeout: 30000 },
+      visionModel: { baseUrl: 'http://localhost:11434', model: 'llava', timeout: 30000, backend: 'ollama' },
     })
 
     expect(describeImageFromDataUrl).toHaveBeenCalledWith(
       imageAttachment.data,
-      { baseUrl: 'http://localhost:11434', model: 'llava', timeout: 30000 },
+      { baseUrl: 'http://localhost:11434', model: 'llava', timeout: 30000, backend: 'ollama' },
       expect.objectContaining({ context: 'File: screenshot.png' }),
     )
 
@@ -152,7 +152,7 @@ describe('processContextImages', () => {
 
     await processContextImages(events1, {
       modelSupportsVision: false,
-      visionModel: { baseUrl: 'http://localhost:11434', model: 'llava', timeout: 30000 },
+      visionModel: { baseUrl: 'http://localhost:11434', model: 'llava', timeout: 30000, backend: 'ollama' },
     })
 
     expect(describeImageFromDataUrl).toHaveBeenCalledTimes(1)
@@ -174,7 +174,7 @@ describe('processContextImages', () => {
 
     await processContextImages(events2, {
       modelSupportsVision: false,
-      visionModel: { baseUrl: 'http://localhost:11434', model: 'llava', timeout: 30000 },
+      visionModel: { baseUrl: 'http://localhost:11434', model: 'llava', timeout: 30000, backend: 'ollama' },
     })
 
     expect(describeImageFromDataUrl).toHaveBeenCalledTimes(1)
@@ -223,7 +223,7 @@ describe('processContextImages', () => {
 
     const result = await processContextImages(events, {
       modelSupportsVision: false,
-      visionModel: { baseUrl: 'http://localhost:11434', model: 'llava', timeout: 30000 },
+      visionModel: { baseUrl: 'http://localhost:11434', model: 'llava', timeout: 30000, backend: 'ollama' },
     })
 
     const toolResult = result.events[2]!
@@ -253,7 +253,7 @@ describe('processContextImages', () => {
 
     const result = await processContextImages(events, {
       modelSupportsVision: false,
-      visionModel: { baseUrl: 'http://localhost:11434', model: 'llava', timeout: 30000 },
+      visionModel: { baseUrl: 'http://localhost:11434', model: 'llava', timeout: 30000, backend: 'ollama' },
     })
 
     const msgStart = result.events[0]!
@@ -276,7 +276,7 @@ describe('processContextImages', () => {
 
     const result = await processContextImages(events, {
       modelSupportsVision: false,
-      visionModel: { baseUrl: 'http://localhost:11434', model: 'llava', timeout: 30000 },
+      visionModel: { baseUrl: 'http://localhost:11434', model: 'llava', timeout: 30000, backend: 'ollama' },
     })
 
     expect(result.events).toEqual(events)
@@ -320,7 +320,7 @@ describe('processContextImages', () => {
     const abortController = new AbortController()
     const resultPromise = processContextImages(events, {
       modelSupportsVision: false,
-      visionModel: { baseUrl: 'http://localhost:11434', model: 'llava', timeout: 30000 },
+      visionModel: { baseUrl: 'http://localhost:11434', model: 'llava', timeout: 30000, backend: 'ollama' },
       signal: abortController.signal,
     })
 
@@ -357,7 +357,7 @@ describe('processContextImages', () => {
 
     await processContextImages(events, {
       modelSupportsVision: false,
-      visionModel: { baseUrl: 'http://localhost:11434', model: 'llava', timeout: 30000 },
+      visionModel: { baseUrl: 'http://localhost:11434', model: 'llava', timeout: 30000, backend: 'ollama' },
       onEvent,
     })
 

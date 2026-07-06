@@ -1,11 +1,12 @@
 import type { StoredEvent, TurnEvent } from '../events/types.js'
 import type { Attachment } from '../../shared/types.js'
 import { describeImageFromDataUrl } from '../llm/vision-fallback.js'
+import type { VisionBackend } from '../llm/vision-fallback.js'
 import { createHash } from 'node:crypto'
 import { getRuntimeConfig } from '../runtime-config.js'
 
 export async function loadVisionModelFromGlobalConfig(): Promise<
-  { baseUrl: string; model: string; timeout: number } | undefined
+  { baseUrl: string; model: string; timeout: number; backend: VisionBackend } | undefined
 > {
   try {
     const { loadGlobalConfig, getVisionFallback } = await import('../../cli/config.js')
@@ -14,7 +15,12 @@ export async function loadVisionModelFromGlobalConfig(): Promise<
     const globalConfig = await loadGlobalConfig(mode)
     const fallback = getVisionFallback(globalConfig)
     if (fallback?.enabled && fallback.model) {
-      return { baseUrl: fallback.url, model: fallback.model, timeout: fallback.timeout * 1000 }
+      return {
+        baseUrl: fallback.url,
+        model: fallback.model,
+        timeout: fallback.timeout * 1000,
+        backend: fallback.backend ?? 'ollama',
+      }
     }
   } catch {
     // Global config not available
@@ -28,6 +34,7 @@ export interface ImageProcessorOptions {
     baseUrl: string
     model: string
     timeout: number
+    backend: VisionBackend
   }
   signal?: AbortSignal
   onEvent?: (event: TurnEvent) => void

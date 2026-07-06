@@ -113,7 +113,13 @@ describe('config', () => {
         logging: { level: 'info' as const },
         database: { path: '' },
         workspace: { workdir: process.cwd() },
-        visionFallback: { enabled: false, url: 'http://localhost:11434', model: 'qwen3.5:0.8b', timeout: 120 },
+        visionFallback: {
+          enabled: false,
+          url: 'http://localhost:11434',
+          model: 'qwen3.5:0.8b',
+          timeout: 120,
+          backend: 'ollama' as const,
+        },
         activeProviderId: undefined,
         activeWorkflowId: undefined,
       }
@@ -215,7 +221,13 @@ describe('config', () => {
         logging: { level: 'info' as const },
         database: { path: '' },
         workspace: { workdir: process.cwd() },
-        visionFallback: { enabled: false, url: 'http://localhost:11434', model: 'qwen3.5:0.8b', timeout: 120 },
+        visionFallback: {
+          enabled: false,
+          url: 'http://localhost:11434',
+          model: 'qwen3.5:0.8b',
+          timeout: 120,
+          backend: 'ollama' as const,
+        },
       }
 
       await saveGlobalConfig('production', config)
@@ -249,7 +261,13 @@ describe('config', () => {
         logging: { level: 'info' as const },
         database: { path: '' },
         workspace: { workdir: process.cwd() },
-        visionFallback: { enabled: false, url: 'http://localhost:11434', model: 'qwen3.5:0.8b', timeout: 120 },
+        visionFallback: {
+          enabled: false,
+          url: 'http://localhost:11434',
+          model: 'qwen3.5:0.8b',
+          timeout: 120,
+          backend: 'ollama' as const,
+        },
       }
 
       await saveGlobalConfig('production', configWithUserModels)
@@ -333,7 +351,13 @@ describe('config', () => {
         logging: { level: 'info' as const },
         database: { path: '' },
         workspace: { workdir: process.cwd() },
-        visionFallback: { enabled: false, url: 'http://localhost:11434', model: 'qwen3.5:0.8b', timeout: 120 },
+        visionFallback: {
+          enabled: false,
+          url: 'http://localhost:11434',
+          model: 'qwen3.5:0.8b',
+          timeout: 120,
+          backend: 'ollama' as const,
+        },
       }
 
       await saveGlobalConfig('production', config)
@@ -350,7 +374,13 @@ describe('config', () => {
         logging: { level: 'info' as const },
         database: { path: '' },
         workspace: { workdir: process.cwd() },
-        visionFallback: { enabled: false, url: 'http://localhost:11434', model: 'qwen3.5:0.8b', timeout: 120 },
+        visionFallback: {
+          enabled: false,
+          url: 'http://localhost:11434',
+          model: 'qwen3.5:0.8b',
+          timeout: 120,
+          backend: 'ollama' as const,
+        },
       }
 
       await saveGlobalConfig('production', config)
@@ -378,7 +408,13 @@ describe('config', () => {
         logging: { level: 'warn' as const },
         database: { path: '' },
         workspace: { workdir: process.cwd() },
-        visionFallback: { enabled: false, url: 'http://localhost:11434', model: 'qwen3.5:0.8b', timeout: 120 },
+        visionFallback: {
+          enabled: false,
+          url: 'http://localhost:11434',
+          model: 'qwen3.5:0.8b',
+          timeout: 120,
+          backend: 'ollama' as const,
+        },
       }
 
       await saveGlobalConfig('production', originalConfig)

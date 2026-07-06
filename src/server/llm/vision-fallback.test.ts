@@ -4,10 +4,18 @@ import type { VisionModelConfig } from './vision-fallback.js'
 
 global.fetch = vi.fn()
 
-const testVisionModel: VisionModelConfig = {
+const ollamaVisionModel: VisionModelConfig = {
   baseUrl: 'http://localhost:11434',
   model: 'qwen3.5:0.8b',
   timeout: 120000,
+  backend: 'ollama',
+}
+
+const openaiVisionModel: VisionModelConfig = {
+  baseUrl: 'http://localhost:8000/v1',
+  model: 'qwen3.5-27b',
+  timeout: 120000,
+  backend: 'openai',
 }
 
 describe('vision-fallback', () => {
@@ -16,7 +24,7 @@ describe('vision-fallback', () => {
     vi.mocked(fetch).mockReset()
   })
 
-  describe('describeImage', () => {
+  describe('describeImage (ollama)', () => {
     it('returns description from API', async () => {
       const mockResponse = {
         ok: true,
@@ -24,8 +32,38 @@ describe('vision-fallback', () => {
       }
       vi.mocked(fetch).mockResolvedValue(mockResponse as unknown as Response)
 
-      const result = await describeImage('dGVzdA==', testVisionModel)
+      const result = await describeImage('dGVzdA==', ollamaVisionModel)
       expect(result).toBe('A test image showing a cat')
+    })
+
+    it('calls /api/chat endpoint', async () => {
+      const mockResponse = {
+        ok: true,
+        json: async () => ({ message: { content: 'desc' } }),
+      }
+      vi.mocked(fetch).mockResolvedValue(mockResponse as unknown as Response)
+
+      await describeImage('dGVzdA==', ollamaVisionModel)
+
+      const callUrl = vi.mocked(fetch).mock.calls[0]?.[0]
+      expect(callUrl).toBe('http://localhost:11434/api/chat')
+    })
+
+    it('sends Ollama request format with images field', async () => {
+      const mockResponse = {
+        ok: true,
+        json: async () => ({ message: { content: 'desc' } }),
+      }
+      vi.mocked(fetch).mockResolvedValue(mockResponse as unknown as Response)
+
+      await describeImage('dGVzdA==', ollamaVisionModel)
+
+      const callArgs = vi.mocked(fetch).mock.calls[0]!
+      const body = JSON.parse(callArgs[1]?.body as string)
+      expect(body.model).toBe('qwen3.5:0.8b')
+      expect(body.stream).toBe(false)
+      expect(body.messages[0].images).toEqual(['dGVzdA=='])
+      expect(body.messages[0].content).toContain('Describe this image')
     })
 
     it('returns error message on API failure', async () => {
@@ -36,7 +74,7 @@ describe('vision-fallback', () => {
       }
       vi.mocked(fetch).mockResolvedValue(mockResponse as unknown as Response)
 
-      const result = await describeImage('dGVzdA==', testVisionModel)
+      const result = await describeImage('dGVzdA==', ollamaVisionModel)
       expect(result).toContain('HTTP 500')
     })
 
@@ -55,7 +93,7 @@ describe('vision-fallback', () => {
         })
       })
 
-      const resultPromise = describeImage('dGVzdA==', testVisionModel, { signal: abortController.signal })
+      const resultPromise = describeImage('dGVzdA==', ollamaVisionModel, { signal: abortController.signal })
 
       abortController.abort()
 
@@ -70,7 +108,7 @@ describe('vision-fallback', () => {
       }
       vi.mocked(fetch).mockResolvedValue(mockResponse as unknown as Response)
 
-      await describeImage('dGVzdA==', testVisionModel, { context: 'File: screenshot.png' })
+      await describeImage('dGVzdA==', ollamaVisionModel, { context: 'File: screenshot.png' })
 
       expect(fetch).toHaveBeenCalled()
       const callArgs = vi.mocked(fetch).mock.calls[0]!
@@ -79,8 +117,117 @@ describe('vision-fallback', () => {
     })
   })
 
+  describe('describeImage (openai)', () => {
+    it('returns description from API', async () => {
+      const mockResponse = {
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: 'A test image showing a diagram' } }],
+        }),
+      }
+      vi.mocked(fetch).mockResolvedValue(mockResponse as unknown as Response)
+
+      const result = await describeImage('dGVzdA==', openaiVisionModel)
+      expect(result).toBe('A test image showing a diagram')
+    })
+
+    it('calls /v1/chat/completions endpoint', async () => {
+      const mockResponse = {
+        ok: true,
+        json: async () => ({ choices: [{ message: { content: 'desc' } }] }),
+      }
+      vi.mocked(fetch).mockResolvedValue(mockResponse as unknown as Response)
+
+      await describeImage('dGVzdA==', openaiVisionModel)
+
+      const callUrl = vi.mocked(fetch).mock.calls[0]?.[0]
+      expect(callUrl).toBe('http://localhost:8000/v1/chat/completions')
+    })
+
+    it('sends OpenAI request format with content array', async () => {
+      const mockResponse = {
+        ok: true,
+        json: async () => ({ choices: [{ message: { content: 'desc' } }] }),
+      }
+      vi.mocked(fetch).mockResolvedValue(mockResponse as unknown as Response)
+
+      await describeImage('dGVzdA==', openaiVisionModel)
+
+      const callArgs = vi.mocked(fetch).mock.calls[0]!
+      const body = JSON.parse(callArgs[1]?.body as string)
+      expect(body.model).toBe('qwen3.5-27b')
+      expect(body.messages).toHaveLength(1)
+      expect(body.messages[0].role).toBe('user')
+      expect(body.messages[0].content).toBeInstanceOf(Array)
+      expect(body.messages[0].content[0].type).toBe('text')
+      expect(body.messages[0].content[0].text).toContain('Describe this image')
+      expect(body.messages[0].content[1].type).toBe('image_url')
+      expect(body.messages[0].content[1].image_url.url).toBe('data:image/png;base64,dGVzdA==')
+    })
+
+    it('returns error message on API failure', async () => {
+      const mockResponse = {
+        ok: false,
+        status: 400,
+        text: async () => 'Bad request',
+      }
+      vi.mocked(fetch).mockResolvedValue(mockResponse as unknown as Response)
+
+      const result = await describeImage('dGVzdA==', openaiVisionModel)
+      expect(result).toContain('HTTP 400')
+    })
+
+    it('is interrupted by external AbortSignal', async () => {
+      const abortController = new AbortController()
+
+      vi.mocked(fetch).mockImplementation(async (_url, init) => {
+        return new Promise((_resolve, reject) => {
+          if (init?.signal?.aborted) {
+            reject(new DOMException('aborted', 'AbortError'))
+            return
+          }
+          init?.signal?.addEventListener('abort', () => {
+            reject(new DOMException('aborted', 'AbortError'))
+          })
+        })
+      })
+
+      const resultPromise = describeImage('dGVzdA==', openaiVisionModel, { signal: abortController.signal })
+
+      abortController.abort()
+
+      const result = await resultPromise
+      expect(result).toContain('timed out')
+    })
+
+    it('includes context in the prompt when provided', async () => {
+      const mockResponse = {
+        ok: true,
+        json: async () => ({ choices: [{ message: { content: 'desc' } }] }),
+      }
+      vi.mocked(fetch).mockResolvedValue(mockResponse as unknown as Response)
+
+      await describeImage('dGVzdA==', openaiVisionModel, { context: 'File: screenshot.png' })
+
+      const callArgs = vi.mocked(fetch).mock.calls[0]!
+      const body = JSON.parse(callArgs[1]?.body as string)
+      expect(body.messages[0].content[0].text).toContain('File: screenshot.png')
+    })
+
+    it('handles empty response content', async () => {
+      const mockResponse = {
+        ok: true,
+        json: async () => ({ choices: [{ message: { content: null } }] }),
+      }
+      vi.mocked(fetch).mockResolvedValue(mockResponse as unknown as Response)
+
+      const result = await describeImage('dGVzdA==', openaiVisionModel)
+      expect(result).toBe('[Image - could not describe]')
+    })
+  })
+
   describe('describeImageFromDataUrl', () => {
-    it('extracts base64 from data URL', async () => {
+    it('extracts base64 from data URL (ollama)', async () => {
       const mockResponse = {
         ok: true,
         json: async () => ({ message: { content: 'A test image' } }),
@@ -88,12 +235,24 @@ describe('vision-fallback', () => {
       vi.mocked(fetch).mockResolvedValue(mockResponse as unknown as Response)
 
       const dataUrl = 'data:image/png;base64,dGVzdA=='
-      const result = await describeImageFromDataUrl(dataUrl, testVisionModel)
+      const result = await describeImageFromDataUrl(dataUrl, ollamaVisionModel)
       expect(result).toBe('A test image')
     })
 
+    it('extracts base64 from data URL (openai)', async () => {
+      const mockResponse = {
+        ok: true,
+        json: async () => ({ choices: [{ message: { content: 'An image' } }] }),
+      }
+      vi.mocked(fetch).mockResolvedValue(mockResponse as unknown as Response)
+
+      const dataUrl = 'data:image/png;base64,dGVzdA=='
+      const result = await describeImageFromDataUrl(dataUrl, openaiVisionModel)
+      expect(result).toBe('An image')
+    })
+
     it('returns error for invalid data URL', async () => {
-      const result = await describeImageFromDataUrl('not-a-data-url', testVisionModel)
+      const result = await describeImageFromDataUrl('not-a-data-url', ollamaVisionModel)
       expect(result).toBe('[Invalid image data URL]')
     })
   })

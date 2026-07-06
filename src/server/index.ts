@@ -8,6 +8,7 @@ import { createServer as createViteServer, type ViteDevServer } from 'vite'
 
 import type { Config, ModelConfig, ProviderBackend } from '../shared/types.js'
 import type { ServerHandle } from './context.js'
+import type { VisionBackend } from './llm/vision-fallback.js'
 import { initDatabase } from './db/index.js'
 import { initEventStore } from './events/index.js'
 import { detectModel, getLlmStatus, getBackendDisplayName } from './llm/index.js'
@@ -822,7 +823,9 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
     const llmClient = getLLMClient()
     const activeProvider = providerManager.getActiveProvider()
 
-    let visionFallback: { enabled: boolean; url: string; model: string; timeout: number } | undefined
+    let visionFallback:
+      | { enabled: boolean; url: string; model: string; timeout: number; backend: VisionBackend }
+      | undefined
     let globalWorkdir: string | undefined
     try {
       const { loadGlobalConfig, getVisionFallback } = await import('../cli/config.js')
@@ -834,6 +837,7 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
           url: fallback.url ?? 'http://localhost:11434',
           model: fallback.model ?? 'qwen3.5:0.8b',
           timeout: fallback.timeout ?? 120,
+          backend: fallback.backend ?? 'ollama',
         }
       }
       globalWorkdir = globalConfig.workspace?.workdir
@@ -1162,7 +1166,7 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
   app.post('/api/init/config', async (req, res) => {
     const { workdir, visionFallback } = req.body as {
       workdir?: string
-      visionFallback?: { enabled: boolean; url: string; model: string; timeout: number }
+      visionFallback?: { enabled: boolean; url: string; model: string; timeout: number; backend: VisionBackend }
     }
 
     try {

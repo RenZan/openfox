@@ -1,9 +1,12 @@
 import { logger } from '../utils/logger.js'
 
+export type VisionBackend = 'ollama' | 'openai'
+
 export interface VisionModelConfig {
   baseUrl: string
   model: string
   timeout: number
+  backend: VisionBackend
 }
 
 interface OllamaChatMessage {
@@ -26,6 +29,24 @@ interface OllamaChatResponse {
   }
 }
 
+interface OpenAIChatMessage {
+  role: 'user' | 'assistant' | 'system'
+  content: string | Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }>
+}
+
+interface OpenAIChatRequest {
+  model: string
+  messages: OpenAIChatMessage[]
+}
+
+interface OpenAIChatResponse {
+  choices: Array<{
+    message: {
+      content: string | null
+    }
+  }>
+}
+
 const IMAGE_PROMPT = `Describe this image in detail. Focus on:
 - What the image shows (UI, diagram, photo, etc.)
 - Any text visible in the image
@@ -33,6 +54,52 @@ const IMAGE_PROMPT = `Describe this image in detail. Focus on:
 - Key elements and their relationships
 
 Provide a concise but comprehensive description.`
+
+function buildPrompt(context?: string): string {
+  return context ? `${IMAGE_PROMPT}\n\nContext: ${context}` : IMAGE_PROMPT
+}
+
+function buildOllamaRequest(base64Data: string, model: string, context?: string): OllamaChatRequest {
+  return {
+    model,
+    messages: [
+      {
+        role: 'user',
+        content: buildPrompt(context),
+        images: [base64Data],
+      },
+    ],
+    stream: false,
+    think: false,
+  }
+}
+
+function buildOpenAIRequest(base64Data: string, model: string, context?: string): OpenAIChatRequest {
+  return {
+    model,
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: buildPrompt(context) },
+          { type: 'image_url', image_url: { url: `data:image/png;base64,${base64Data}` } },
+        ],
+      },
+    ],
+  }
+}
+
+function parseOllamaResponse(data: unknown): string | null {
+  const resp = data as OllamaChatResponse
+  return resp.message?.content?.trim() ?? null
+}
+
+function parseOpenAIResponse(data: unknown): string | null {
+  const resp = data as OpenAIChatResponse
+  const choice = resp.choices?.[0]
+  if (!choice) return null
+  return choice.message?.content?.trim() ?? null
+}
 
 export async function describeImage(
   base64Data: string,
@@ -42,20 +109,14 @@ export async function describeImage(
   const timeout = visionModel.timeout
 
   try {
-    const url = `${visionModel.baseUrl}/api/chat`
+    const isOpenAI = visionModel.backend === 'openai'
+    const url = isOpenAI
+      ? `${visionModel.baseUrl.replace(/\/+$/, '')}/chat/completions`
+      : `${visionModel.baseUrl.replace(/\/+$/, '')}/api/chat`
 
-    const requestBody: OllamaChatRequest = {
-      model: visionModel.model,
-      messages: [
-        {
-          role: 'user',
-          content: options?.context ? `${IMAGE_PROMPT}\n\nContext: ${options.context}` : IMAGE_PROMPT,
-          images: [base64Data],
-        },
-      ],
-      stream: false,
-      think: false,
-    }
+    const requestBody = isOpenAI
+      ? buildOpenAIRequest(base64Data, visionModel.model, options?.context)
+      : buildOllamaRequest(base64Data, visionModel.model, options?.context)
 
     const timeoutController = new AbortController()
     const timeoutId = setTimeout(() => timeoutController.abort(), timeout)
@@ -81,9 +142,9 @@ export async function describeImage(
       return `[Image description failed: HTTP ${response.status}]`
     }
 
-    const data = (await response.json()) as OllamaChatResponse
+    const data = await response.json()
+    const description = isOpenAI ? parseOpenAIResponse(data) : parseOllamaResponse(data)
 
-    const description = data.message?.content?.trim()
     if (!description) {
       logger.warn('Vision fallback returned empty description')
       return '[Image - could not describe]'

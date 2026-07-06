@@ -11,7 +11,7 @@ import type { ProviderInfo } from './types'
 interface OnboardingData {
   providers: ProviderInfo[]
   workdir: string
-  visionFallback?: { enabled: boolean; url: string; model: string; timeout: number }
+  visionFallback?: { enabled: boolean; url: string; model: string; timeout: number; backend: 'ollama' | 'openai' }
 }
 
 interface OnboardingWizardProps {
@@ -34,7 +34,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   }
 
   async function handleVisionComplete(visionData: {
-    visionFallback?: { enabled: boolean; url: string; model: string; timeout: number }
+    visionFallback?: { enabled: boolean; url: string; model: string; timeout: number; backend: 'ollama' | 'openai' }
   }) {
     setSaving(true)
 
