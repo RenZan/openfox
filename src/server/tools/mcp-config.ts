@@ -143,9 +143,12 @@ export const mcpConfigTool: Tool = createTool<McpConfigArgs>(
         const cmdStr = server.config.command
           ? `${server.config.command} ${(server.config.args ?? []).join(' ')}`
           : (server.config.url ?? '')
-        lines.push(
-          `${connStr} ${server.name} (${server.config.transport}) — ${server.status}${server.error ? `: ${server.error}` : ''}`,
-        )
+        const hasCachedTools = server.tools.length > 0
+        const sourceLabel = server.status === 'connected' ? ' (live)' : hasCachedTools ? ' (from cache)' : ''
+        const statusLine = server.error
+          ? `${server.status}${sourceLabel}: ${server.error}`
+          : `${server.status}${sourceLabel}`
+        lines.push(`${connStr} ${server.name} (${server.config.transport}) — ${statusLine}`)
         lines.push(`  ${cmdStr}`)
         lines.push(`  ${server.tools.length} tools, ~${server.estimatedTokens} tokens`)
 

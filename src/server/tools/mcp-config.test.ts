@@ -91,6 +91,96 @@ describe('mcpConfigTool', () => {
       expect(result.output).toContain('connected')
       expect(result.output).toContain('read_file')
       expect(result.output).toContain('2 tools')
+      expect(result.output).toContain('(live)')
+    })
+
+    it('should show (from cache) for errored servers with cached tools', async () => {
+      setMcpManagerForTools({
+        ...mockManager,
+        getAllServers: vi.fn().mockReturnValue([
+          {
+            name: 'cached-server',
+            config: {
+              transport: 'http',
+              url: 'https://example.com/mcp',
+              cachedTools: [{ name: 't1', description: 'test', inputSchema: {}, estimatedTokens: 10 }],
+            },
+            status: 'error',
+            error: 'Connection refused',
+            tools: [{ name: 't1', description: 'test', inputSchema: {}, enabled: true, estimatedTokens: 10 }],
+            estimatedTokens: 10,
+          },
+        ]),
+      } as unknown as McpManager)
+
+      const { mcpConfigTool } = await import('./mcp-config.js')
+
+      const result = await mcpConfigTool.execute(
+        { action: 'list' },
+        { workdir: '/tmp', sessionId: 's1', sessionManager: mockSessionManager() },
+      )
+
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('(from cache)')
+      expect(result.output).toContain('Connection refused')
+    })
+
+    it('should show (from cache) for disconnected servers with cached tools', async () => {
+      setMcpManagerForTools({
+        ...mockManager,
+        getAllServers: vi.fn().mockReturnValue([
+          {
+            name: 'disconnected-cached',
+            config: {
+              transport: 'http',
+              url: 'https://example.com/mcp',
+              cachedTools: [{ name: 't1', description: 'test', inputSchema: {}, estimatedTokens: 10 }],
+            },
+            status: 'disconnected',
+            tools: [{ name: 't1', description: 'test', inputSchema: {}, enabled: true, estimatedTokens: 10 }],
+            estimatedTokens: 10,
+          },
+        ]),
+      } as unknown as McpManager)
+
+      const { mcpConfigTool } = await import('./mcp-config.js')
+
+      const result = await mcpConfigTool.execute(
+        { action: 'list' },
+        { workdir: '/tmp', sessionId: 's1', sessionManager: mockSessionManager() },
+      )
+
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('(from cache)')
+      expect(result.output).toContain('disconnected')
+    })
+
+    it('should show no source label for errored servers without cached tools', async () => {
+      setMcpManagerForTools({
+        ...mockManager,
+        getAllServers: vi.fn().mockReturnValue([
+          {
+            name: 'dead-server',
+            config: { transport: 'http', url: 'https://example.com/mcp' },
+            status: 'error',
+            error: 'Timeout',
+            tools: [],
+            estimatedTokens: 0,
+          },
+        ]),
+      } as unknown as McpManager)
+
+      const { mcpConfigTool } = await import('./mcp-config.js')
+
+      const result = await mcpConfigTool.execute(
+        { action: 'list' },
+        { workdir: '/tmp', sessionId: 's1', sessionManager: mockSessionManager() },
+      )
+
+      expect(result.success).toBe(true)
+      expect(result.output).not.toContain('(from cache)')
+      expect(result.output).not.toContain('(live)')
+      expect(result.output).toContain('0 tools')
     })
 
     it('should report no servers when none configured', async () => {

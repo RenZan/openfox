@@ -134,7 +134,24 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
   const toolRegistry = createToolRegistry()
 
   // Initialize MCP manager and connect to configured servers
-  const mcpManager = new McpManager()
+  const mcpManager = new McpManager({
+    onToolsDiscovered: async (name, tools) => {
+      try {
+        const { loadGlobalConfig, saveGlobalConfig } = await import('../cli/config.js')
+        const mode = config.mode ?? 'production'
+        const globalConfig = await loadGlobalConfig(mode)
+        const mcpServers = {
+          ...((globalConfig.mcpServers ?? {}) as Record<string, import('./mcp/types.js').McpServerConfig>),
+        }
+        if (mcpServers[name]) {
+          mcpServers[name] = { ...mcpServers[name], cachedTools: tools }
+          await saveGlobalConfig(mode, { ...globalConfig, mcpServers })
+        }
+      } catch (err) {
+        logger.warn('Failed to persist MCP tool cache', { name, error: String(err) })
+      }
+    },
+  })
   setMcpManagerForTools(mcpManager)
   setMcpConfigMode(config.mode ?? 'production')
   const mcpServers = (config.mcpServers ?? {}) as Record<string, import('./mcp/types.js').McpServerConfig>

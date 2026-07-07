@@ -76,6 +76,13 @@ const visionFallbackSchema = z.object({
   backend: z.enum(['ollama', 'openai']).default('ollama'),
 })
 
+const cachedToolSchema = z.object({
+  name: z.string(),
+  description: z.string().optional(),
+  inputSchema: z.record(z.string(), z.unknown()),
+  estimatedTokens: z.number(),
+})
+
 const mcpServerSchema = z.object({
   transport: z.enum(['stdio', 'http']).default('stdio'),
   command: z.string().optional(),
@@ -84,6 +91,7 @@ const mcpServerSchema = z.object({
   url: z.string().optional(),
   headers: z.record(z.string(), z.string()).optional(),
   disabledTools: z.array(z.string()).optional(),
+  cachedTools: z.array(cachedToolSchema).optional(),
 })
 
 const defaultVisionFallback = {

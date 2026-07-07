@@ -58,6 +58,7 @@ describe('McpManager', () => {
   let manager: McpManager
 
   beforeEach(() => {
+    vi.clearAllMocks()
     manager = new McpManager()
   })
 
@@ -179,6 +180,117 @@ describe('McpManager', () => {
       expect(server!.tools.find((t) => t.name === 'get_weather')!.enabled).toBe(false)
 
       await manager.setToolEnabled('test', 'get_weather', true)
+      expect(server!.tools.find((t) => t.name === 'get_weather')!.enabled).toBe(true)
+    })
+  })
+
+  describe('cachedTools', () => {
+    it('should fall back to cachedTools on connection failure', async () => {
+      // Make listTools throw to simulate connection failure
+      mockClientInstance.listTools.mockRejectedValueOnce(new Error('Connection refused'))
+
+      await manager.addServer('cached-server', {
+        transport: 'http',
+        url: 'https://mcp.example.com/mcp',
+        cachedTools: [
+          { name: 'cached_tool', description: 'From cache', inputSchema: { type: 'object' }, estimatedTokens: 50 },
+        ],
+      })
+
+      const server = manager.getServer('cached-server')
+      expect(server).toBeDefined()
+      expect(server!.status).toBe('error')
+      expect(server!.error).toContain('Connection refused')
+      expect(server!.tools).toHaveLength(1)
+      expect(server!.tools[0]!.name).toBe('cached_tool')
+      expect(server!.tools[0]!.description).toBe('From cache')
+      expect(server!.tools[0]!.enabled).toBe(true)
+    })
+
+    it('should apply disabledTools filter to cached tools', async () => {
+      mockClientInstance.listTools.mockRejectedValueOnce(new Error('Timeout'))
+
+      await manager.addServer('cached-filtered', {
+        transport: 'http',
+        url: 'https://mcp.example.com/mcp',
+        disabledTools: ['tool_b'],
+        cachedTools: [
+          { name: 'tool_a', description: 'A', inputSchema: { type: 'object' }, estimatedTokens: 30 },
+          { name: 'tool_b', description: 'B', inputSchema: { type: 'object' }, estimatedTokens: 40 },
+          { name: 'tool_c', description: 'C', inputSchema: { type: 'object' }, estimatedTokens: 50 },
+        ],
+      })
+
+      const server = manager.getServer('cached-filtered')
+      expect(server!.tools).toHaveLength(3)
+      expect(server!.tools.find((t) => t.name === 'tool_a')!.enabled).toBe(true)
+      expect(server!.tools.find((t) => t.name === 'tool_b')!.enabled).toBe(false)
+      expect(server!.tools.find((t) => t.name === 'tool_c')!.enabled).toBe(true)
+    })
+
+    it('should have empty tools when no cachedTools and connection fails', async () => {
+      mockClientInstance.listTools.mockRejectedValueOnce(new Error('DNS failure'))
+
+      await manager.addServer('no-cache', {
+        transport: 'http',
+        url: 'https://mcp.example.com/mcp',
+      })
+
+      const server = manager.getServer('no-cache')
+      expect(server!.status).toBe('error')
+      expect(server!.tools).toHaveLength(0)
+    })
+
+    it('should update cachedTools on successful connection and fire callback', async () => {
+      const onToolsDiscovered = vi.fn()
+      manager = new McpManager({ onToolsDiscovered })
+
+      await manager.addServer('live-server', {
+        transport: 'stdio',
+        command: 'node',
+      })
+
+      const server = manager.getServer('live-server')
+      expect(server!.status).toBe('connected')
+      expect(server!.tools).toHaveLength(2)
+
+      // Callback should have been called with raw tool definitions
+      expect(onToolsDiscovered).toHaveBeenCalledWith('live-server', [
+        expect.objectContaining({ name: 'get_weather', estimatedTokens: expect.any(Number) }),
+        expect.objectContaining({ name: 'write_file', estimatedTokens: expect.any(Number) }),
+      ])
+    })
+
+    it('should preserve enabled state from cachedTools when reconnecting successfully', async () => {
+      // First: fail and use cache
+      mockClientInstance.listTools.mockRejectedValueOnce(new Error('Offline'))
+      await manager.addServer('hybrid', {
+        transport: 'http',
+        url: 'https://mcp.example.com/mcp',
+        disabledTools: ['write_file'],
+        cachedTools: [
+          { name: 'get_weather', description: 'Weather', inputSchema: { type: 'object' }, estimatedTokens: 40 },
+          { name: 'write_file', description: 'Write', inputSchema: { type: 'object' }, estimatedTokens: 30 },
+        ],
+      })
+
+      let server = manager.getServer('hybrid')
+      expect(server!.status).toBe('error')
+      expect(server!.tools.find((t) => t.name === 'write_file')!.enabled).toBe(false)
+
+      // Second: reconnect successfully (clear the mock rejection)
+      mockClientInstance.listTools.mockResolvedValue({
+        tools: [
+          { name: 'get_weather', description: 'Weather live', inputSchema: { type: 'object' } },
+          { name: 'write_file', description: 'Write live', inputSchema: { type: 'object' } },
+        ],
+      })
+      await manager.reconnectServer('hybrid')
+
+      server = manager.getServer('hybrid')
+      expect(server!.status).toBe('connected')
+      // disabledTools still applies
+      expect(server!.tools.find((t) => t.name === 'write_file')!.enabled).toBe(false)
       expect(server!.tools.find((t) => t.name === 'get_weather')!.enabled).toBe(true)
     })
   })

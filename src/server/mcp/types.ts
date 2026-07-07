@@ -1,5 +1,12 @@
 import type { LLMToolDefinition } from '../llm/types.js'
 
+export interface CachedToolInfo {
+  name: string
+  description?: string
+  inputSchema: Record<string, unknown>
+  estimatedTokens: number
+}
+
 export interface McpServerConfig {
   transport: 'stdio' | 'http'
   command?: string
@@ -8,6 +15,7 @@ export interface McpServerConfig {
   url?: string
   headers?: Record<string, string>
   disabledTools?: string[]
+  cachedTools?: CachedToolInfo[]
 }
 
 export interface McpServerState {
@@ -29,6 +37,7 @@ export interface McpToolInfo {
 
 export interface McpManagerOptions {
   onServersChanged?: () => void
+  onToolsDiscovered?: (serverName: string, tools: CachedToolInfo[]) => void
 }
 
 export interface McpToolDefinition extends LLMToolDefinition {

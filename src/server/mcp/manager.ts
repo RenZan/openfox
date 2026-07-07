@@ -3,7 +3,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import type { StreamableHTTPClientTransportOptions } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
-import type { McpServerConfig, McpServerState, McpToolInfo, McpManagerOptions } from './types.js'
+import type { McpServerConfig, McpServerState, McpToolInfo, McpManagerOptions, CachedToolInfo } from './types.js'
 import type { LLMToolDefinition } from '../llm/types.js'
 import { logger } from '../utils/logger.js'
 
@@ -30,9 +30,11 @@ interface ServerEntry {
 export class McpManager {
   private servers = new Map<string, ServerEntry>()
   private onServersChanged: (() => void) | undefined
+  private onToolsDiscovered: ((serverName: string, tools: CachedToolInfo[]) => void) | undefined
 
   constructor(options?: McpManagerOptions) {
     this.onServersChanged = options?.onServersChanged
+    this.onToolsDiscovered = options?.onToolsDiscovered
   }
 
   async addServer(name: string, config: McpServerConfig): Promise<void> {
@@ -103,12 +105,38 @@ export class McpManager {
       entry.transport = transport
       entry.state = { name, config: entry.config, status: 'connected', tools, estimatedTokens: totalTokens }
 
+      // Update cache with raw tool definitions (without enabled state)
+      const cachedTools: CachedToolInfo[] = tools.map((t) => ({
+        name: t.name,
+        ...(t.description ? { description: t.description } : {}),
+        inputSchema: t.inputSchema,
+        estimatedTokens: t.estimatedTokens,
+      }))
+      entry.config.cachedTools = cachedTools
+      this.onToolsDiscovered?.(name, cachedTools)
+
       logger.info('Connected to MCP server', { name, toolCount: tools.length })
       this.onServersChanged?.()
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
       logger.error('Failed to connect MCP server', { name, error: msg })
-      entry.state = { name, config: entry.config, status: 'error', tools: [], estimatedTokens: 0, error: msg }
+
+      // Fall back to cached tools if available
+      const cachedTools = entry.config.cachedTools
+      if (cachedTools && cachedTools.length > 0) {
+        const disabledSet = new Set(entry.config.disabledTools ?? [])
+        const tools: McpToolInfo[] = cachedTools.map((t) => ({
+          name: t.name,
+          description: t.description ?? '',
+          inputSchema: t.inputSchema,
+          enabled: !disabledSet.has(t.name),
+          estimatedTokens: t.estimatedTokens,
+        }))
+        const totalTokens = tools.filter((t) => t.enabled).reduce((sum, t) => sum + t.estimatedTokens, 0)
+        entry.state = { name, config: entry.config, status: 'error', tools, estimatedTokens: totalTokens, error: msg }
+      } else {
+        entry.state = { name, config: entry.config, status: 'error', tools: [], estimatedTokens: 0, error: msg }
+      }
       this.onServersChanged?.()
     }
   }
