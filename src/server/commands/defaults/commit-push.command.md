@@ -6,7 +6,6 @@ agentMode: builder
 
 Commit and push:
 
-0. `npm test` -> make sure the project is green
 1. `git status` -> verify what files are modified
 2. `git add` -> never do `-A`, add your files and your files only
 3. `git commit -m` -> add a clear message
