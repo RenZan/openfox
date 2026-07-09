@@ -94,6 +94,7 @@ export class SessionManager {
   private providerManager: import('../provider-manager.js').ProviderManager
   private dynamicContextChangedStore = new Map<string, boolean>()
   private debugDumpStore = new Map<string, { cachedPrompt: string; cachedTools: string[]; liveTools: string[] }>()
+  private warmedUpSessions = new Set<string>()
 
   constructor(providerManager: import('../provider-manager.js').ProviderManager) {
     this.providerManager = providerManager
@@ -209,6 +210,9 @@ export class SessionManager {
 
     // Clear message queue to prevent memory leak
     this.messageQueues.delete(id)
+
+    // Clean up warmup state
+    this.warmedUpSessions.delete(id)
 
     // Delete session from DB
     dbDeleteSession(id)
@@ -823,6 +827,18 @@ export class SessionManager {
     logger.debug('updateExecutionState called', { sessionId, updates })
   }
 
+  isWarmedUp(sessionId: string): boolean {
+    return this.warmedUpSessions.has(sessionId)
+  }
+
+  markWarmedUp(sessionId: string): void {
+    this.warmedUpSessions.add(sessionId)
+  }
+
+  resetWarmup(sessionId: string): void {
+    this.warmedUpSessions.delete(sessionId)
+  }
+
   setCachedPrompt(
     sessionId: string,
     systemPrompt: string,
@@ -830,6 +846,7 @@ export class SessionManager {
     hash: string,
   ): void {
     updateSessionCachedPrompt(sessionId, systemPrompt, tools, hash)
+    this.resetWarmup(sessionId)
   }
 
   getCachedPrompt(

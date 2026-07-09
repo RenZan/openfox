@@ -674,6 +674,53 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
     res.json({ success: true, queueState: sessionManager.getQueueState(sessionId) })
   })
 
+  // Warmup endpoint: prefills the LLM KV cache with system prompt + tools
+  // so the first real message has a lower time-to-first-token.
+  app.post('/api/sessions/:id/warmup', async (req, res) => {
+    const sessionId = req.params.id
+    const session = sessionManager.getSession(sessionId)
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found' })
+    }
+
+    if (session.messages.length > 0) {
+      return res.json({ success: false, reason: 'not_empty' })
+    }
+
+    if (sessionManager.isWarmedUp(sessionId)) {
+      return res.json({ success: false, reason: 'already_warmed' })
+    }
+
+    const { runAgentTurn, TurnMetrics } = await import('./chat/orchestrator.js')
+
+    runAgentTurn(
+      {
+        sessionManager,
+        sessionId,
+        llmClient: getLLMClient(),
+        statsIdentity: {
+          providerId: 'warmup',
+          providerName: 'Warmup',
+          backend: getLLMClient().getBackend(),
+          model: getLLMClient().getModel(),
+        },
+        onMessage: () => {},
+        warmup: true,
+      },
+      new TurnMetrics(),
+      session.mode,
+      () => {},
+    )
+      .then(() => {
+        sessionManager.markWarmedUp(sessionId)
+      })
+      .catch((err) => {
+        logger.debug('Warmup failed (expected)', { sessionId, error: err instanceof Error ? err.message : String(err) })
+      })
+
+    res.json({ success: true })
+  })
+
   // Delete queued message (cancel)
   app.delete('/api/sessions/:id/queue/:queueId', (req, res) => {
     const sessionId = req.params.id

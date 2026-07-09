@@ -641,4 +641,62 @@ describe('maxTokens clamping', () => {
     // modelSettings should be undefined — no partial object created
     expect(callArgs.modelSettings).toBeUndefined()
   })
+
+  it('warmup mode calls assembleRequest and llmClient.complete, does not call streamLLMPure', async () => {
+    mockSessionManager = {
+      requireSession: vi.fn().mockReturnValue({
+        workdir: '/test',
+        projectId: 'test-project',
+        executionState: null,
+        criteria: [],
+        isRunning: false,
+      }),
+      getContextState: vi.fn().mockReturnValue({
+        currentTokens: 0,
+        maxTokens: 200000,
+        compactionCount: 0,
+        dangerZone: false,
+        canCompact: false,
+        dynamicContextChanged: false,
+      }),
+      getCurrentModelContext: vi.fn().mockReturnValue(200000),
+      getCurrentModelSettings: vi.fn().mockReturnValue({ maxTokens: 16384 }),
+      setCurrentContextSize: vi.fn(),
+      getDynamicContextChanged: vi.fn().mockReturnValue(false),
+      setDynamicContextChanged: vi.fn(),
+      getCachedPrompt: vi.fn().mockReturnValue(undefined),
+      setCachedPrompt: vi.fn(),
+      getLspManager: vi.fn(),
+      drainAsapMessages: vi.fn().mockReturnValue([]),
+      getCurrentWindowMessages: vi.fn().mockReturnValue([]),
+      updateMessage: vi.fn(),
+    } as any
+
+    const completeMock = vi.fn().mockResolvedValue({
+      id: 'warmup',
+      content: '',
+      finishReason: 'stop',
+      usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+    })
+    mockLLMClient.complete = completeMock
+
+    await runTopLevelAgentLoop(makeConfig({ warmup: true }), mockTurnMetrics)
+
+    expect(assembleRequestMock).toHaveBeenCalledTimes(1)
+    expect(assembleRequestMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messages: [],
+        toolChoice: 'none',
+      }),
+    )
+    expect(completeMock).toHaveBeenCalledTimes(1)
+    expect(completeMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        maxTokens: 1,
+        temperature: 0,
+        skipClientReasoningEffort: true,
+      }),
+    )
+    expect(streamLLMPure).not.toHaveBeenCalled()
+  })
 })

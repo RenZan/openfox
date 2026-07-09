@@ -136,6 +136,9 @@ export interface TopLevelLoopConfig {
   /** When true, the loop starts in compacting mode (used for manual compaction).
    *  After compaction completes, the loop breaks instead of continuing. */
   initialCompacting?: boolean
+  /** When true, only warm up the LLM cache by sending system prompt + tools.
+   *  Skips message creation, event emission, tool execution — just prefills the KV cache. */
+  warmup?: boolean
 }
 
 // ============================================================================
@@ -164,6 +167,37 @@ export async function runTopLevelAgentLoop(
 
   for (;;) {
     if (signal?.aborted) throw new Error('Aborted')
+
+    // Warmup mode: just assemble the request to populate the cache, then fire a
+    // minimal LLM call to prefill the KV cache. No events, no messages, no tools.
+    if (config.warmup) {
+      const session = sessionManager.requireSession(sessionId)
+      const runtimeConfig = getRuntimeConfig()
+      const configDir = getGlobalConfigDir(runtimeConfig.mode ?? 'production')
+      const skills = await getEnabledSkillMetadata(configDir, runtimeConfig.workdir)
+      const { content: instructionContent } = await getAllInstructions(session.workdir, session.projectId)
+      const toolRegistry = config.getToolRegistry()
+
+      const assembledRequest = await config.assembleRequest({
+        workdir: session.workdir,
+        messages: [],
+        injectedFiles: [],
+        promptTools: toolRegistry.definitions,
+        toolChoice: 'none',
+        ...(instructionContent ? { customInstructions: instructionContent } : {}),
+        ...(skills.length > 0 ? { skills } : {}),
+      })
+
+      await llmClient.complete({
+        messages: [{ role: 'system', content: assembledRequest.systemPrompt }],
+        tools: assembledRequest.tools,
+        maxTokens: 1,
+        temperature: 0,
+        skipClientReasoningEffort: true,
+      })
+
+      return {}
+    }
 
     const session = sessionManager.requireSession(sessionId)
 

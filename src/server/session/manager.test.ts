@@ -460,4 +460,39 @@ describe('SessionManager', () => {
       expect(manager.hasQueuedMessages(session.id)).toBe(false)
     })
   })
+
+  describe('warmup tracking', () => {
+    it('starts not warmed up', () => {
+      const session = manager.createSession(projectId)
+      expect(manager.isWarmedUp(session.id)).toBe(false)
+    })
+
+    it('returns true after marking warmed up', () => {
+      const session = manager.createSession(projectId)
+      manager.markWarmedUp(session.id)
+      expect(manager.isWarmedUp(session.id)).toBe(true)
+    })
+
+    it('returns false after reset', () => {
+      const session = manager.createSession(projectId)
+      manager.markWarmedUp(session.id)
+      manager.resetWarmup(session.id)
+      expect(manager.isWarmedUp(session.id)).toBe(false)
+    })
+
+    it('resets warmup when setCachedPrompt is called', () => {
+      const session = manager.createSession(projectId)
+      manager.markWarmedUp(session.id)
+      manager.setCachedPrompt(session.id, 'new prompt', [], 'new-hash')
+      expect(manager.isWarmedUp(session.id)).toBe(false)
+    })
+
+    it('tracks warmup per session independently', () => {
+      const s1 = manager.createSession(projectId)
+      const s2 = manager.createSession(projectId)
+      manager.markWarmedUp(s1.id)
+      expect(manager.isWarmedUp(s1.id)).toBe(true)
+      expect(manager.isWarmedUp(s2.id)).toBe(false)
+    })
+  })
 })

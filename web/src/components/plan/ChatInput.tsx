@@ -1,5 +1,6 @@
 import { useRef, useEffect, useCallback } from 'react'
 import { useSessionStore, useIsRunning } from '../../stores/session'
+import { authFetch } from '../../lib/api'
 import type { Attachment } from '@shared/types.js'
 import type { PromptHistoryItem } from '../../hooks/usePromptHistory'
 import { AttachmentPreview } from '../shared/AttachmentPreview.js'
@@ -15,7 +16,11 @@ import { QueuedMessages } from './QueuedMessages'
 import { AgentSelector } from './AgentSelector'
 import { DangerLevelSelector } from './DangerLevelSelector'
 import { ProviderSelector } from '../settings/ProviderSelector'
-import { AtMentionAutocomplete, type AtMentionAutocompleteHandle, type FileSuggestion } from '../shared/AtMentionAutocomplete'
+import {
+  AtMentionAutocomplete,
+  type AtMentionAutocompleteHandle,
+  type FileSuggestion,
+} from '../shared/AtMentionAutocomplete'
 
 interface ChatInputProps {
   input: string
@@ -89,6 +94,8 @@ export function ChatInput({
   const restoredInput = useSessionStore((state) => state.restoredInput)
   const clearRestoredInput = useSessionStore((state) => state.clearRestoredInput)
   const workdir = useSessionStore((state) => state.currentSession?.workdir)
+  const currentSession = useSessionStore((state) => state.currentSession)
+  const warmupSentRef = useRef(false)
 
   const { sendMessage } = useScrolledSend(setAutoScroll)
 
@@ -285,29 +292,42 @@ export function ChatInput({
     clearInput()
   }
 
-  const handleSelectFile = useCallback((suggestion: FileSuggestion, startIndex: number) => {
-    const isDirectory = suggestion.type === 'directory'
-    // Files get a trailing space (closes the popup); directories get a trailing
-    // slash so the query continues and the popup refetches the dir's contents.
-    const suffix = isDirectory ? '/' : ' '
-    const beforeCursor = input.slice(0, startIndex)
-    const afterCursor = input.slice(cursorPosRef.current)
-    const newText = `${beforeCursor}@${suggestion.path}${suffix}${afterCursor}`
-    setInput(newText)
-    const newCursorPos = startIndex + suggestion.path.length + 2
-    cursorPosRef.current = newCursorPos
-    if (textareaRef.current) {
-      textareaRef.current.selectionStart = newCursorPos
-      textareaRef.current.selectionEnd = newCursorPos
-      textareaRef.current.focus()
-    }
-  }, [input, setInput])
+  const handleSelectFile = useCallback(
+    (suggestion: FileSuggestion, startIndex: number) => {
+      const isDirectory = suggestion.type === 'directory'
+      // Files get a trailing space (closes the popup); directories get a trailing
+      // slash so the query continues and the popup refetches the dir's contents.
+      const suffix = isDirectory ? '/' : ' '
+      const beforeCursor = input.slice(0, startIndex)
+      const afterCursor = input.slice(cursorPosRef.current)
+      const newText = `${beforeCursor}@${suggestion.path}${suffix}${afterCursor}`
+      setInput(newText)
+      const newCursorPos = startIndex + suggestion.path.length + 2
+      cursorPosRef.current = newCursorPos
+      if (textareaRef.current) {
+        textareaRef.current.selectionStart = newCursorPos
+        textareaRef.current.selectionEnd = newCursorPos
+        textareaRef.current.focus()
+      }
+    },
+    [input, setInput],
+  )
 
-  const handleInput = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInput(e.target.value)
-    if (showHistory) closeHistory()
-    cursorPosRef.current = e.target.selectionStart
-  }, [setInput, showHistory, closeHistory])
+  const handleInput = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const value = e.target.value
+      setInput(value)
+      if (showHistory) closeHistory()
+      cursorPosRef.current = e.target.selectionStart
+
+      // Warmup: on first keystroke in an empty session, prefill the LLM cache
+      if (!warmupSentRef.current && sessionId && value && currentSession && currentSession.messages.length === 0) {
+        warmupSentRef.current = true
+        authFetch(`/api/sessions/${sessionId}/warmup`, { method: 'POST' }).catch(() => {})
+      }
+    },
+    [setInput, showHistory, closeHistory, sessionId, currentSession],
+  )
 
   const handleSelect = useCallback((e: React.MouseEvent<HTMLTextAreaElement>) => {
     cursorPosRef.current = (e.target as HTMLTextAreaElement).selectionStart
@@ -405,8 +425,14 @@ export function ChatInput({
             className="w-full bg-transparent text-sm placeholder:text-text-muted resize-none overflow-y-auto focus:outline-none"
             style={{ minHeight: '24px', maxHeight: '200px' }}
             spellCheck={false}
-            />
-          <AtMentionAutocomplete ref={autocompleteRef} text={input} cursorPos={cursorPosRef.current} workdir={workdir} onSelect={handleSelectFile} />
+          />
+          <AtMentionAutocomplete
+            ref={autocompleteRef}
+            text={input}
+            cursorPos={cursorPosRef.current}
+            workdir={workdir}
+            onSelect={handleSelectFile}
+          />
         </div>
         <div className="flex items-center self-center gap-1.5">
           {isRunning && (

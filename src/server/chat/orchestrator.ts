@@ -106,6 +106,8 @@ export interface OrchestratorOptions {
   /** When true, the agent loop starts in compacting mode (manual compaction).
    *  After compaction completes, the loop breaks. */
   initialCompacting?: boolean
+  /** When true, only warm up the LLM cache — no events, no messages, no tools. */
+  warmup?: boolean
 }
 
 function resolveStatsIdentity(options: OrchestratorOptions): StatsIdentity {
@@ -322,8 +324,9 @@ export async function runAgentTurn(
   const allAgents = await loadAllAgentsDefault()
   const agentDef = findAgentById(agentId, allAgents) ?? findAgentById('planner', allAgents)!
 
-  // Inject agent reminder (full definition or small reminder based on latest agent message)
-  injectAgentReminder(options.sessionId, agentDef)
+  if (!options.warmup) {
+    injectAgentReminder(options.sessionId, agentDef)
+  }
 
   const { content: instructionContent } = await getAllInstructions(
     options.sessionManager.requireSession(options.sessionId).workdir,
@@ -382,6 +385,7 @@ export async function runAgentTurn(
       ...(options.initialCompacting ? { initialCompacting: true } : {}),
       ...(callbacks?.injectKickoff ? { injectKickoff: callbacks.injectKickoff } : {}),
       ...(callbacks?.onToolExecuted ? { onToolExecuted: callbacks.onToolExecuted } : {}),
+      ...(options.warmup ? { warmup: true } : {}),
     },
     turnMetrics,
   )
