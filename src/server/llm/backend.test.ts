@@ -15,6 +15,18 @@ describe('backend', () => {
       expect(caps.supportsTopK).toBe(true)
     })
 
+    it('returns correct capabilities for openai', () => {
+      const caps = getBackendCapabilities('openai')
+      expect(caps.supportsChatTemplateKwargs).toBe(false)
+      expect(caps.supportsTopK).toBe(false)
+    })
+
+    it('returns correct capabilities for anthropic', () => {
+      const caps = getBackendCapabilities('anthropic')
+      expect(caps.supportsChatTemplateKwargs).toBe(false)
+      expect(caps.supportsTopK).toBe(false)
+    })
+
     it('returns correct capabilities for ollama', () => {
       const caps = getBackendCapabilities('ollama')
       expect(caps.supportsChatTemplateKwargs).toBe(false)
@@ -42,6 +54,8 @@ describe('backend', () => {
         ollama: 'Ollama',
         llamacpp: 'llama.cpp',
         'opencode-go': 'OpenCode Go',
+        openai: 'OpenAI',
+        anthropic: 'Anthropic',
         unknown: 'Other',
       }
 

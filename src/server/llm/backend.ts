@@ -3,7 +3,7 @@
  * Supports vLLM, SGLang, Ollama, and llama.cpp inference engines.
  */
 
-export type Backend = 'vllm' | 'sglang' | 'ollama' | 'llamacpp' | 'opencode-go' | 'unknown'
+export type Backend = 'vllm' | 'sglang' | 'ollama' | 'llamacpp' | 'opencode-go' | 'openai' | 'anthropic' | 'unknown'
 
 export interface BackendCapabilities {
   /** Whether chat_template_kwargs with enable_thinking works (vLLM/SGLang) */
@@ -20,6 +20,14 @@ const BACKEND_CAPABILITIES: Record<Backend, BackendCapabilities> = {
   sglang: {
     supportsChatTemplateKwargs: true,
     supportsTopK: true,
+  },
+  openai: {
+    supportsChatTemplateKwargs: false,
+    supportsTopK: false,
+  },
+  anthropic: {
+    supportsChatTemplateKwargs: false,
+    supportsTopK: false,
   },
   ollama: {
     supportsChatTemplateKwargs: false,
@@ -56,6 +64,10 @@ export function getBackendDisplayName(backend: Backend): string {
       return 'llama.cpp'
     case 'opencode-go':
       return 'OpenCode Go'
+    case 'openai':
+      return 'OpenAI'
+    case 'anthropic':
+      return 'Anthropic'
     case 'unknown':
       return 'Other'
   }

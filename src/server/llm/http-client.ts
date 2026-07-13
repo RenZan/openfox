@@ -1,4 +1,3 @@
-import { Agent, setGlobalDispatcher } from 'undici'
 import type {
   ChatCompletionCreateParamsNonStreaming,
   ChatCompletionCreateParamsStreaming,
@@ -7,10 +6,6 @@ import type {
 } from './openai-types.js'
 import { logger } from '../utils/logger.js'
 import { LLMError } from '../utils/errors.js'
-
-// Set up HTTP/2 agent globally
-const agent = new Agent({ allowH2: true })
-setGlobalDispatcher(agent)
 
 export interface HttpClientOptions {
   baseURL: string
