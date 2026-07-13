@@ -104,10 +104,14 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
     }
 
     const detected = await detectModel(config.llm.baseUrl)
-    if (detected) {
+    if (detected && !config.defaultModelSelection) {
       llmClient.setModel(detected)
       if (!useMock) {
         logger.info('Auto-detected LLM model', { model: detected, backend: getBackendDisplayName(backend) })
+      }
+    } else if (detected && config.defaultModelSelection) {
+      if (!useMock) {
+        logger.debug('Skipping auto-detect, using configured model', { model: config.llm.model })
       }
     } else {
       if (!useMock) {
