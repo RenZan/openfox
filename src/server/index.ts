@@ -103,16 +103,18 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
       logger.info('Using configured LLM backend', { backend: getBackendDisplayName(backend) })
     }
 
+    const hasExplicitModel = !!config.defaultModelSelection
     const detected = await detectModel(config.llm.baseUrl)
-    if (detected) {
+    if (detected && !hasExplicitModel) {
       llmClient.setModel(detected)
       if (!useMock) {
         logger.info('Auto-detected LLM model', { model: detected, backend: getBackendDisplayName(backend) })
       }
-    } else {
-      if (!useMock) {
-        logger.warn('Could not auto-detect model, using config', { model: config.llm.model })
-      }
+    } else if (!detected && !useMock) {
+      logger.warn('Could not auto-detect model, using config', { model: config.llm.model })
+    }
+    if (hasExplicitModel && !useMock) {
+      logger.info('Using explicit model from config', { model: config.llm.model, defaultModelSelection: config.defaultModelSelection })
     }
 
     // Refetch models with context windows on startup
