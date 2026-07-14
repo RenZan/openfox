@@ -3,6 +3,7 @@ import type { ShikiTransformer } from 'shiki'
 import { useThemeStore } from '../stores/theme'
 
 let highlighter: Highlighter | null = null
+let highlighterPromise: Promise<Highlighter> | null = null
 const loadedLanguages = new Set<string>()
 const loadingPromises = new Map<string, Promise<void>>()
 
@@ -53,11 +54,14 @@ export function lineNumbersTransformer(): ShikiTransformer {
 }
 
 export async function getHighlighter() {
-  if (!highlighter) {
-    highlighter = await createHighlighter({ themes, langs: coreLangs })
-    coreLangs.forEach((lang) => loadedLanguages.add(lang))
+  if (!highlighterPromise) {
+    highlighterPromise = createHighlighter({ themes, langs: coreLangs }).then((h) => {
+      highlighter = h
+      coreLangs.forEach((lang) => loadedLanguages.add(lang))
+      return h
+    })
   }
-  return highlighter
+  return highlighterPromise
 }
 
 export async function loadLanguage(lang: string): Promise<void> {
