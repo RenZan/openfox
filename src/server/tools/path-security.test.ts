@@ -478,6 +478,32 @@ describe('path-security', () => {
         // file:// URLs should be detected as paths
         expect(paths).toContain('/home/user/doc.pdf')
       })
+
+      it('excludes API routes in git commit messages', () => {
+        const paths = extractAbsolutePathsFromCommand(
+          'git add -A && git commit -m "fix: POST /api/auto-update test was spawning real npm install"',
+        )
+        expect(paths).not.toContain('/api/auto-update')
+      })
+
+      it('excludes paths in git commit -m messages', () => {
+        const paths = extractAbsolutePathsFromCommand(
+          'git commit -m "fix: update /api/users endpoint and /api/sessions route"',
+        )
+        expect(paths).not.toContain('/api/users')
+        expect(paths).not.toContain('/api/sessions')
+      })
+
+      it('excludes paths in git commit --message long form', () => {
+        const paths = extractAbsolutePathsFromCommand('git commit --message "chore: bump /version/file"')
+        expect(paths).not.toContain('/version/file')
+      })
+
+      it('still extracts real paths from git commands outside -m', () => {
+        const paths = extractAbsolutePathsFromCommand('git add /etc/passwd && git commit -m "add config"')
+        expect(paths).toContain('/etc/passwd')
+        expect(paths).not.toContain('/add')
+      })
     })
 
     describe('cd and directory changes', () => {

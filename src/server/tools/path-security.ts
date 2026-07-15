@@ -226,7 +226,9 @@ function looksLikeRegex(str: string): boolean {
  * These are not real paths and should be skipped.
  */
 function isPlaceholderToken(str: string): boolean {
-  return str.includes('__URL__') || str.includes('__FILEURL__') || str.includes('__SED__')
+  return (
+    str.includes('__URL__') || str.includes('__FILEURL__') || str.includes('__SED__') || str.includes('__COMMIT_MSG__')
+  )
 }
 
 /**
@@ -254,6 +256,13 @@ export function extractAbsolutePathsFromCommand(command: string): string[] {
   sanitized = sanitized.replace(/s\/[^/]*\/[^/]*\/[gip]*/g, ' __SED__ ')
   sanitized = sanitized.replace(/s\|[^|]*\|[^|]*\|[gip]*/g, ' __SED__ ')
   sanitized = sanitized.replace(/s:[^:]*:[^:]*:[gip]*/g, ' __SED__ ')
+
+  // Strip git commit -m/--message content to avoid treating commit message
+  // text as file paths (e.g. "/api/auto-update" in a commit message).
+  // The message argument is a quoted string that should not be scanned for paths.
+  sanitized = sanitized.replace(/git\s+commit\s+(?:-[^-]\s*|--message\s+)(["'])(?:\\?.)*?\1/gi, (match) =>
+    match.replace(/\/[^\s"'|&;<>`()]+/g, ' __COMMIT_MSG__ '),
+  )
 
   // Handle file:// URLs specially - extract the path
   const fileUrlMatches = command.matchAll(/file:\/\/([^\s'"]+)/g)
