@@ -93,9 +93,10 @@ describe('web_search', () => {
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({
-          results: [{ title: 'Tavily Result', url: 'https://tavily.com', content: 'From Tavily' }],
-        }),
+        json: () =>
+          Promise.resolve({
+            results: [{ title: 'Tavily Result', url: 'https://tavily.com', content: 'From Tavily' }],
+          }),
       })
 
       const result = await webSearchTool.execute({ query: 'test' }, baseContext)
@@ -112,9 +113,10 @@ describe('web_search', () => {
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({
-          results: [{ title: 'SearXNG Result', url: 'https://sx.com', content: 'From SearXNG' }],
-        }),
+        json: () =>
+          Promise.resolve({
+            results: [{ title: 'SearXNG Result', url: 'https://sx.com', content: 'From SearXNG' }],
+          }),
       })
 
       const result = await webSearchTool.execute({ query: 'test' }, baseContext)
@@ -130,9 +132,10 @@ describe('web_search', () => {
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({
-          results: [{ title: 'Auto Tavily', url: 'https://tavily.com', content: 'Auto' }],
-        }),
+        json: () =>
+          Promise.resolve({
+            results: [{ title: 'Auto Tavily', url: 'https://tavily.com', content: 'Auto' }],
+          }),
       })
 
       const result = await webSearchTool.execute({ query: 'test' }, baseContext)
@@ -168,9 +171,10 @@ describe('web_search', () => {
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({
-          results: [{ title: 'Env Var Tavily', url: 'https://env.com', content: 'From env var' }],
-        }),
+        json: () =>
+          Promise.resolve({
+            results: [{ title: 'Env Var Tavily', url: 'https://env.com', content: 'From env var' }],
+          }),
       })
 
       const result = await webSearchTool.execute({ query: 'test' }, baseContext)
@@ -188,12 +192,13 @@ describe('web_search', () => {
     it('returns formatted results on success', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({
-          results: [
-            { title: 'Test Result', url: 'https://example.com', content: 'This is a test result' },
-            { title: 'Second Result', url: 'https://example.org', content: 'Another result' },
-          ],
-        }),
+        json: () =>
+          Promise.resolve({
+            results: [
+              { title: 'Test Result', url: 'https://example.com', content: 'This is a test result' },
+              { title: 'Second Result', url: 'https://example.org', content: 'Another result' },
+            ],
+          }),
       })
 
       const result = await webSearchTool.execute({ query: 'hello world' }, baseContext)
@@ -217,12 +222,13 @@ describe('web_search', () => {
     it('respects max_results parameter', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({
-          results: [
-            { title: 'R1', url: 'https://a.com', content: 'A' },
-            { title: 'R2', url: 'https://b.com', content: 'B' },
-          ],
-        }),
+        json: () =>
+          Promise.resolve({
+            results: [
+              { title: 'R1', url: 'https://a.com', content: 'A' },
+              { title: 'R2', url: 'https://b.com', content: 'B' },
+            ],
+          }),
       })
 
       await webSearchTool.execute({ query: 'test', max_results: 2 }, baseContext)
@@ -243,7 +249,7 @@ describe('web_search', () => {
       expect(body2.max_results).toBe(5)
     })
 
-    it('handles max_results=0', async () => {
+    it('clamps max_results=0 to default (5)', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({ results: [] }),
@@ -252,10 +258,10 @@ describe('web_search', () => {
       await webSearchTool.execute({ query: 'test', max_results: 0 }, baseContext)
 
       const body2 = JSON.parse(mockFetch.mock.calls[0]![1]!.body)
-      expect(body2.max_results).toBe(0)
+      expect(body2.max_results).toBe(5)
     })
 
-    it('handles max_results negative', async () => {
+    it('clamps negative max_results to default (5)', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({ results: [] }),
@@ -264,7 +270,7 @@ describe('web_search', () => {
       await webSearchTool.execute({ query: 'test', max_results: -1 }, baseContext)
 
       const body2 = JSON.parse(mockFetch.mock.calls[0]![1]!.body)
-      expect(body2.max_results).toBe(-1)
+      expect(body2.max_results).toBe(5)
     })
 
     it('returns no results message when empty', async () => {
@@ -326,9 +332,10 @@ describe('web_search', () => {
     it('handles empty query string', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({
-          results: [{ title: 'Empty Q', url: 'https://a.com', content: 'C' }],
-        }),
+        json: () =>
+          Promise.resolve({
+            results: [{ title: 'Empty Q', url: 'https://a.com', content: 'C' }],
+          }),
       })
 
       const result = await webSearchTool.execute({ query: '' }, baseContext)
@@ -341,9 +348,10 @@ describe('web_search', () => {
     it('handles query with special characters', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({
-          results: [{ title: 'Special', url: 'https://a.com', content: 'C++ & .NET <3' }],
-        }),
+        json: () =>
+          Promise.resolve({
+            results: [{ title: 'Special', url: 'https://a.com', content: 'C++ & .NET <3' }],
+          }),
       })
 
       const result = await webSearchTool.execute({ query: 'C++ & .NET <3' }, baseContext)
@@ -356,9 +364,10 @@ describe('web_search', () => {
     it('does not leak API key in output', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({
-          results: [{ title: 'Result', url: 'https://a.com', content: 'Content' }],
-        }),
+        json: () =>
+          Promise.resolve({
+            results: [{ title: 'Result', url: 'https://a.com', content: 'Content' }],
+          }),
       })
 
       const result = await webSearchTool.execute({ query: 'test' }, baseContext)
@@ -387,11 +396,10 @@ describe('web_search', () => {
     it('returns formatted results on success', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({
-          results: [
-            { title: 'SX Result', url: 'https://sx.com', content: 'SearXNG result' },
-          ],
-        }),
+        json: () =>
+          Promise.resolve({
+            results: [{ title: 'SX Result', url: 'https://sx.com', content: 'SearXNG result' }],
+          }),
       })
 
       const result = await webSearchTool.execute({ query: 'search term' }, baseContext)
@@ -494,9 +502,10 @@ describe('web_search', () => {
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({
-          results: [{ title: 'Trailing', url: 'https://a.com', content: 'Slash works' }],
-        }),
+        json: () =>
+          Promise.resolve({
+            results: [{ title: 'Trailing', url: 'https://a.com', content: 'Slash works' }],
+          }),
       })
 
       const result = await webSearchTool.execute({ query: 'test' }, baseContext)
@@ -509,9 +518,10 @@ describe('web_search', () => {
     it('handles query with special characters (URL encoded)', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({
-          results: [{ title: 'Special', url: 'https://a.com', content: 'Special chars' }],
-        }),
+        json: () =>
+          Promise.resolve({
+            results: [{ title: 'Special', url: 'https://a.com', content: 'Special chars' }],
+          }),
       })
 
       const result = await webSearchTool.execute({ query: 'hello world & foo' }, baseContext)
@@ -526,9 +536,10 @@ describe('web_search', () => {
       process.env['SEARXNG_API_KEY'] = 'sx-super-secret'
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({
-          results: [{ title: 'R', url: 'https://a.com', content: 'C' }],
-        }),
+        json: () =>
+          Promise.resolve({
+            results: [{ title: 'R', url: 'https://a.com', content: 'C' }],
+          }),
       })
 
       const result = await webSearchTool.execute({ query: 'test' }, baseContext)
@@ -559,10 +570,7 @@ describe('web_search', () => {
       const abortController = new AbortController()
       abortController.abort()
 
-      const result = await webSearchTool.execute(
-        { query: 'test' },
-        { ...baseContext, signal: abortController.signal },
-      )
+      const result = await webSearchTool.execute({ query: 'test' }, { ...baseContext, signal: abortController.signal })
 
       // Aborted signal should cause a fetch abort
       expect(result.success).toBe(false)

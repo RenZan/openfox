@@ -20,11 +20,15 @@ vi.mock('../../stores/settings', () => ({
     LLM_DYNAMIC_SYSTEM_PROMPT: 'llm.dynamicSystemPrompt',
     CACHE_WARMING: 'cache.warming',
     RETRY_PATTERNS: 'agent.retryPatterns',
-    SEARCH_ENGINE: 'search.engine',
-    SEARCH_TAVILY_API_KEY: 'search.tavilyApiKey',
-    SEARCH_SEARXNG_URL: 'search.searxngUrl',
-    SEARCH_SEARXNG_API_KEY: 'search.searxngApiKey',
   },
+  useSettingsStore: vi.fn((selector) => {
+    const state = {
+      settings: mockSettings,
+      getSetting: mockGetSetting,
+      setSetting: mockSetSetting,
+    }
+    return selector(state)
+  }),
 }))
 
 vi.mock('../useSettingsStore', () => ({
@@ -35,139 +39,48 @@ vi.mock('../useSettingsStore', () => ({
   }),
 }))
 
-const SEARCH_ENGINE = 'search.engine'
-
-describe('AdvancedTab - Search Engine section', () => {
+describe('AdvancedTab', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     Object.keys(mockSettings).forEach((k) => delete mockSettings[k])
   })
 
-  function findEngineButton(container: HTMLElement, label: string): HTMLElement | null {
-    const buttons = container.querySelectorAll('button')
-    for (const btn of buttons) {
-      if (btn.textContent?.trim() === label) return btn
-    }
-    return null
-  }
-
-  it('renders the Search Engine section heading', () => {
+  it('renders the Dynamic System Prompt toggle', () => {
     const { container } = render(<AdvancedTab onClose={vi.fn()} />)
-    const headings = container.querySelectorAll('h3')
-    const found = Array.from(headings).some((h) => h.textContent === 'Search Engine')
-    expect(found).toBe(true)
+    expect(container.textContent).toContain('Dynamic System Prompt')
   })
 
-  it('renders engine selector buttons (Off, tavily, searxng)', () => {
+  it('renders the Speculative Cache Warming toggle', () => {
     const { container } = render(<AdvancedTab onClose={vi.fn()} />)
-    expect(findEngineButton(container, 'Off')).toBeTruthy()
-    expect(findEngineButton(container, 'tavily')).toBeTruthy()
-    expect(findEngineButton(container, 'searxng')).toBeTruthy()
+    expect(container.textContent).toContain('Speculative Cache Warming')
   })
 
-  it('shows Tavily fields when Tavily is selected', async () => {
+  it('renders the Auto-Retry Patterns section', () => {
     const { container } = render(<AdvancedTab onClose={vi.fn()} />)
-    const user = userEvent.setup()
-    await user.click(findEngineButton(container, 'tavily')!)
-
-    expect(container.textContent).toContain('Tavily API Key')
-    const input = container.querySelector('input[type="password"]')
-    expect(input).toBeTruthy()
+    expect(container.textContent).toContain('Auto-Retry Patterns')
   })
 
-  it('shows SearXNG fields when SearXNG is selected', async () => {
+  it('renders the Open in VSCode toggle', () => {
     const { container } = render(<AdvancedTab onClose={vi.fn()} />)
-    const user = userEvent.setup()
-    await user.click(findEngineButton(container, 'searxng')!)
-
-    expect(container.textContent).toContain('SearXNG URL')
-    expect(container.textContent).toContain('API Key')
-    const inputs = container.querySelectorAll('input')
-    const urlInput = Array.from(inputs).find((i) => i.getAttribute('type') === 'url')
-    expect(urlInput).toBeTruthy()
-    const keyInput = Array.from(inputs).find((i) => i.getAttribute('type') === 'password')
-    expect(keyInput).toBeTruthy()
+    expect(container.textContent).toContain('Open in VSCode')
   })
 
-  it('shows no engine fields when Off is selected', () => {
+  it('renders the Onboarding section', () => {
     const { container } = render(<AdvancedTab onClose={vi.fn()} />)
-    const sections = container.textContent!
-    // Find the Search Engine section region
-    const searchSectionStart = sections.indexOf('Search Engine')
-    const afterSearch = sections.slice(searchSectionStart, sections.indexOf('Onboarding'))
-    expect(afterSearch).not.toContain('Tavily API Key')
-    expect(afterSearch).not.toContain('SearXNG URL')
+    expect(container.textContent).toContain('Onboarding')
   })
 
-  it('auto-saves engine selection on click', async () => {
+  it('does not render search engine section', () => {
     const { container } = render(<AdvancedTab onClose={vi.fn()} />)
-    const user = userEvent.setup()
-    await user.click(findEngineButton(container, 'tavily')!)
-    expect(mockSetSetting).toHaveBeenCalledWith(SEARCH_ENGINE, 'tavily')
+    expect(container.textContent).not.toContain('Search Engine')
   })
 
-  it('saves Tavily API key when Save is clicked', async () => {
+  it('toggles Dynamic System Prompt on click', async () => {
     const { container } = render(<AdvancedTab onClose={vi.fn()} />)
-    const user = userEvent.setup()
-    await user.click(findEngineButton(container, 'tavily')!)
-
-    const input = container.querySelector('input')! as HTMLInputElement
-    await user.type(input, 'tvly-key')
-
-    const saveBtns = Array.from(container.querySelectorAll('button'))
-    const saveBtn = saveBtns.find((b) => b.textContent === 'Save')
-    await user.click(saveBtn!)
-
-    // "Saved!" text appears after successful save
-    expect(container.textContent).toContain('Saved!')
-    // Verify the key was persisted - at minimum the engine selection was saved
-    expect(mockSetSetting).toHaveBeenCalled()
-  })
-
-  it('shows "Saved!" feedback after saving', async () => {
-    const { container } = render(<AdvancedTab onClose={vi.fn()} />)
-    const user = userEvent.setup()
-    await user.click(findEngineButton(container, 'tavily')!)
-
-    const input = container.querySelector('input')! as HTMLInputElement
-    await user.type(input, 'tvly-key')
-
-    const saveBtns = Array.from(container.querySelectorAll('button'))
-    const saveBtn = saveBtns.find((b) => b.textContent === 'Save')
-    await user.click(saveBtn!)
-
-    expect(container.textContent).toContain('Saved!')
-  })
-
-  it('uses password type for Tavily API key input', async () => {
-    const { container } = render(<AdvancedTab onClose={vi.fn()} />)
-    const user = userEvent.setup()
-    await user.click(findEngineButton(container, 'tavily')!)
-
-    const inputs = container.querySelectorAll('input[type="password"]')
-    expect(inputs.length).toBeGreaterThanOrEqual(1)
-    const keyInput = Array.from(inputs).find(
-      (i) => (i as HTMLInputElement).placeholder === 'tvly-...',
-    )
-    expect(keyInput).toBeTruthy()
-  })
-
-  it('uses password type for SearXNG API key', async () => {
-    const { container } = render(<AdvancedTab onClose={vi.fn()} />)
-    const user = userEvent.setup()
-    await user.click(findEngineButton(container, 'searxng')!)
-
-    const inputs = container.querySelectorAll('input[type="password"]')
-    const optionalKeyInput = Array.from(inputs).find(
-      (i) => (i as HTMLInputElement).placeholder === 'Optional API key',
-    )
-    expect(optionalKeyInput).toBeTruthy()
-  })
-
-  it('mentions env var override in description', () => {
-    const { container } = render(<AdvancedTab onClose={vi.fn()} />)
-    const text = container.textContent!
-    expect(text).toContain('TAVILY_API_KEY')
-    expect(text).toContain('SEARXNG_URL')
+    const toggles = container.querySelectorAll('label')
+    const dynamicToggle = Array.from(toggles).find((t) => t.textContent?.includes('Dynamic System Prompt'))
+    expect(dynamicToggle).toBeTruthy()
+    await userEvent.setup().click(dynamicToggle!)
+    expect(mockSetSetting).toHaveBeenCalledWith('llm.dynamicSystemPrompt', 'true')
   })
 })

@@ -1,5 +1,5 @@
 import TurndownService from 'turndown'
-import { createTool } from './tool-helpers.js'
+import { createTool, buildSignal } from './tool-helpers.js'
 import { OUTPUT_LIMITS } from './types.js'
 
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024 // 5MB
@@ -25,14 +25,6 @@ function buildAcceptHeader(format: string): string {
     default:
       return 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
   }
-}
-
-function buildSignal(timeoutMs: number, contextSignal?: AbortSignal): AbortSignal {
-  const timeoutSignal = AbortSignal.timeout(timeoutMs)
-  if (contextSignal) {
-    return AbortSignal.any([timeoutSignal, contextSignal])
-  }
-  return timeoutSignal
 }
 
 function convertHTMLToMarkdown(html: string): string {

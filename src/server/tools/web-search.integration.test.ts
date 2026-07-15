@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { ToolContext } from './types.js'
 
 const context: ToolContext = {
@@ -17,12 +17,20 @@ const describeIfSearxng = hasSearxng ? describe : describe.skip
 const describeIfAny = hasTavily || hasSearxng ? describe : describe.skip
 
 describeIfAny('web_search integration', () => {
+  beforeEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
   describeIfTavily('Tavily backend', () => {
     it(
       'returns real results for a French query',
       async () => {
-        delete process.env['SEARXNG_URL']
-        delete process.env['SEARXNG_API_KEY']
+        vi.stubEnv('SEARXNG_URL', '')
+        vi.stubEnv('SEARXNG_API_KEY', '')
 
         const { webSearchTool } = await import('./web-search.js')
         const result = await webSearchTool.execute(
@@ -41,7 +49,7 @@ describeIfAny('web_search integration', () => {
     it(
       'rejects too-short queries',
       async () => {
-        delete process.env['SEARXNG_URL']
+        vi.stubEnv('SEARXNG_URL', '')
 
         const { webSearchTool } = await import('./web-search.js')
         const result = await webSearchTool.execute({ query: 'a' }, context)
@@ -56,8 +64,8 @@ describeIfAny('web_search integration', () => {
     it(
       'returns error with invalid API key',
       async () => {
-        process.env['TAVILY_API_KEY'] = 'tvly-invalid-key'
-        delete process.env['SEARXNG_URL']
+        vi.stubEnv('TAVILY_API_KEY', 'tvly-invalid-key')
+        vi.stubEnv('SEARXNG_URL', '')
 
         const { webSearchTool } = await import('./web-search.js')
         const result = await webSearchTool.execute({ query: 'test' }, context)
@@ -73,14 +81,11 @@ describeIfAny('web_search integration', () => {
     it(
       'returns real results',
       async () => {
-        delete process.env['TAVILY_API_KEY']
-        delete process.env['SEARXNG_API_KEY']
+        vi.stubEnv('TAVILY_API_KEY', '')
+        vi.stubEnv('SEARXNG_API_KEY', '')
 
         const { webSearchTool } = await import('./web-search.js')
-        const result = await webSearchTool.execute(
-          { query: 'intelligence artificielle', max_results: 3 },
-          context,
-        )
+        const result = await webSearchTool.execute({ query: 'intelligence artificielle', max_results: 3 }, context)
 
         expect(result.success).toBe(true)
         expect(result.output).toContain('[1]')
@@ -92,9 +97,9 @@ describeIfAny('web_search integration', () => {
     it(
       'returns error with unreachable URL',
       async () => {
-        delete process.env['TAVILY_API_KEY']
-        process.env['SEARXNG_URL'] = 'http://localhost:1'
-        delete process.env['SEARXNG_API_KEY']
+        vi.stubEnv('TAVILY_API_KEY', '')
+        vi.stubEnv('SEARXNG_URL', 'http://localhost:1')
+        vi.stubEnv('SEARXNG_API_KEY', '')
 
         const { webSearchTool } = await import('./web-search.js')
         const result = await webSearchTool.execute({ query: 'test' }, context)
@@ -125,14 +130,11 @@ describeIfAny('web_search integration', () => {
     it(
       'default favors Tavily when both configured',
       async () => {
-        process.env['TAVILY_API_KEY'] = process.env['TAVILY_API_KEY'] ?? ''
-        process.env['SEARXNG_URL'] = process.env['SEARXNG_URL'] ?? ''
+        vi.stubEnv('TAVILY_API_KEY', process.env['TAVILY_API_KEY'] ?? '')
+        vi.stubEnv('SEARXNG_URL', process.env['SEARXNG_URL'] ?? '')
 
         const { webSearchTool } = await import('./web-search.js')
-        const result = await webSearchTool.execute(
-          { query: 'test integration', max_results: 1 },
-          context,
-        )
+        const result = await webSearchTool.execute({ query: 'test integration', max_results: 1 }, context)
 
         expect(result.success).toBe(true)
       },
