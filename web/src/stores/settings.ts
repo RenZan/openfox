@@ -25,6 +25,7 @@ export const SETTINGS_KEYS = {
   SEARCH_TAVILY_API_KEY: 'search.tavilyApiKey',
   SEARCH_SEARXNG_URL: 'search.searxngUrl',
   SEARCH_SEARXNG_API_KEY: 'search.searxngApiKey',
+  TOOLS_USE_RTK: 'tools.useRtk',
 } as const
 
 interface SettingsState {

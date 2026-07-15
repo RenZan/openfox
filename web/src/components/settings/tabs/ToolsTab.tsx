@@ -109,6 +109,7 @@ export function ToolsTab() {
     getSetting(SETTINGS_KEYS.SEARCH_TAVILY_API_KEY)
     getSetting(SETTINGS_KEYS.SEARCH_SEARXNG_URL)
     getSetting(SETTINGS_KEYS.SEARCH_SEARXNG_API_KEY)
+    getSetting(SETTINGS_KEYS.TOOLS_USE_RTK)
   }, [getSetting])
 
   useEffect(() => {
@@ -150,6 +151,16 @@ export function ToolsTab() {
       return res.json()
     })
   }
+
+  // ── RTK availability ──
+  const [rtkStatus, setRtkStatus] = useState<'checking' | 'available' | 'unavailable'>('checking')
+
+  useEffect(() => {
+    authFetch('/api/tools/rtk-check')
+      .then((r) => r.json())
+      .then((data) => setRtkStatus(data.available ? 'available' : 'unavailable'))
+      .catch(() => setRtkStatus('unavailable'))
+  }, [])
 
   // ── MCP state ──
   const [servers, setServers] = useState<McpServerState[]>([])
@@ -414,6 +425,44 @@ export function ToolsTab() {
               {searxngTestError && <p className="text-xs text-red-500">{searxngTestError}</p>}
             </div>
           )}
+        </div>
+      </div>
+
+      <hr className="border-border" />
+
+      {/* ── Token Optimization Section ── */}
+      <div>
+        <h3 className="text-sm font-medium text-text-primary mb-3">Token Optimization</h3>
+        <p className="text-sm text-text-muted mb-3">
+          Reduce token consumption by filtering command output through RTK. See the{' '}
+          <a
+            href="https://github.com/rtk-ai/rtk"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-accent-primary hover:underline"
+          >
+            README
+          </a>{' '}
+          for installation.
+        </p>
+        <div className="flex items-center justify-between py-2">
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-text-primary">Enable RTK auto-rewrite</span>
+              {rtkStatus === 'checking' && <span className="text-xs text-text-muted animate-pulse">checking…</span>}
+              {rtkStatus === 'available' && <span className="text-xs text-accent-success">● installed</span>}
+              {rtkStatus === 'unavailable' && <span className="text-xs text-accent-error">○ not found</span>}
+            </div>
+          </div>
+          <Toggle
+            enabled={settings[SETTINGS_KEYS.TOOLS_USE_RTK] === 'true'}
+            onClick={() =>
+              setSetting(
+                SETTINGS_KEYS.TOOLS_USE_RTK,
+                settings[SETTINGS_KEYS.TOOLS_USE_RTK] === 'true' ? 'false' : 'true',
+              )
+            }
+          />
         </div>
       </div>
 

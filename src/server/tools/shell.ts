@@ -1,10 +1,42 @@
+import { spawn } from 'node:child_process'
 import { resolve, isAbsolute } from 'node:path'
+import { access } from 'node:fs/promises'
 import { OUTPUT_LIMITS } from './types.js'
 import { createTool } from './tool-helpers.js'
 import { checkAborted, spawnShellProcess } from '../utils/shell.js'
 import { extractAbsolutePathsFromCommand, extractSensitivePathsFromCommand } from './path-security.js'
 import { terminateProcessTree } from '../utils/process-tree.js'
 import { stripTailPipe } from './shell-tail.js'
+import { getSetting, SETTINGS_KEYS } from '../db/settings.js'
+
+let rtkAvailable: boolean | undefined
+
+async function checkRtkAvailability(): Promise<boolean> {
+  if (rtkAvailable !== undefined) return rtkAvailable
+  try {
+    await access('/usr/local/bin/rtk')
+    rtkAvailable = true
+  } catch {
+    try {
+      const out = await new Promise<string>((resolve, reject) => {
+        const proc = spawn('rtk', ['--version'], { stdio: ['ignore', 'pipe', 'pipe'] })
+        let output = ''
+        proc.stdout?.on('data', (d: Buffer) => {
+          output += d.toString()
+        })
+        proc.on('error', reject)
+        proc.on('close', (code) => {
+          if (code === 0) resolve(output.trim())
+          else reject(new Error(`exit ${code}`))
+        })
+      })
+      rtkAvailable = out.startsWith('rtk ')
+    } catch {
+      rtkAvailable = false
+    }
+  }
+  return rtkAvailable
+}
 
 export function hasBackgroundAmpersand(command: string): boolean {
   const trimmed = command.replace(/[;\s]+$/, '')
@@ -80,7 +112,10 @@ export const runCommandTool = createTool<RunCommandArgs>(
     const tailInfo = stripTailPipe(args.command)
     const execCommand = tailInfo ? tailInfo.command : args.command
 
-    const result = await executeCommand(execCommand, workingDir, timeout, context.signal, context.onProgress)
+    const useRtk = getSetting(SETTINGS_KEYS.TOOLS_USE_RTK) === 'true'
+    const finalCommand = useRtk ? await tryRtkRewrite(execCommand) : execCommand
+
+    const result = await executeCommand(finalCommand, workingDir, timeout, context.signal, context.onProgress)
 
     let output = ''
 
@@ -129,6 +164,31 @@ interface CommandResult {
   stdout: string
   stderr: string
   exitCode: number
+}
+
+async function tryRtkRewrite(command: string): Promise<string> {
+  if (!(await checkRtkAvailability())) return command
+  try {
+    const result = await new Promise<string>((resolve, reject) => {
+      const proc = spawn('rtk', ['rewrite', command], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        timeout: 2_000,
+      })
+      let stdout = ''
+      proc.stdout?.on('data', (data: Buffer) => {
+        stdout += data.toString()
+      })
+      proc.on('error', reject)
+      proc.on('close', (code) => {
+        if (code === 0 || code === 3) resolve(stdout.trim())
+        else reject(new Error(`exit ${code}`))
+      })
+    })
+    if (result && result !== command) return result
+  } catch {
+    // rewrite failed — fall through
+  }
+  return command
 }
 
 function executeCommand(

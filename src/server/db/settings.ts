@@ -26,6 +26,7 @@ export const SETTINGS_KEYS = {
   SEARCH_TAVILY_API_KEY: 'search.tavilyApiKey',
   SEARCH_SEARXNG_URL: 'search.searxngUrl',
   SEARCH_SEARXNG_API_KEY: 'search.searxngApiKey',
+  TOOLS_USE_RTK: 'tools.useRtk',
 } as const
 
 export const SETTINGS_DEFAULTS: Record<string, string> = {
@@ -52,6 +53,7 @@ export const SETTINGS_DEFAULTS: Record<string, string> = {
       { type: 'chord', key: '4', modifiers: ['ctrl'] },
     ],
   }),
+  [SETTINGS_KEYS.TOOLS_USE_RTK]: 'false',
 }
 
 export type SettingsKey = (typeof SETTINGS_KEYS)[keyof typeof SETTINGS_KEYS]
