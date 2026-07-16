@@ -2,12 +2,14 @@ import type { Provider } from '../../../shared/types.js'
 import { getBackendCapabilities, type Backend } from '../../llm/backend.js'
 import { getModelProfile } from '../../llm/profiles.js'
 import type { LLMClientWithModel } from '../../llm/client.js'
-import type { ProviderTransportAdapter } from '../../../provider/index.js'
+import type { ProviderTransportAdapter, ProviderRequestContext, ProviderAccessContext } from '../../../provider/index.js'
+import { logger } from '../../utils/logger.js'
 
 export function createTransportLLMClient(
   provider: Provider,
   modelId: string,
   transport: ProviderTransportAdapter,
+  resolveAuth?: () => Promise<ProviderAccessContext>,
 ): LLMClientWithModel {
   let model = modelId
   let backend = provider.backend as Backend
@@ -26,15 +28,23 @@ export function createTransportLLMClient(
   let profile = profileFor(model)
   void getBackendCapabilities(backend)
 
-  const context = () => {
+  const context = async (): Promise<ProviderRequestContext> => {
     const configured = provider.models.find((item) => item.id === model)
-    return {
+    const ctx: ProviderRequestContext = {
       providerId: provider.id,
       model: configured?.apiModelId ?? model,
       catalogModel: model,
       ...(configured?.requestBody && { requestBody: configured.requestBody }),
       ...(provider.credentialRef && { credentialRef: provider.credentialRef }),
     }
+    if (resolveAuth) {
+      try {
+        ctx.auth = await resolveAuth()
+      } catch (error) {
+        logger.debug('Auth resolution failed for transport client', { providerId: provider.id, error: String(error) })
+      }
+    }
+    return ctx
   }
 
   return {
@@ -48,7 +58,7 @@ export function createTransportLLMClient(
     setBackend(next) {
       backend = next
     },
-    complete: (request) => transport.complete(request, context()),
-    stream: (request) => transport.stream(request, context()),
+    complete: async (request) => transport.complete(request, await context()),
+    stream: async function* (request) { yield* transport.stream(request, await context()) },
   }
 }

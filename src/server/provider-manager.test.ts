@@ -347,7 +347,7 @@ describe('ProviderManager - Model Selection', () => {
         complete: vi.fn(),
         stream: vi.fn(),
       }
-      const adapters = { getTransport: vi.fn((id?: string) => (id === 'example-transport' ? transport : undefined)) }
+      const adapters = { getTransport: vi.fn((id?: string) => (id === 'example-transport' ? transport : undefined)), getAuth: vi.fn(() => undefined) }
       const chatConfig: Config = {
         ...config,
         providers: [
@@ -659,7 +659,7 @@ describe('ProviderManager - Model Selection', () => {
         complete: vi.fn(),
         stream: vi.fn(),
       }
-      const adapters = { getTransport: vi.fn((id?: string) => (id === 'example-transport' ? transport : undefined)) }
+      const adapters = { getTransport: vi.fn((id?: string) => (id === 'example-transport' ? transport : undefined)), getAuth: vi.fn(() => undefined) }
       const chatConfig: Config = {
         ...config,
         providers: [

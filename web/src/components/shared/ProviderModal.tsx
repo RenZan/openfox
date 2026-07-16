@@ -907,6 +907,8 @@ export function ProviderModal({
                   onClick={() => {
                     setFormBackend('unknown')
                     setFormIsLocal(false)
+                    setFormAuthAdapter(undefined)
+                    setFormTransportAdapter(undefined)
                     setFetchError(null)
                   }}
                   className={`p-2 rounded border text-center text-sm transition-colors ${
@@ -939,6 +941,8 @@ export function ProviderModal({
                         setFormUrl((prev) => prev || `http://localhost:${port}`)
                         setFormBackend(backendMap[port] ?? '')
                         setFormIsLocal(true)
+                        setFormAuthAdapter(undefined)
+                        setFormTransportAdapter(undefined)
                         setFetchError(null)
                       }}
                       className={`p-2 rounded border text-center text-sm transition-colors ${

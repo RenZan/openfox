@@ -426,17 +426,36 @@ export function createProviderManager(config: Config, options: ProviderManagerOp
   function createClientForProvider(provider: Provider, model?: string): LLMClientWithModel {
     const resolvedModel = resolveProviderModel(provider, model)
     const transport = options.adapters?.getTransport(resolveTransportAdapter(provider))
-    return transport
-      ? createTransportLLMClient(provider, resolvedModel, transport)
-      : createLLMClient(createConfigForProvider(provider, resolvedModel))
+    if (transport) {
+      const authAdapter = provider.credentialRef && provider.authAdapter
+        ? options.adapters?.getAuth(provider.authAdapter)
+        : undefined
+      const resolveAuth = authAdapter && provider.credentialRef
+        ? () => authAdapter.getAccessContext(provider.credentialRef!)
+        : undefined
+      return createTransportLLMClient(provider, resolvedModel, transport, resolveAuth)
+    }
+    return createLLMClient(createConfigForProvider(provider, resolvedModel))
   }
 
   async function fetchProviderModels(provider: Provider): Promise<ModelConfig[]> {
     const transport = options.adapters?.getTransport(resolveTransportAdapter(provider))
     if (transport) {
+      let authContext: { accessToken?: string; headers?: Record<string, string> } | undefined
+      if (provider.credentialRef && provider.authAdapter) {
+        const authAdapter = options.adapters?.getAuth(provider.authAdapter)
+        if (authAdapter) {
+          try {
+            authContext = await authAdapter.getAccessContext(provider.credentialRef)
+          } catch (error) {
+            logger.debug('Auth resolution failed for provider models', { providerId: provider.id, error: String(error) })
+          }
+        }
+      }
       return transport.listModels({
         providerId: provider.id,
         ...(provider.credentialRef && { credentialRef: provider.credentialRef }),
+        ...(authContext ? { auth: authContext } : {}),
       })
     }
 
@@ -665,6 +684,12 @@ export function createProviderManager(config: Config, options: ProviderManagerOp
       const provider = providers.find((p) => p.id === providerId)
       if (!provider) {
         return []
+      }
+
+      // For transport-based providers (e.g. Copilot, Anthropic), always fetch fresh models
+      const transport = options.adapters?.getTransport(resolveTransportAdapter(provider))
+      if (transport) {
+        return fetchProviderModels(provider)
       }
 
       // Return stored models with context info
