@@ -14,7 +14,7 @@ export const devServerTool = createTool<DevServerArgs>(
     function: {
       name: 'dev_server',
       description:
-        'Control the project dev server. Start, stop, restart, check status, or fetch logs with optional pagination. The dev server is configured via .openfox/dev.json in the project root with fields: command (string, required), url (string, required), hotReload (boolean, optional, default false), disableInspect (boolean, optional, default false).',
+        'Control the project dev server. Start, stop, restart, check status, or fetch logs with optional pagination. The dev server is configured via .openfox/dev.json in the project root with fields: command (string, required), url (string, required), hotReload (boolean, optional, default false), disableInspect (boolean, optional, default false). You can use ${PORT} in command and url — it will be replaced with an available port at runtime (auto-assigned if the configured port is taken).',
       parameters: {
         type: 'object',
         properties: {
