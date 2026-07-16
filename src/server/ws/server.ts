@@ -37,6 +37,7 @@ export function signalMcpReady(): void {
 }
 
 import { getAuthConfig, isValidToken } from '../auth.js'
+import { gitSpawnEnv } from '../git/env.js'
 import {
   parseClientMessage,
   serializeServerMessage,
@@ -56,6 +57,7 @@ function moduleGitBranch(cwd: string): Promise<string | null> {
   return new Promise((resolve) => {
     const proc = spawn('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
       cwd,
+      env: gitSpawnEnv(),
       stdio: ['ignore', 'pipe', 'ignore'],
       windowsHide: true,
     })
@@ -80,13 +82,16 @@ function hashContent(content: string): string {
 
 function moduleGitDiff(cwd: string): Promise<{ hash: string; files: GitDiffFile[] }> {
   return new Promise((resolve) => {
+    const env = gitSpawnEnv()
     const diffProc = spawn('git', ['diff', '--name-status', 'HEAD'], {
       cwd,
+      env,
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
     })
     const statusProc = spawn('git', ['status', '--porcelain'], {
       cwd,
+      env,
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
     })

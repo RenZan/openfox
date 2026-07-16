@@ -75,6 +75,18 @@ describe('getGitBranch', () => {
     const result = await getGitBranch(CWD)
     expect(result).toBeNull()
   })
+
+  it('passes sanitized env excluding inherited GIT_* vars', async () => {
+    vi.mocked(spawn).mockReturnValue(makeMockProc('main\n') as any)
+    await getGitBranch(CWD)
+    const callOpts = vi.mocked(spawn).mock.calls[0]?.[2] as { env: Record<string, string | undefined> } | undefined
+    expect(callOpts).toBeDefined()
+    expect(callOpts!.env['GIT_DIR']).toBeUndefined()
+    expect(callOpts!.env['GIT_INDEX_FILE']).toBeUndefined()
+    expect(callOpts!.env['GIT_WORK_TREE']).toBeUndefined()
+    expect(callOpts!.env['GIT_PREFIX']).toBeUndefined()
+    expect(callOpts!.env['PATH']).toBe(process.env['PATH'])
+  })
 })
 
 describe('listWorktrees', () => {

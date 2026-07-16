@@ -2,10 +2,11 @@ import { spawn } from 'node:child_process'
 import { mkdir, readFile, appendFile, stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { logger } from '../utils/logger.js'
+import { gitSpawnEnv } from './env.js'
 
 function captureStdout(cwd: string, args: string[]): Promise<string | null> {
   return new Promise((resolvePromise) => {
-    const proc = spawn('git', args, { cwd, stdio: ['ignore', 'pipe', 'ignore'] })
+    const proc = spawn('git', args, { cwd, env: gitSpawnEnv(), stdio: ['ignore', 'pipe', 'ignore'] })
     let out = ''
     proc.stdout.on('data', (d: Buffer) => {
       out += d.toString()
@@ -17,7 +18,7 @@ function captureStdout(cwd: string, args: string[]): Promise<string | null> {
 
 function runGit(cwd: string, args: string[]): Promise<void> {
   return new Promise((resolvePromise, reject) => {
-    const proc = spawn('git', args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] })
+    const proc = spawn('git', args, { cwd, env: gitSpawnEnv(), stdio: ['ignore', 'pipe', 'pipe'] })
     let stderr = ''
     proc.stderr.on('data', (d: Buffer) => {
       stderr += d.toString()
