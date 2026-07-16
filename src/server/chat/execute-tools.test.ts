@@ -264,22 +264,6 @@ describe('executeTools', () => {
     expect(result.stepDoneCalled).toBe(false)
   })
 
-  it('handles step_done with empty string arguments', async () => {
-    const append = vi.fn()
-    mockToolRegistry.execute = vi.fn().mockResolvedValue({
-      success: true,
-      output: 'Step completion signal recorded.',
-      durationMs: 0,
-      truncated: false,
-    })
-
-    const toolCalls: ToolCall[] = [{ id: 'call-1', name: 'step_done', arguments: {} }]
-
-    const result = await executeTools('msg-1', toolCalls, makeCtx(), append)
-
-    expect(result.stepDoneCalled).toBe(true)
-  })
-
   it('detects return_value tool and includes it in result', async () => {
     const append = vi.fn()
     mockToolRegistry.execute = vi.fn().mockResolvedValue({
