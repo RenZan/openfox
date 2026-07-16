@@ -122,7 +122,7 @@ export function createLLMClient(config: Config, initialBackend: Backend = 'unkno
         const toolCalls = message.tool_calls?.map((tc) => ({
           id: tc.id,
           name: tc.function.name,
-          arguments: JSON.parse(tc.function.arguments) as Record<string, unknown>,
+          arguments: JSON.parse(tc.function.arguments || '{}') as Record<string, unknown>,
         }))
 
         return {
@@ -305,7 +305,7 @@ export function createLLMClient(config: Config, initialBackend: Backend = 'unkno
             parsedToolCalls.push({
               id: tc.id,
               name: tc.name,
-              arguments: JSON.parse(tc.arguments) as Record<string, unknown>,
+              arguments: JSON.parse(tc.arguments || '{}') as Record<string, unknown>,
             })
           } catch (error) {
             logger.warn('Failed to parse tool call arguments', { name: tc.name, arguments: tc.arguments })
