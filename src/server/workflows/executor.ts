@@ -427,10 +427,6 @@ export async function executeWorkflow(
               if (toolCall.name === 'step_done' && toolResult.success) {
                 stepDoneCalled = true
               }
-              if (toolResult.success && ['write_file', 'edit_file'].includes(toolCall.name)) {
-                const path = toolCall.arguments['path'] as string
-                sessionManager.addModifiedFile(sessionId, path)
-              }
             },
           },
         )

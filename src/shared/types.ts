@@ -408,7 +408,6 @@ export interface FileReadEntry {
 
 export interface ExecutionState {
   iteration: number
-  modifiedFiles: string[]
   readFiles: Record<string, FileReadEntry> // path → hash/timestamp for read-before-write validation
   consecutiveFailures: number
   lastFailedTool?: string

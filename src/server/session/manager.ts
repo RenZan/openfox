@@ -636,15 +636,6 @@ export class SessionManager {
   // ============================================================================
 
   /**
-   * Record that a file was modified.
-   */
-  addModifiedFile(sessionId: string, filePath: string): void {
-    // In event model, this could be tracked via file.modified events
-    // For now, this is a no-op - modifications are tracked per-tool
-    logger.debug('addModifiedFile called', { sessionId, filePath })
-  }
-
-  /**
    * Add a criterion. Returns the updated criteria list.
    */
   addCriterion(
@@ -1193,10 +1184,24 @@ export class SessionManager {
       contextWindows: [], // Derived from events, not stored separately
       executionState:
         eventState.cachedSystemPrompt || cachedPrompt
-          ? ({
-              cachedSystemPrompt: cachedPrompt?.systemPrompt ?? eventState.cachedSystemPrompt,
-              dynamicContextHash: cachedPrompt?.hash ?? eventState.dynamicContextHash,
-            } as import('../../shared/types.js').ExecutionState)
+          ? {
+              iteration: 0,
+              readFiles: {},
+              consecutiveFailures: 0,
+              currentTokenCount: 0,
+              messageCountAtLastUpdate: messages.length,
+              compactionCount: 0,
+              startedAt: new Date().toISOString(),
+              lastActivityAt: new Date().toISOString(),
+              ...(cachedPrompt?.systemPrompt ? { cachedSystemPrompt: cachedPrompt.systemPrompt } : {}),
+              ...(eventState.cachedSystemPrompt && !cachedPrompt?.systemPrompt
+                ? { cachedSystemPrompt: eventState.cachedSystemPrompt }
+                : {}),
+              ...(cachedPrompt?.hash ? { dynamicContextHash: cachedPrompt.hash } : {}),
+              ...(eventState.dynamicContextHash && !cachedPrompt?.hash
+                ? { dynamicContextHash: eventState.dynamicContextHash }
+                : {}),
+            }
           : null,
     }
   }

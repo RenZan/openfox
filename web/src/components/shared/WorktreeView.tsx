@@ -35,7 +35,9 @@ export const WorktreeView = memo(function WorktreeView({ result, action }: Workt
     case 'close':
       return renderActionResult(parsed as WorktreeStatusData)
     default:
-      return <pre className="text-xs bg-bg-primary p-1.5 rounded overflow-x-auto max-h-[60vh] break-words">{result}</pre>
+      return (
+        <pre className="text-xs bg-bg-primary p-1.5 rounded overflow-x-auto max-h-[60vh] break-words">{result}</pre>
+      )
   }
 })
 
@@ -50,12 +52,8 @@ function renderBranches(data: BranchesData) {
       <div className="text-text-muted mb-1">Local branches:</div>
       {branches.map((b) => (
         <div key={b.name} className="flex items-center gap-2 font-mono">
-          <span className={b.current ? 'text-accent-success' : 'text-text-muted'}>
-            {b.current ? '●' : '○'}
-          </span>
-          <span className={b.current ? 'text-text-primary font-medium' : 'text-text-secondary'}>
-            {b.name}
-          </span>
+          <span className={b.current ? 'text-accent-success' : 'text-text-muted'}>{b.current ? '●' : '○'}</span>
+          <span className={b.current ? 'text-text-primary font-medium' : 'text-text-secondary'}>{b.name}</span>
           {b.current && <span className="text-[10px] text-accent-primary">(current)</span>}
         </div>
       ))}
@@ -74,21 +72,11 @@ function renderStatus(data: WorktreeStatusData) {
       </div>
       {data.active && data.worktree && (
         <>
-          <div className="flex items-center gap-2">
-            <span className="text-text-muted">Path:</span>
-            <span className="font-mono text-text-primary">{data.worktree}</span>
-          </div>
-          {data.branch && (
-            <div className="flex items-center gap-2">
-              <span className="text-text-muted">Branch:</span>
-              <span className="font-mono text-accent-primary">{data.branch}</span>
-            </div>
-          )}
+          <FieldRow label="Path" value={data.worktree} mono />
+          {data.branch && <FieldRow label="Branch" value={data.branch} mono />}
         </>
       )}
-      {!data.active && (
-        <div className="text-text-muted italic">Session is using the project root directory.</div>
-      )}
+      {!data.active && <div className="text-text-muted italic">Session is using the project root directory.</div>}
       <div className="flex items-center gap-2">
         <span className="text-text-muted">Project root:</span>
         <span className="font-mono text-text-secondary">{data.workdir}</span>
@@ -97,22 +85,21 @@ function renderStatus(data: WorktreeStatusData) {
   )
 }
 
+function FieldRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-text-muted">{label}:</span>
+      <span className={mono ? 'font-mono text-accent-primary' : 'text-text-primary'}>{value}</span>
+    </div>
+  )
+}
+
 function renderActionResult(data: WorktreeStatusData) {
   return (
     <div className="space-y-2 text-xs">
       {data.message && <div className="text-text-primary">{data.message}</div>}
-      {data.worktree && (
-        <div className="flex items-center gap-2">
-          <span className="text-text-muted">Worktree:</span>
-          <span className="font-mono text-accent-primary">{data.worktree}</span>
-        </div>
-      )}
-      {data.branch && (
-        <div className="flex items-center gap-2">
-          <span className="text-text-muted">Branch:</span>
-          <span className="font-mono text-accent-primary">{data.branch}</span>
-        </div>
-      )}
+      {data.worktree && <FieldRow label="Worktree" value={data.worktree} mono />}
+      {data.branch && <FieldRow label="Branch" value={data.branch} mono />}
     </div>
   )
 }

@@ -89,7 +89,6 @@ describe('SubAgentManager', () => {
       getCurrentWindowMessages: vi.fn().mockReturnValue([]),
       updateMessage: vi.fn(),
       getQueueState: vi.fn().mockReturnValue({ queued: 0, processing: false }),
-      addModifiedFile: vi.fn(),
     } as unknown as SessionManager
 
     let llmCallCount = 0

@@ -105,7 +105,6 @@ describe('executeWorkflow mode changes', () => {
       setMode,
       setPhase,
       addMessage: vi.fn(),
-      addModifiedFile: vi.fn(),
     }
 
     options = {
