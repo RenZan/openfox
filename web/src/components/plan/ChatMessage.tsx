@@ -34,6 +34,8 @@ function UserMessage({ message, messageId, sessionId }: UserMessageProps) {
   const [copied, setCopied] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editContent, setEditContent] = useState(message.content)
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const autoResize = useCallback(() => {
@@ -54,24 +56,40 @@ function UserMessage({ message, messageId, sessionId }: UserMessageProps) {
   }
 
   const handleReplay = async () => {
-    if (!sessionId || !messageId) return
+    if (!sessionId || !messageId || pending) return
+    setPending(true)
+    setError(null)
     const ok = await replayMessage(sessionId, messageId)
-    if (ok) loadSession(sessionId)
+    setPending(false)
+    if (ok) {
+      loadSession(sessionId)
+    } else {
+      setError('Failed to replay')
+    }
   }
 
   const handleEditConfirm = async () => {
-    if (!sessionId || !messageId || !editContent.trim()) return
+    if (!sessionId || !messageId || !editContent.trim() || pending) return
+    setPending(true)
+    setError(null)
     const ok = await replayMessage(sessionId, messageId, editContent)
+    setPending(false)
     if (ok) {
       loadSession(sessionId)
       setEditing(false)
+    } else {
+      setError('Failed to send')
     }
   }
 
   const handleEditCancel = () => {
     setEditContent(message.content)
     setEditing(false)
+    setError(null)
   }
+
+  const actionsVisible = hovered && !editing && !pending
+  const actionsClass = `flex items-center gap-0.5 self-end transition-opacity focus-within:opacity-100 focus-within:pointer-events-auto ${actionsVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`
 
   return (
     <div
@@ -80,27 +98,30 @@ function UserMessage({ message, messageId, sessionId }: UserMessageProps) {
       onMouseLeave={() => setHovered(false)}
     >
       {!isSystemGenerated && (
-        <div className={`flex items-center gap-0.5 self-end transition-opacity ${hovered && !editing ? 'opacity-100' : 'opacity-0'}`}>
+        <div className={actionsClass}>
           <button
             onClick={() => { void handleCopy() }}
             title="Copy"
-            className="p-1 rounded hover:bg-bg-tertiary text-text-muted hover:text-text-primary"
+            disabled={pending}
+            className="p-1 rounded hover:bg-bg-tertiary text-text-muted hover:text-text-primary disabled:opacity-50"
           >
             {copied ? <CheckIcon className="w-3.5 h-3.5 text-accent-success" /> : <CopyIcon className="w-3.5 h-3.5" />}
           </button>
           {sessionId && messageId && (
             <>
               <button
-                onClick={() => { setEditContent(message.content); setEditing(true) }}
+                onClick={() => { setError(null); setEditContent(message.content); setEditing(true) }}
                 title="Edit & resend"
-                className="p-1 rounded hover:bg-bg-tertiary text-text-muted hover:text-text-primary"
+                disabled={pending}
+                className="p-1 rounded hover:bg-bg-tertiary text-text-muted hover:text-text-primary disabled:opacity-50"
               >
                 <EditSmallIcon className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={() => { void handleReplay() }}
                 title="Replay"
-                className="p-1 rounded hover:bg-bg-tertiary text-text-muted hover:text-text-primary"
+                disabled={pending}
+                className="p-1 rounded hover:bg-bg-tertiary text-text-muted hover:text-text-primary disabled:opacity-50"
               >
                 <ReloadIcon className="w-3.5 h-3.5" />
               </button>
@@ -136,26 +157,30 @@ function UserMessage({ message, messageId, sessionId }: UserMessageProps) {
                 (textareaRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = el
                 if (el) { el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px` }
               }}
-              className="w-full bg-bg-primary border border-border rounded p-1.5 text-sm text-text-primary resize-none focus:outline-none focus:border-accent-primary min-h-[60px] overflow-hidden"
+              className="w-full bg-bg-primary border border-border rounded p-1.5 text-sm text-text-primary resize-none focus:outline-none focus:border-accent-primary min-h-[60px] overflow-hidden disabled:opacity-50"
               value={editContent}
               onChange={(e) => { setEditContent(e.target.value); autoResize() }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { void handleEditConfirm() }
                 if (e.key === 'Escape') handleEditCancel()
               }}
+              disabled={pending}
               autoFocus
             />
+            {error && <p className="text-xs text-red-400">{error}</p>}
             <div className="flex justify-end gap-1">
               <button
                 onClick={handleEditCancel}
-                className="p-1 rounded hover:bg-bg-tertiary text-text-muted hover:text-text-primary"
+                disabled={pending}
+                className="p-1 rounded hover:bg-bg-tertiary text-text-muted hover:text-text-primary disabled:opacity-50"
                 title="Cancel"
               >
                 <XCloseIcon className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={() => { void handleEditConfirm() }}
-                className="p-1 rounded hover:bg-bg-tertiary text-accent-primary hover:text-accent-primary"
+                disabled={pending || !editContent.trim()}
+                className="p-1 rounded hover:bg-bg-tertiary text-accent-primary hover:text-accent-primary disabled:opacity-50"
                 title="Confirm (Ctrl+Enter)"
               >
                 <CheckIcon className="w-3.5 h-3.5" />
@@ -164,6 +189,7 @@ function UserMessage({ message, messageId, sessionId }: UserMessageProps) {
           </div>
         ) : (
           <>
+            {error && <p className="text-xs text-red-400 mb-1">{error}</p>}
             <div
               className={`whitespace-pre-wrap break-words text-sm ${
                 isSystemGenerated
