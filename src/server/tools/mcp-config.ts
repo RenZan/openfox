@@ -52,7 +52,7 @@ export const mcpConfigTool: Tool = createTool<McpConfigArgs>(
     function: {
       name: 'mcp_config',
       description:
-        'Configure MCP servers (Model Context Protocol). Actions: list (show all servers and tools), add (add a server), remove (delete a server), toggle-tool (enable/disable a tool). Use this when the user asks to add, remove, or configure MCP servers or tools.',
+        'Configure MCP servers (Model Context Protocol). Actions: list (show all servers and tools), add (add a server), update (modify an existing server — all fields are optional and merged with the current config, transport-incompatible fields are cleared on transport change), remove (delete a server), toggle-tool (enable/disable a tool). Use this when the user asks to add, remove, update, or configure MCP servers or tools.',
       parameters: {
         type: 'object',
         properties: {
@@ -64,7 +64,7 @@ export const mcpConfigTool: Tool = createTool<McpConfigArgs>(
           },
           name: {
             type: 'string',
-            description: 'Server name (required for: add, remove, toggle-tool)',
+            description: 'Server name (required for: add, update, remove, toggle-tool)',
           },
           transport: {
             type: 'string',
@@ -211,10 +211,18 @@ export const mcpConfigTool: Tool = createTool<McpConfigArgs>(
       if (!existing) return helpers.error(`MCP server "${args.name}" not found`)
 
       const transport = args.transport ?? existing.config.transport
+      const transportChanged = transport !== existing.config.transport
+
+      const mergedCommand = args.command !== undefined ? args.command : (transportChanged ? undefined : existing.config.command)
+      const mergedArgs = args.args !== undefined ? args.args : (transportChanged ? undefined : existing.config.args)
+      const mergedEnv = args.env !== undefined ? args.env : (transportChanged ? undefined : existing.config.env)
+      const mergedUrl = args.url !== undefined ? args.url : (transportChanged ? undefined : existing.config.url)
+      const mergedHeaders = args.headers !== undefined ? args.headers : (transportChanged ? undefined : existing.config.headers)
+
       if (transport === 'http') {
-        if (!args.url && !existing.config.url) return helpers.error('url is required for http transport')
+        if (!mergedUrl) return helpers.error('url is required for http transport')
       } else {
-        if (!args.command && !existing.config.command) return helpers.error('command is required for stdio transport')
+        if (!mergedCommand) return helpers.error('command is required for stdio transport')
       }
 
       const globalConfig = await loadGlobalConfig(mcpConfigMode, mcpConfigPath)
@@ -223,18 +231,25 @@ export const mcpConfigTool: Tool = createTool<McpConfigArgs>(
 
       const serverCfg: McpServerConfig = {
         transport,
-        ...(args.command !== undefined ? (args.command ? { command: args.command } : {}) : existing.config.command ? { command: existing.config.command } : {}),
-        ...(args.args !== undefined ? (args.args.length > 0 ? { args: args.args } : {}) : existing.config.args && existing.config.args.length > 0 ? { args: existing.config.args } : {}),
-        ...(args.env !== undefined ? (Object.keys(args.env).length > 0 ? { env: args.env } : {}) : existing.config.env && Object.keys(existing.config.env).length > 0 ? { env: existing.config.env } : {}),
-        ...(args.url !== undefined ? (args.url ? { url: args.url } : {}) : existing.config.url ? { url: existing.config.url } : {}),
-        ...(args.headers !== undefined ? (Object.keys(args.headers).length > 0 ? { headers: args.headers } : {}) : existing.config.headers && Object.keys(existing.config.headers).length > 0 ? { headers: existing.config.headers } : {}),
+        ...(mergedCommand ? { command: mergedCommand } : {}),
+        ...(mergedArgs && mergedArgs.length > 0 ? { args: mergedArgs } : {}),
+        ...(mergedEnv && Object.keys(mergedEnv).length > 0 ? { env: mergedEnv } : {}),
+        ...(mergedUrl ? { url: mergedUrl } : {}),
+        ...(mergedHeaders && Object.keys(mergedHeaders).length > 0 ? { headers: mergedHeaders } : {}),
         ...(existingCfg?.disabledTools && existingCfg.disabledTools.length > 0 ? { disabledTools: existingCfg.disabledTools } : {}),
+        ...(existingCfg?.cachedTools && existingCfg.cachedTools.length > 0 ? { cachedTools: existingCfg.cachedTools } : {}),
+      }
+
+      mcpManagerForTools.removeServer(args.name)
+      try {
+        await mcpManagerForTools.addServer(args.name, serverCfg)
+      } catch (addError) {
+        await mcpManagerForTools.addServer(args.name, existing.config)
+        throw addError
       }
 
       mcpServers[args.name] = serverCfg
       await saveGlobalConfig(mcpConfigMode, { ...globalConfig, mcpServers }, mcpConfigPath)
-      mcpManagerForTools.removeServer(args.name)
-      await mcpManagerForTools.addServer(args.name, serverCfg)
       await rebuildTools()
       notifyContextChanged(context.sessionId)
 

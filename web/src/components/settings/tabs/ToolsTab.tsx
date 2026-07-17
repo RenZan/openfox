@@ -18,7 +18,7 @@ function parseKeyValueLines(text: string): Record<string, string> {
     .forEach((line) => {
       const eqIdx = line.indexOf('=')
       if (eqIdx > 0) {
-        result[line.slice(0, eqIdx).trim()] = line.slice(eqIdx + 1).trim()
+        result[line.slice(0, eqIdx).trim()] = line.slice(eqIdx + 1)
       }
     })
   return result
@@ -249,7 +249,7 @@ export function ToolsTab() {
 
       if (formData.transport === 'stdio') {
         body.command = formData.command
-        const args = formData.args ? formData.args.split(' ').filter(Boolean) : undefined
+        const args = formData.args ? formData.args.split('\n').filter(Boolean) : undefined
         if (args && args.length > 0) body.args = args
         const env = parseKeyValueLines(formData.env)
         if (Object.keys(env).length > 0) body.env = env
@@ -283,7 +283,7 @@ export function ToolsTab() {
       name: server.name,
       transport: server.config.transport as 'stdio' | 'http',
       command: server.config.command ?? '',
-      args: server.config.args?.join(' ') ?? '',
+      args: server.config.args?.join('\n') ?? '',
       env: server.config.env
         ? Object.entries(server.config.env)
             .map(([k, v]) => `${k}=${v}`)
@@ -316,7 +316,7 @@ export function ToolsTab() {
 
       if (formData.transport === 'stdio') {
         body.command = formData.command
-        const args = formData.args ? formData.args.split(' ').filter(Boolean) : undefined
+        const args = formData.args ? formData.args.split('\n').filter(Boolean) : undefined
         if (args && args.length > 0) body.args = args
         const env = parseKeyValueLines(formData.env)
         if (Object.keys(env).length > 0) body.env = env
@@ -741,7 +741,7 @@ export function ToolsTab() {
                     label="Arguments"
                     value={formData.args}
                     onChange={(v) => setFormData({ ...formData, args: v })}
-                    placeholder="space-separated args"
+                    placeholder="one arg per line"
                   />
                   <div>
                     <label className="block text-xs text-text-secondary mb-1">
@@ -850,7 +850,7 @@ export function ToolsTab() {
                     label="Arguments"
                     value={formData.args}
                     onChange={(v) => setFormData({ ...formData, args: v })}
-                    placeholder="space-separated args"
+                    placeholder="one arg per line"
                   />
                   <div>
                     <label className="block text-xs text-text-secondary mb-1">
