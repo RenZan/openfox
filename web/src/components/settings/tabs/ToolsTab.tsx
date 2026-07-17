@@ -24,6 +24,103 @@ function parseKeyValueLines(text: string): Record<string, string> {
   return result
 }
 
+interface McpFormData {
+  name: string
+  transport: 'stdio' | 'http'
+  command: string
+  args: string
+  env: string
+  url: string
+  headers: string
+}
+
+interface McpServerFormFieldsProps {
+  formData: McpFormData
+  onChange: (data: McpFormData) => void
+}
+
+function McpServerFormFields({ formData, onChange }: McpServerFormFieldsProps) {
+  return (
+    <>
+      <div>
+        <label className="block text-xs text-text-secondary mb-1">Transport</label>
+        <div className="flex gap-1">
+          <button
+            onClick={() => onChange({ ...formData, transport: 'stdio' })}
+            className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+              formData.transport === 'stdio'
+                ? 'bg-accent-primary text-white'
+                : 'bg-bg-tertiary text-text-secondary hover:bg-bg-primary'
+            }`}
+          >
+            Stdio
+          </button>
+          <button
+            onClick={() => onChange({ ...formData, transport: 'http' })}
+            className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+              formData.transport === 'http'
+                ? 'bg-accent-primary text-white'
+                : 'bg-bg-tertiary text-text-secondary hover:bg-bg-primary'
+            }`}
+          >
+            HTTP
+          </button>
+        </div>
+      </div>
+
+      {formData.transport === 'stdio' ? (
+        <>
+          <FormField
+            label="Command"
+            value={formData.command}
+            onChange={(v) => onChange({ ...formData, command: v })}
+            placeholder="e.g. npx"
+          />
+          <FormField
+            label="Arguments"
+            value={formData.args}
+            onChange={(v) => onChange({ ...formData, args: v })}
+            placeholder="one arg per line"
+          />
+          <div>
+            <label className="block text-xs text-text-secondary mb-1">
+              Environment variables <span className="text-text-muted">(KEY=VALUE, one per line)</span>
+            </label>
+            <textarea
+              value={formData.env}
+              onChange={(e) => onChange({ ...formData, env: e.target.value })}
+              placeholder="API_KEY=xxx"
+              className="w-full px-2 py-1.5 bg-bg-tertiary border border-border rounded text-sm font-mono resize-none focus:outline-none focus:ring-1 focus:ring-accent-primary"
+              rows={3}
+            />
+          </div>
+        </>
+      ) : (
+        <>
+          <FormField
+            label="URL"
+            value={formData.url}
+            onChange={(v) => onChange({ ...formData, url: v })}
+            placeholder="e.g. https://mcp.example.com/mcp"
+          />
+          <div>
+            <label className="block text-xs text-text-secondary mb-1">
+              Headers <span className="text-text-muted">(KEY=VALUE, one per line)</span>
+            </label>
+            <textarea
+              value={formData.headers}
+              onChange={(e) => onChange({ ...formData, headers: e.target.value })}
+              placeholder="X-API-Key=xxx"
+              className="w-full px-2 py-1.5 bg-bg-tertiary border border-border rounded text-sm font-mono resize-none focus:outline-none focus:ring-1 focus:ring-accent-primary"
+              rows={3}
+            />
+          </div>
+        </>
+      )}
+    </>
+  )
+}
+
 interface McpToolInfo {
   name: string
   description?: string
@@ -183,7 +280,7 @@ export function ToolsTab() {
   const [editingServer, setEditingServer] = useState<string | null>(null)
   const [expandedServers, setExpandedServers] = useState<Set<string>>(new Set())
   const [expandedDescs, setExpandedDescs] = useState<Set<string>>(new Set())
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<McpFormData>({
     name: '',
     transport: 'stdio' as 'stdio' | 'http',
     command: '',
@@ -316,14 +413,11 @@ export function ToolsTab() {
 
       if (formData.transport === 'stdio') {
         body.command = formData.command
-        const args = formData.args ? formData.args.split('\n').filter(Boolean) : undefined
-        if (args && args.length > 0) body.args = args
-        const env = parseKeyValueLines(formData.env)
-        if (Object.keys(env).length > 0) body.env = env
+        body.args = formData.args ? formData.args.split('\n').filter(Boolean) : []
+        body.env = parseKeyValueLines(formData.env)
       } else {
         body.url = formData.url
-        const headers = parseKeyValueLines(formData.headers)
-        if (Object.keys(headers).length > 0) body.headers = headers
+        body.headers = parseKeyValueLines(formData.headers)
       }
 
       const res = await authFetch(`/api/mcp/servers/${encodeURIComponent(editingServer!)}`, {
@@ -347,21 +441,17 @@ export function ToolsTab() {
 
   const handleRemove = async (name: string) => {
     try {
-      const res = await authFetch(`/api/mcp/servers/${encodeURIComponent(name)}`, { method: 'DELETE' })
-      if (!res.ok) {
-        const data = await res.json()
-        console.error('Failed to remove MCP server:', data.error)
-      }
+      await authFetch(`/api/mcp/servers/${encodeURIComponent(name)}`, { method: 'DELETE' })
       clearConfirm()
       await loadServers()
-    } catch (err) {
-      console.error('Failed to remove MCP server:', err)
+    } catch {
+      /* ignore */
     }
   }
 
   const handleToggleTool = async (serverName: string, toolName: string, enabled: boolean) => {
     try {
-      const res = await authFetch(
+      await authFetch(
         `/api/mcp/servers/${encodeURIComponent(serverName)}/tools/${encodeURIComponent(toolName)}`,
         {
           method: 'PUT',
@@ -369,13 +459,9 @@ export function ToolsTab() {
           body: JSON.stringify({ enabled }),
         },
       )
-      if (!res.ok) {
-        const data = await res.json()
-        console.error('Failed to toggle tool:', data.error)
-      }
       await loadServers()
-    } catch (err) {
-      console.error('Failed to toggle tool:', err)
+    } catch {
+      /* ignore */
     }
   }
 
@@ -703,81 +789,7 @@ export function ToolsTab() {
                 placeholder="e.g. filesystem"
               />
 
-              <div>
-                <label className="block text-xs text-text-secondary mb-1">Transport</label>
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => setFormData({ ...formData, transport: 'stdio' })}
-                    className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-                      formData.transport === 'stdio'
-                        ? 'bg-accent-primary text-white'
-                        : 'bg-bg-tertiary text-text-secondary hover:bg-bg-primary'
-                    }`}
-                  >
-                    Stdio
-                  </button>
-                  <button
-                    onClick={() => setFormData({ ...formData, transport: 'http' })}
-                    className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-                      formData.transport === 'http'
-                        ? 'bg-accent-primary text-white'
-                        : 'bg-bg-tertiary text-text-secondary hover:bg-bg-primary'
-                    }`}
-                  >
-                    HTTP
-                  </button>
-                </div>
-              </div>
-
-              {formData.transport === 'stdio' ? (
-                <>
-                  <FormField
-                    label="Command"
-                    value={formData.command}
-                    onChange={(v) => setFormData({ ...formData, command: v })}
-                    placeholder="e.g. npx"
-                  />
-                  <FormField
-                    label="Arguments"
-                    value={formData.args}
-                    onChange={(v) => setFormData({ ...formData, args: v })}
-                    placeholder="one arg per line"
-                  />
-                  <div>
-                    <label className="block text-xs text-text-secondary mb-1">
-                      Environment variables <span className="text-text-muted">(KEY=VALUE, one per line)</span>
-                    </label>
-                    <textarea
-                      value={formData.env}
-                      onChange={(e) => setFormData({ ...formData, env: e.target.value })}
-                      placeholder="API_KEY=xxx"
-                      className="w-full px-2 py-1.5 bg-bg-tertiary border border-border rounded text-sm font-mono resize-none focus:outline-none focus:ring-1 focus:ring-accent-primary"
-                      rows={3}
-                    />
-                  </div>
-                </>
-              ) : (
-                <>
-                  <FormField
-                    label="URL"
-                    value={formData.url}
-                    onChange={(v) => setFormData({ ...formData, url: v })}
-                    placeholder="e.g. https://mcp.example.com/mcp"
-                  />
-                  <div>
-                    <label className="block text-xs text-text-secondary mb-1">
-                      Headers <span className="text-text-muted">(KEY=VALUE, one per line)</span>
-                    </label>
-                    <textarea
-                      value={formData.headers}
-                      onChange={(e) => setFormData({ ...formData, headers: e.target.value })}
-                      placeholder="X-API-Key=xxx"
-                      className="w-full px-2 py-1.5 bg-bg-tertiary border border-border rounded text-sm font-mono resize-none focus:outline-none focus:ring-1 focus:ring-accent-primary"
-                      rows={3}
-                    />
-                  </div>
-                </>
-              )}
+              <McpServerFormFields formData={formData} onChange={setFormData} />
 
               {formError && <ErrorBanner message={formError} />}
               <div className="flex justify-end gap-2 pt-2 border-t border-border">
@@ -812,81 +824,7 @@ export function ToolsTab() {
             size="sm"
           >
             <div className="space-y-3">
-              <div>
-                <label className="block text-xs text-text-secondary mb-1">Transport</label>
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => setFormData({ ...formData, transport: 'stdio' })}
-                    className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-                      formData.transport === 'stdio'
-                        ? 'bg-accent-primary text-white'
-                        : 'bg-bg-tertiary text-text-secondary hover:bg-bg-primary'
-                    }`}
-                  >
-                    Stdio
-                  </button>
-                  <button
-                    onClick={() => setFormData({ ...formData, transport: 'http' })}
-                    className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-                      formData.transport === 'http'
-                        ? 'bg-accent-primary text-white'
-                        : 'bg-bg-tertiary text-text-secondary hover:bg-bg-primary'
-                    }`}
-                  >
-                    HTTP
-                  </button>
-                </div>
-              </div>
-
-              {formData.transport === 'stdio' ? (
-                <>
-                  <FormField
-                    label="Command"
-                    value={formData.command}
-                    onChange={(v) => setFormData({ ...formData, command: v })}
-                    placeholder="e.g. npx"
-                  />
-                  <FormField
-                    label="Arguments"
-                    value={formData.args}
-                    onChange={(v) => setFormData({ ...formData, args: v })}
-                    placeholder="one arg per line"
-                  />
-                  <div>
-                    <label className="block text-xs text-text-secondary mb-1">
-                      Environment variables <span className="text-text-muted">(KEY=VALUE, one per line)</span>
-                    </label>
-                    <textarea
-                      value={formData.env}
-                      onChange={(e) => setFormData({ ...formData, env: e.target.value })}
-                      placeholder="API_KEY=xxx"
-                      className="w-full px-2 py-1.5 bg-bg-tertiary border border-border rounded text-sm font-mono resize-none focus:outline-none focus:ring-1 focus:ring-accent-primary"
-                      rows={3}
-                    />
-                  </div>
-                </>
-              ) : (
-                <>
-                  <FormField
-                    label="URL"
-                    value={formData.url}
-                    onChange={(v) => setFormData({ ...formData, url: v })}
-                    placeholder="e.g. https://mcp.example.com/mcp"
-                  />
-                  <div>
-                    <label className="block text-xs text-text-secondary mb-1">
-                      Headers <span className="text-text-muted">(KEY=VALUE, one per line)</span>
-                    </label>
-                    <textarea
-                      value={formData.headers}
-                      onChange={(e) => setFormData({ ...formData, headers: e.target.value })}
-                      placeholder="X-API-Key=xxx"
-                      className="w-full px-2 py-1.5 bg-bg-tertiary border border-border rounded text-sm font-mono resize-none focus:outline-none focus:ring-1 focus:ring-accent-primary"
-                      rows={3}
-                    />
-                  </div>
-                </>
-              )}
+              <McpServerFormFields formData={formData} onChange={setFormData} />
 
               {formError && <ErrorBanner message={formError} />}
               <div className="flex justify-end gap-2 pt-2 border-t border-border">

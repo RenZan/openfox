@@ -210,7 +210,7 @@ export const mcpConfigTool: Tool = createTool<McpConfigArgs>(
       const existing = mcpManagerForTools.getServer(args.name)
       if (!existing) return helpers.error(`MCP server "${args.name}" not found`)
 
-      const transport = args.transport ?? existing.config.transport
+      const transport: 'stdio' | 'http' = args.transport ?? existing.config.transport ?? 'stdio'
       const transportChanged = transport !== existing.config.transport
 
       const mergedCommand = args.command !== undefined ? args.command : (transportChanged ? undefined : existing.config.command)
