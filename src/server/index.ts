@@ -705,9 +705,22 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
       return res.status(400).json({ error: 'entries is required and must be an array' })
     }
 
+    for (let i = 0; i < entries.length; i++) {
+      const c = entries[i]
+      if (c === null || typeof c !== 'object' || Array.isArray(c)) {
+        return res.status(400).json({ error: `entries[${i}] must be an object` })
+      }
+      if (c.description !== undefined && typeof c.description !== 'string') {
+        return res.status(400).json({ error: `entries[${i}].description must be a string` })
+      }
+      if (c.status !== undefined && typeof c.status !== 'string') {
+        return res.status(400).json({ error: `entries[${i}].status must be a string` })
+      }
+    }
+
     const mapped = entries.map((c: { id?: string; description?: string; status?: string; [key: string]: unknown }, i: number) => ({
       ...c,
-      id: c.id ?? String(i),
+      id: c.id != null ? String(c.id) : String(i),
       description: c.description ?? '',
       status: c.status ?? 'open',
     }))

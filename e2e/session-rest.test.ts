@@ -364,5 +364,41 @@ describe('Session REST API', () => {
       })
       expect(res.status).toBe(400)
     })
+
+    it('returns 400 when an entry is null', async () => {
+      const res = await fetch(`${server.url}/api/sessions/${sessionId}/metadata/qa_findings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entries: [null] }),
+      })
+      expect(res.status).toBe(400)
+    })
+
+    it('returns 400 when an entry is a primitive', async () => {
+      const res = await fetch(`${server.url}/api/sessions/${sessionId}/metadata/qa_findings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entries: [42] }),
+      })
+      expect(res.status).toBe(400)
+    })
+
+    it('returns 400 when description is not a string', async () => {
+      const res = await fetch(`${server.url}/api/sessions/${sessionId}/metadata/qa_findings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entries: [{ description: 42, status: 'open' }] }),
+      })
+      expect(res.status).toBe(400)
+    })
+
+    it('returns 400 when status is not a string', async () => {
+      const res = await fetch(`${server.url}/api/sessions/${sessionId}/metadata/qa_findings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entries: [{ description: 'Bug', status: {} }] }),
+      })
+      expect(res.status).toBe(400)
+    })
   })
 })
