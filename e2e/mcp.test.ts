@@ -50,7 +50,7 @@ describe('MCP Integration', () => {
   async function fetchMcpServers() {
     const res = await fetch(`${server.url}/api/mcp/servers`)
     const data = (await res.json()) as {
-      servers: Array<{ name: string; status: string; tools: Array<{ name: string; enabled: boolean }> }>
+      servers: Array<{ name: string; status: string; config: { command?: string; transport: string }; tools: Array<{ name: string; enabled: boolean }> }>
     }
     return data.servers
   }
@@ -237,6 +237,7 @@ describe('MCP Integration', () => {
     const servers = await fetchMcpServers()
     const testServer = servers.find((s) => s.name === 'test-server')
     expect(testServer!.status).toBe('connected')
+    expect(testServer!.config.command).toBe('npx')
   })
 
   it('switches transport from stdio to stdio with explicit transport field', async () => {

@@ -1876,53 +1876,36 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
       return res.status(400).json({ error: 'headers must be a string/string object' })
     }
 
-    const resolvedTransport: 'stdio' | 'http' = rawTransport !== undefined ? (rawTransport as 'stdio' | 'http') : (existing.config.transport ?? 'stdio')
-    const transportChanged = resolvedTransport !== existing.config.transport
-
-    const mergedCommand = (command as string | undefined) ?? (transportChanged ? undefined : existing.config.command)
-    const mergedArgs = (args as string[] | undefined) ?? (transportChanged ? undefined : existing.config.args)
-    const mergedEnv = (env as Record<string, string> | undefined) ?? (transportChanged ? undefined : existing.config.env)
-    const mergedUrl = (url as string | undefined) ?? (transportChanged ? undefined : existing.config.url)
-    const mergedHeaders = (headers as Record<string, string> | undefined) ?? (transportChanged ? undefined : existing.config.headers)
-
-    if (resolvedTransport !== 'http' && !mergedCommand) {
-      return res.status(400).json({ error: 'command is required for stdio transport' })
-    }
-    if (resolvedTransport === 'http' && !mergedUrl) {
-      return res.status(400).json({ error: 'url is required for http transport' })
-    }
-
     try {
       const { loadGlobalConfig, saveGlobalConfig } = await import('../cli/config.js')
+      const { applyMcpServerUpdate } = await import('./mcp/update-server.js')
+
       const globalConfig = await loadGlobalConfig(config.mode ?? 'production', config.globalConfigPath)
       const mcpServers = { ...(globalConfig.mcpServers ?? {}) } as Record<string, import('./mcp/types.js').McpServerConfig>
-      const existingCfg = mcpServers[name]
 
-      const serverCfg: import('./mcp/types.js').McpServerConfig = {
-        transport: resolvedTransport,
-        ...(mergedCommand ? { command: mergedCommand } : {}),
-        ...(mergedArgs && mergedArgs.length > 0 ? { args: mergedArgs } : {}),
-        ...(mergedEnv && Object.keys(mergedEnv).length > 0 ? { env: mergedEnv } : {}),
-        ...(mergedUrl ? { url: mergedUrl } : {}),
-        ...(mergedHeaders && Object.keys(mergedHeaders).length > 0 ? { headers: mergedHeaders } : {}),
-        ...(existingCfg?.disabledTools && existingCfg.disabledTools.length > 0 ? { disabledTools: existingCfg.disabledTools } : {}),
-        ...(existingCfg?.cachedTools && existingCfg.cachedTools.length > 0 ? { cachedTools: existingCfg.cachedTools } : {}),
+      const patch = {
+        ...(rawTransport !== undefined ? { transport: rawTransport as 'stdio' | 'http' } : {}),
+        ...(command !== undefined ? { command: command as string } : {}),
+        ...(args !== undefined ? { args: args as string[] } : {}),
+        ...(env !== undefined ? { env: env as Record<string, string> } : {}),
+        ...(url !== undefined ? { url: url as string } : {}),
+        ...(headers !== undefined ? { headers: headers as Record<string, string> } : {}),
       }
 
-      mcpManager.removeServer(name)
-      try {
-        await mcpManager.addServer(name, serverCfg)
-      } catch (addError) {
-        await mcpManager.addServer(name, existing.config)
-        throw addError
+      const { serverCfg, error: updateError } = await applyMcpServerUpdate({
+        name,
+        patch,
+        existing,
+        persistedCfg: mcpServers[name],
+        mcpManager,
+      })
+
+      if (updateError) {
+        return res.status(400).json({ error: updateError })
       }
 
       mcpServers[name] = serverCfg
-      await saveGlobalConfig(
-        config.mode ?? 'production',
-        { ...globalConfig, mcpServers },
-        config.globalConfigPath,
-      )
+      await saveGlobalConfig(config.mode ?? 'production', { ...globalConfig, mcpServers }, config.globalConfigPath)
 
       await rebuildMcpTools()
       const sessions = sessionManager.listSessions()

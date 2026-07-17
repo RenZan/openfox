@@ -5,6 +5,7 @@ import type { McpServerConfig } from '../mcp/types.js'
 import type { Mode } from '../../cli/main.js'
 import { loadGlobalConfig, saveGlobalConfig } from '../../cli/config.js'
 import { createMcpTools } from '../mcp/tool-adapter.js'
+import { applyMcpServerUpdate } from '../mcp/update-server.js'
 
 interface McpConfigArgs {
   action: 'list' | 'add' | 'update' | 'remove' | 'toggle-tool'
@@ -210,43 +211,27 @@ export const mcpConfigTool: Tool = createTool<McpConfigArgs>(
       const existing = mcpManagerForTools.getServer(args.name)
       if (!existing) return helpers.error(`MCP server "${args.name}" not found`)
 
-      const transport: 'stdio' | 'http' = args.transport ?? existing.config.transport ?? 'stdio'
-      const transportChanged = transport !== existing.config.transport
-
-      const mergedCommand = args.command !== undefined ? args.command : (transportChanged ? undefined : existing.config.command)
-      const mergedArgs = args.args !== undefined ? args.args : (transportChanged ? undefined : existing.config.args)
-      const mergedEnv = args.env !== undefined ? args.env : (transportChanged ? undefined : existing.config.env)
-      const mergedUrl = args.url !== undefined ? args.url : (transportChanged ? undefined : existing.config.url)
-      const mergedHeaders = args.headers !== undefined ? args.headers : (transportChanged ? undefined : existing.config.headers)
-
-      if (transport === 'http') {
-        if (!mergedUrl) return helpers.error('url is required for http transport')
-      } else {
-        if (!mergedCommand) return helpers.error('command is required for stdio transport')
-      }
-
       const globalConfig = await loadGlobalConfig(mcpConfigMode, mcpConfigPath)
       const mcpServers = { ...((globalConfig.mcpServers ?? {}) as Record<string, McpServerConfig>) }
-      const existingCfg = mcpServers[args.name]
 
-      const serverCfg: McpServerConfig = {
-        transport,
-        ...(mergedCommand ? { command: mergedCommand } : {}),
-        ...(mergedArgs && mergedArgs.length > 0 ? { args: mergedArgs } : {}),
-        ...(mergedEnv && Object.keys(mergedEnv).length > 0 ? { env: mergedEnv } : {}),
-        ...(mergedUrl ? { url: mergedUrl } : {}),
-        ...(mergedHeaders && Object.keys(mergedHeaders).length > 0 ? { headers: mergedHeaders } : {}),
-        ...(existingCfg?.disabledTools && existingCfg.disabledTools.length > 0 ? { disabledTools: existingCfg.disabledTools } : {}),
-        ...(existingCfg?.cachedTools && existingCfg.cachedTools.length > 0 ? { cachedTools: existingCfg.cachedTools } : {}),
+      const patch = {
+        ...(args.transport !== undefined ? { transport: args.transport } : {}),
+        ...(args.command !== undefined ? { command: args.command } : {}),
+        ...(args.args !== undefined ? { args: args.args } : {}),
+        ...(args.env !== undefined ? { env: args.env } : {}),
+        ...(args.url !== undefined ? { url: args.url } : {}),
+        ...(args.headers !== undefined ? { headers: args.headers } : {}),
       }
 
-      mcpManagerForTools.removeServer(args.name)
-      try {
-        await mcpManagerForTools.addServer(args.name, serverCfg)
-      } catch (addError) {
-        await mcpManagerForTools.addServer(args.name, existing.config)
-        throw addError
-      }
+      const { serverCfg, error: updateError } = await applyMcpServerUpdate({
+        name: args.name,
+        patch,
+        existing,
+        persistedCfg: mcpServers[args.name],
+        mcpManager: mcpManagerForTools,
+      })
+
+      if (updateError) return helpers.error(updateError)
 
       mcpServers[args.name] = serverCfg
       await saveGlobalConfig(mcpConfigMode, { ...globalConfig, mcpServers }, mcpConfigPath)
