@@ -1847,6 +1847,64 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
     }
   })
 
+  app.put('/api/mcp/servers/:name', async (req, res) => {
+    const { name } = req.params
+    const existing = mcpManager.getServer(name)
+    if (!existing) {
+      return res.status(404).json({ error: `MCP server '${name}' not found` })
+    }
+    const { transport, command, args, env, url, headers } = req.body as {
+      transport?: string
+      command?: string
+      args?: string[]
+      env?: Record<string, string>
+      url?: string
+      headers?: Record<string, string>
+    }
+    if (transport !== undefined && transport !== 'stdio' && transport !== 'http') {
+      return res.status(400).json({ error: `Invalid transport '${transport}'. Must be 'stdio' or 'http'.` })
+    }
+    const resolvedTransport: 'stdio' | 'http' = transport === 'http' ? 'http' : 'stdio'
+    if (resolvedTransport !== 'http' && !command) {
+      return res.status(400).json({ error: 'command is required for stdio transport' })
+    }
+    if (resolvedTransport === 'http' && !url) {
+      return res.status(400).json({ error: 'url is required for http transport' })
+    }
+    try {
+      const { loadGlobalConfig, saveGlobalConfig } = await import('../cli/config.js')
+      const globalConfig = await loadGlobalConfig(config.mode ?? 'production', config.globalConfigPath)
+      const mcpServers = { ...(globalConfig.mcpServers ?? {}) } as Record<string, import('./mcp/types.js').McpServerConfig>
+      const existingCfg = mcpServers[name]
+      const serverCfg: import('./mcp/types.js').McpServerConfig = {
+        transport: resolvedTransport,
+        ...(command ? { command } : {}),
+        ...(args && args.length > 0 ? { args } : {}),
+        ...(env && Object.keys(env).length > 0 ? { env } : {}),
+        ...(url ? { url } : {}),
+        ...(headers && Object.keys(headers).length > 0 ? { headers } : {}),
+        ...(existingCfg?.disabledTools && existingCfg.disabledTools.length > 0 ? { disabledTools: existingCfg.disabledTools } : {}),
+      }
+      mcpManager.removeServer(name)
+      await mcpManager.addServer(name, serverCfg)
+      mcpServers[name] = serverCfg
+      await saveGlobalConfig(
+        config.mode ?? 'production',
+        { ...globalConfig, mcpServers },
+        config.globalConfigPath,
+      )
+      await rebuildMcpTools()
+      const sessions = sessionManager.listSessions()
+      for (const s of sessions) {
+        sessionManager.setDynamicContextChanged(s.id, true)
+      }
+      const server = mcpManager.getServer(name)
+      res.json({ server })
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : String(error) })
+    }
+  })
+
   app.delete('/api/mcp/servers/:name', async (req, res) => {
     const { name } = req.params
     const server = mcpManager.getServer(name)

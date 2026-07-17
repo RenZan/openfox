@@ -7,7 +7,7 @@ import { loadGlobalConfig, saveGlobalConfig } from '../../cli/config.js'
 import { createMcpTools } from '../mcp/tool-adapter.js'
 
 interface McpConfigArgs {
-  action: 'list' | 'add' | 'remove' | 'toggle-tool'
+  action: 'list' | 'add' | 'update' | 'remove' | 'toggle-tool'
   name?: string
   transport?: 'stdio' | 'http'
   command?: string
@@ -58,9 +58,9 @@ export const mcpConfigTool: Tool = createTool<McpConfigArgs>(
         properties: {
           action: {
             type: 'string',
-            enum: ['list', 'add', 'remove', 'toggle-tool'],
+            enum: ['list', 'add', 'update', 'remove', 'toggle-tool'],
             description:
-              'Action: list (show servers), add (add new server), remove (delete a server), toggle-tool (enable/disable a tool)',
+              'Action: list (show servers), add (add new server), update (modify existing server), remove (delete a server), toggle-tool (enable/disable a tool)',
           },
           name: {
             type: 'string',
@@ -110,7 +110,7 @@ export const mcpConfigTool: Tool = createTool<McpConfigArgs>(
   async (args, context, helpers) => {
     const actionError = validateActionWithPermission(
       args.action,
-      ['list', 'add', 'remove', 'toggle-tool'],
+      ['list', 'add', 'update', 'remove', 'toggle-tool'],
       'mcp_config',
       context.permittedActions,
     )
@@ -203,6 +203,44 @@ export const mcpConfigTool: Tool = createTool<McpConfigArgs>(
       const server = mcpManagerForTools.getServer(args.name)
       const toolCount = server?.tools.length ?? 0
       return helpers.success(`Added MCP server "${args.name}" (${toolCount} tools discovered). ${APPLY_PROMPT_MESSAGE}`)
+    }
+
+    if (args.action === 'update') {
+      if (!args.name) return helpers.error('Missing required field: name')
+      const existing = mcpManagerForTools.getServer(args.name)
+      if (!existing) return helpers.error(`MCP server "${args.name}" not found`)
+
+      const transport = args.transport ?? existing.config.transport
+      if (transport === 'http') {
+        if (!args.url && !existing.config.url) return helpers.error('url is required for http transport')
+      } else {
+        if (!args.command && !existing.config.command) return helpers.error('command is required for stdio transport')
+      }
+
+      const globalConfig = await loadGlobalConfig(mcpConfigMode, mcpConfigPath)
+      const mcpServers = { ...((globalConfig.mcpServers ?? {}) as Record<string, McpServerConfig>) }
+      const existingCfg = mcpServers[args.name]
+
+      const serverCfg: McpServerConfig = {
+        transport,
+        ...(args.command !== undefined ? (args.command ? { command: args.command } : {}) : existing.config.command ? { command: existing.config.command } : {}),
+        ...(args.args !== undefined ? (args.args.length > 0 ? { args: args.args } : {}) : existing.config.args && existing.config.args.length > 0 ? { args: existing.config.args } : {}),
+        ...(args.env !== undefined ? (Object.keys(args.env).length > 0 ? { env: args.env } : {}) : existing.config.env && Object.keys(existing.config.env).length > 0 ? { env: existing.config.env } : {}),
+        ...(args.url !== undefined ? (args.url ? { url: args.url } : {}) : existing.config.url ? { url: existing.config.url } : {}),
+        ...(args.headers !== undefined ? (Object.keys(args.headers).length > 0 ? { headers: args.headers } : {}) : existing.config.headers && Object.keys(existing.config.headers).length > 0 ? { headers: existing.config.headers } : {}),
+        ...(existingCfg?.disabledTools && existingCfg.disabledTools.length > 0 ? { disabledTools: existingCfg.disabledTools } : {}),
+      }
+
+      mcpServers[args.name] = serverCfg
+      await saveGlobalConfig(mcpConfigMode, { ...globalConfig, mcpServers }, mcpConfigPath)
+      mcpManagerForTools.removeServer(args.name)
+      await mcpManagerForTools.addServer(args.name, serverCfg)
+      await rebuildTools()
+      notifyContextChanged(context.sessionId)
+
+      const server = mcpManagerForTools.getServer(args.name)
+      const toolCount = server?.tools.length ?? 0
+      return helpers.success(`Updated MCP server "${args.name}" (${toolCount} tools discovered). ${APPLY_PROMPT_MESSAGE}`)
     }
 
     if (args.action === 'remove') {
