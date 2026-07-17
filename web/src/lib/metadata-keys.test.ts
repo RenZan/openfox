@@ -22,6 +22,12 @@ describe('formatMetadataKeyLabel', () => {
     expect(formatMetadataKeyLabel('single')).toBe('Single')
     expect(formatMetadataKeyLabel('ui_tests')).toBe('Ui Tests')
   })
+
+  it('safely handles reserved JS property names', () => {
+    expect(formatMetadataKeyLabel('toString')).toBe('ToString')
+    expect(formatMetadataKeyLabel('constructor')).toBe('Constructor')
+    expect(() => formatMetadataKeyLabel('__proto__')).not.toThrow()
+  })
 })
 
 describe('formatMetadataKeyLabelLower', () => {
@@ -35,5 +41,11 @@ describe('formatMetadataKeyLabelLower', () => {
     expect(formatMetadataKeyLabelLower('qa_findings')).toBe('qa findings')
     expect(formatMetadataKeyLabelLower('custom_key')).toBe('custom key')
     expect(formatMetadataKeyLabelLower('single')).toBe('single')
+  })
+
+  it('safely handles reserved JS property names', () => {
+    expect(formatMetadataKeyLabelLower('toString')).toBe('toString')
+    expect(formatMetadataKeyLabelLower('constructor')).toBe('constructor')
+    expect(() => formatMetadataKeyLabelLower('__proto__')).not.toThrow()
   })
 })

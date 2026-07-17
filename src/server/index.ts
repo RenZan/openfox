@@ -705,9 +705,10 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
       return res.status(400).json({ error: 'entries is required and must be an array' })
     }
 
-    const mapped = entries.map((c: { id?: string; description: string; status?: string }, i: number) => ({
+    const mapped = entries.map((c: { id?: string; description?: string; status?: string; [key: string]: unknown }, i: number) => ({
+      ...c,
       id: c.id ?? String(i),
-      description: c.description,
+      description: c.description ?? '',
       status: c.status ?? 'open',
     }))
     sessionManager.setMetadataEntries(sessionId, key, mapped)
