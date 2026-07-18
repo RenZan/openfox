@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { authFetch } from '../../../lib/api'
 import { Button } from '../../shared/Button'
+import { ConfirmModal } from '../../shared/ConfirmModal'
 
 const STORAGE_KEY = 'openfox_user_plugins'
 
@@ -117,6 +118,8 @@ function PluginCard({
   const [updating, setUpdating] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [localVersion, setLocalVersion] = useState<string | null>(installedVersion)
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false)
+  const [removing, setRemoving] = useState(false)
 
   useEffect(() => {
     setLocalVersion(installedVersion)
@@ -150,7 +153,11 @@ function PluginCard({
   }
 
   const handleRemove = async () => {
-    if (!window.confirm(`Remove "${plugin.displayName}"?`)) return
+    setShowRemoveConfirm(true)
+  }
+
+  const handleConfirmRemove = async () => {
+    setRemoving(true)
     try {
       const res = await authFetch(`/api/plugins/${plugin.name}`, { method: 'DELETE' })
       if (res.ok) {
@@ -160,6 +167,8 @@ function PluginCard({
     } catch {
       // ignore
     }
+    setRemoving(false)
+    setShowRemoveConfirm(false)
   }
 
   const handleUpdate = async () => {
@@ -247,6 +256,17 @@ function PluginCard({
           )}
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={showRemoveConfirm}
+        onClose={() => setShowRemoveConfirm(false)}
+        onConfirm={handleConfirmRemove}
+        title={`Remove "${plugin.displayName}"?`}
+        message={`Remove "${plugin.displayName}" plugin?`}
+        confirmLabel="Remove"
+        confirmVariant="danger"
+        disabled={removing}
+      />
     </div>
   )
 }
