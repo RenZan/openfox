@@ -100,7 +100,9 @@ function UserMessage({ message, messageId, sessionId }: UserMessageProps) {
       {!isSystemGenerated && (
         <div className={actionsClass}>
           <button
-            onClick={() => { void handleCopy() }}
+            onClick={() => {
+              void handleCopy()
+            }}
             title="Copy"
             disabled={pending}
             className="p-1 rounded hover:bg-bg-tertiary text-text-muted hover:text-text-primary disabled:opacity-50"
@@ -110,7 +112,11 @@ function UserMessage({ message, messageId, sessionId }: UserMessageProps) {
           {sessionId && messageId && (
             <>
               <button
-                onClick={() => { setError(null); setEditContent(message.content); setEditing(true) }}
+                onClick={() => {
+                  setError(null)
+                  setEditContent(message.content)
+                  setEditing(true)
+                }}
                 title="Edit & resend"
                 disabled={pending}
                 className="p-1 rounded hover:bg-bg-tertiary text-text-muted hover:text-text-primary disabled:opacity-50"
@@ -118,7 +124,9 @@ function UserMessage({ message, messageId, sessionId }: UserMessageProps) {
                 <EditSmallIcon className="w-3.5 h-3.5" />
               </button>
               <button
-                onClick={() => { void handleReplay() }}
+                onClick={() => {
+                  void handleReplay()
+                }}
                 title="Replay"
                 disabled={pending}
                 className="p-1 rounded hover:bg-bg-tertiary text-text-muted hover:text-text-primary disabled:opacity-50"
@@ -154,20 +162,28 @@ function UserMessage({ message, messageId, sessionId }: UserMessageProps) {
           <div className="flex flex-col gap-1.5">
             <textarea
               ref={(el) => {
-                (textareaRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = el
-                if (el) { el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px` }
+                ;(textareaRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = el
+                if (el) {
+                  el.style.height = 'auto'
+                  el.style.height = `${el.scrollHeight}px`
+                }
               }}
               className="w-full bg-bg-primary border border-border rounded p-1.5 text-sm text-text-primary resize-none focus:outline-none focus:border-accent-primary min-h-[60px] overflow-hidden disabled:opacity-50"
               value={editContent}
-              onChange={(e) => { setEditContent(e.target.value); autoResize() }}
+              onChange={(e) => {
+                setEditContent(e.target.value)
+                autoResize()
+              }}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { void handleEditConfirm() }
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                  void handleEditConfirm()
+                }
                 if (e.key === 'Escape') handleEditCancel()
               }}
               disabled={pending}
               autoFocus
             />
-            {error && <p className="text-xs text-red-400">{error}</p>}
+            {error && <p className="text-xs text-error">{error}</p>}
             <div className="flex justify-end gap-1">
               <button
                 onClick={handleEditCancel}
@@ -178,7 +194,9 @@ function UserMessage({ message, messageId, sessionId }: UserMessageProps) {
                 <XCloseIcon className="w-3.5 h-3.5" />
               </button>
               <button
-                onClick={() => { void handleEditConfirm() }}
+                onClick={() => {
+                  void handleEditConfirm()
+                }}
                 disabled={pending || !editContent.trim()}
                 className="p-1 rounded hover:bg-bg-tertiary text-accent-primary hover:text-accent-primary disabled:opacity-50"
                 title="Confirm (Ctrl+Enter)"
@@ -189,7 +207,7 @@ function UserMessage({ message, messageId, sessionId }: UserMessageProps) {
           </div>
         ) : (
           <>
-            {error && <p className="text-xs text-red-400 mb-1">{error}</p>}
+            {error && <p className="text-xs text-error mb-1">{error}</p>}
             <div
               className={`whitespace-pre-wrap break-words text-sm ${
                 isSystemGenerated
