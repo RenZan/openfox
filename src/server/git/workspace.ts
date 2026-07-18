@@ -1,10 +1,10 @@
 import { spawn, execSync } from 'node:child_process'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, rm } from 'node:fs/promises'
 import { resolve, join, isAbsolute } from 'node:path'
 import { homedir, platform } from 'node:os'
 import { logger } from '../utils/logger.js'
 import { gitSpawnEnv } from './env.js'
-import { loadWorkspaceConfig } from './workspace-config.js'
+import { loadWorkspaceConfig, validateWorkspacesDir } from './workspace-config.js'
 
 function captureStdout(cwd: string, args: string[]): Promise<string | null> {
   return new Promise((resolvePromise) => {
@@ -53,6 +53,7 @@ function getGlobalDataDir(): string {
 
 export function getWorkspacesDir(projectName: string, workspacesDir?: string): string {
   if (workspacesDir) {
+    validateWorkspacesDir(workspacesDir)
     return join(workspacesDir, projectName)
   }
   return join(getGlobalDataDir(), 'workspaces', projectName)
@@ -211,9 +212,17 @@ export async function deleteWorkspace(projectName: string, name: string, workspa
   if (!st?.isDirectory()) {
     throw new Error(`Workspace "${name}" does not exist`)
   }
-  const { rm } = await import('node:fs/promises')
   await rm(wsPath, { recursive: true, force: true })
   logger.info('Deleted workspace', { projectName, name, path: wsPath })
+}
+
+export async function deleteWorkspaceByPath(wsPath: string): Promise<void> {
+  const st = await statSafe(wsPath)
+  if (!st?.isDirectory()) {
+    throw new Error(`Workspace path does not exist: ${wsPath}`)
+  }
+  await rm(wsPath, { recursive: true, force: true })
+  logger.info('Deleted workspace at path', { path: wsPath })
 }
 
 async function statSafe(p: string): Promise<{ isDirectory: () => boolean } | null> {

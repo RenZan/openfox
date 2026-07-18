@@ -495,4 +495,44 @@ describe('SessionManager', () => {
       expect(manager.isWarmedUp(s2.id)).toBe(false)
     })
   })
+
+  describe('resolveWorkspacesDir', () => {
+    it('returns undefined when no global or project config set', async () => {
+      const result = await manager.resolveWorkspacesDir(workdir)
+      expect(result).toBeUndefined()
+    })
+
+    it('returns global workspacesDir when set', async () => {
+      const managerWithGlobal = new SessionManager(mockProviderManager as any, '/custom/global/workspaces')
+      const result = await managerWithGlobal.resolveWorkspacesDir(workdir)
+      expect(result).toBe('/custom/global/workspaces')
+    })
+
+    it('returns per-project workspacesDir without any global config', async () => {
+      // Create project-level config only (no global workspacesDir)
+      const { mkdir, writeFile } = await import('node:fs/promises')
+      const dotOpenfox = join(workdir, '.openfox')
+      await mkdir(dotOpenfox, { recursive: true })
+      await writeFile(
+        join(dotOpenfox, 'workspace.json'),
+        JSON.stringify({ workspacesDir: '/custom/project/workspaces' }),
+      )
+      const result = await manager.resolveWorkspacesDir(workdir)
+      expect(result).toBe('/custom/project/workspaces')
+    })
+
+    it('returns per-project workspacesDir overriding global', async () => {
+      const managerWithGlobal = new SessionManager(mockProviderManager as any, '/custom/global/workspaces')
+      // Create project-level config
+      const { mkdir, writeFile } = await import('node:fs/promises')
+      const dotOpenfox = join(workdir, '.openfox')
+      await mkdir(dotOpenfox, { recursive: true })
+      await writeFile(
+        join(dotOpenfox, 'workspace.json'),
+        JSON.stringify({ workspacesDir: '/custom/project/workspaces' }),
+      )
+      const result = await managerWithGlobal.resolveWorkspacesDir(workdir)
+      expect(result).toBe('/custom/project/workspaces')
+    })
+  })
 })

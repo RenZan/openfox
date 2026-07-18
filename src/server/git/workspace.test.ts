@@ -7,6 +7,7 @@ import {
   listBranches,
   listWorkspaces,
   getWorkspacesDir,
+  deleteWorkspaceByPath,
 } from './workspace.js'
 
 vi.mock('node:child_process', () => ({
@@ -19,6 +20,7 @@ vi.mock('node:fs/promises', () => ({
   readdir: vi.fn(),
   mkdir: vi.fn(),
   stat: vi.fn(),
+  rm: vi.fn(),
 }))
 
 vi.mock('../utils/logger.js', () => ({
@@ -114,6 +116,37 @@ describe('getWorkspacesDir', () => {
     expect(dir).toContain('workspaces')
     expect(dir).toContain(PROJECT_NAME)
   })
+
+  it('rejects relative workspacesDir', () => {
+    expect(() => getWorkspacesDir(PROJECT_NAME, 'relative/path')).toThrow('workspacesDir must be an absolute path')
+  })
+
+  it('rejects root workspacesDir', () => {
+    expect(() => getWorkspacesDir(PROJECT_NAME, '/')).toThrow('workspacesDir cannot be the root directory')
+  })
+
+  it('rejects workspacesDir with parent references', () => {
+    expect(() => getWorkspacesDir(PROJECT_NAME, '/home/../workspaces')).toThrow(
+      'workspacesDir cannot contain parent directory references',
+    )
+  })
+})
+
+describe('deleteWorkspaceByPath', () => {
+  it('deletes workspace at given path', async () => {
+    vi.mocked(stat).mockResolvedValueOnce({ isDirectory: () => true } as any)
+    const { rm } = await import('node:fs/promises')
+    vi.mocked(rm).mockResolvedValue(undefined as any)
+
+    await deleteWorkspaceByPath('/custom/ws/test-project/my-ws')
+    expect(rm).toHaveBeenCalledWith('/custom/ws/test-project/my-ws', { recursive: true, force: true })
+  })
+
+  it('throws if path does not exist', async () => {
+    vi.mocked(stat).mockResolvedValueOnce(null as any)
+
+    await expect(deleteWorkspaceByPath('/nonexistent')).rejects.toThrow('Workspace path does not exist')
+  })
 })
 
 describe('listWorkspaces', () => {
@@ -136,6 +169,25 @@ describe('listWorkspaces', () => {
     vi.mocked(readdir).mockRejectedValue({ code: 'ENOENT' })
     const result = await listWorkspaces(PROJECT_NAME)
     expect(result).toEqual([])
+  })
+
+  it('lists workspaces in custom dir, ignoring default dir', async () => {
+    vi.mocked(readdir).mockResolvedValue([{ name: 'custom-feature', isDirectory: () => true }] as any)
+    vi.mocked(spawn).mockReturnValue(makeMockProc('develop\n') as any)
+
+    const result = await listWorkspaces(PROJECT_NAME, '/custom/ws')
+    expect(result).toHaveLength(1)
+    expect(result[0]?.name).toBe('custom-feature')
+    expect(result[0]?.path).toContain('/custom/ws')
+    // Default dir workspaces are not included
+    expect(result[0]?.path).not.toContain('.local')
+  })
+
+  it('returns empty when custom dir has no workspaces (legacy workspaces hidden)', async () => {
+    vi.mocked(readdir).mockRejectedValue({ code: 'ENOENT' })
+    const result = await listWorkspaces(PROJECT_NAME, '/custom/ws')
+    expect(result).toEqual([])
+    // Workspaces in the default dir are not listed with custom dir
   })
 })
 

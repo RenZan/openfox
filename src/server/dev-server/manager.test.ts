@@ -159,9 +159,11 @@ describe('loadConfig with workspace fallback', () => {
 
   it('falls back to project root when workspace path has no config', async () => {
     vi.mocked(readFile)
-      .mockRejectedValueOnce(new Error('ENOENT'))
-      .mockRejectedValueOnce(new Error('ENOENT'))
-      .mockResolvedValueOnce(JSON.stringify({ command: 'npm run dev', url: 'http://localhost:5173' }))
+      .mockRejectedValueOnce(new Error('ENOENT')) // dev.json at workspace
+      .mockRejectedValueOnce(new Error('ENOENT')) // .git/HEAD at my-feature
+      .mockRejectedValueOnce(new Error('ENOENT')) // .git/HEAD at workspaces
+      .mockResolvedValueOnce('ref: refs/heads/main\n') // .git/HEAD at project root
+      .mockResolvedValueOnce(JSON.stringify({ command: 'npm run dev', url: 'http://localhost:5173' })) // dev.json at project root
 
     const config = await devServerManager.loadConfig('/some/project/workspaces/my-feature')
     expect(config).toEqual({
@@ -170,7 +172,7 @@ describe('loadConfig with workspace fallback', () => {
       hotReload: false,
       disableInspect: false,
     })
-    expect(readFile).toHaveBeenCalledTimes(3)
+    expect(readFile).toHaveBeenCalledTimes(5)
   })
 
   it('returns null when neither path has config', async () => {
@@ -185,6 +187,37 @@ describe('loadConfig with workspace fallback', () => {
     const config = await devServerManager.loadConfig('/some/project')
     expect(config).toBeNull()
     expect(readFile).toHaveBeenCalledTimes(2)
+  })
+
+  it('returns null when dev.json exists in ancestor with no .git (unrelated project)', async () => {
+    vi.mocked(readFile)
+      .mockRejectedValueOnce(new Error('ENOENT')) // 1. dev.json at workspace
+      .mockRejectedValueOnce(new Error('ENOENT')) // 2. .git/HEAD at /some/project/workspaces
+      .mockRejectedValueOnce(new Error('ENOENT')) // 3. .git/HEAD at /some/project
+      // Even if /some/project has a dev.json, it's never checked because .git is missing
+      .mockRejectedValueOnce(new Error('ENOENT')) // 4. .git/HEAD at /some
+
+    const config = await devServerManager.loadConfig('/some/project/workspaces/my-feature')
+    expect(config).toBeNull()
+    // Only 4 reads: 1 dev.json + 3 .git/HEAD checks. No dev.json loaded from non-.git dirs.
+    expect(readFile).toHaveBeenCalledTimes(4)
+  })
+
+  it('loads dev.json from the closest parent with a .git directory', async () => {
+    vi.mocked(readFile)
+      .mockRejectedValueOnce(new Error('ENOENT')) // 1. dev.json at workspace
+      .mockRejectedValueOnce(new Error('ENOENT')) // 2. .git/HEAD at /some/project/workspaces
+      .mockResolvedValueOnce('ref: refs/heads/main\n') // 3. .git/HEAD at /some/project ✓
+      .mockResolvedValueOnce(JSON.stringify({ command: 'npm run dev', url: 'http://localhost:5173' })) // 4. dev.json at /some/project
+
+    const config = await devServerManager.loadConfig('/some/project/workspaces/my-feature')
+    expect(config).toEqual({
+      command: 'npm run dev',
+      url: 'http://localhost:5173',
+      hotReload: false,
+      disableInspect: false,
+    })
+    expect(readFile).toHaveBeenCalledTimes(4)
   })
 })
 

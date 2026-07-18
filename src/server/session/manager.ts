@@ -42,6 +42,7 @@ import {
   workspaceExists,
   getWorkspacesDir,
   deleteWorkspace as deleteWorkspaceDir,
+  deleteWorkspaceByPath,
   validateWorkspaceName,
 } from '../git/workspace.js'
 import { loadWorkspaceConfig } from '../git/workspace-config.js'
@@ -1161,18 +1162,21 @@ export class SessionManager {
 
     // If currently in the workspace being deleted, switch to original first
     const currentWsName = session.workspace?.split('/').pop()
+    const wsPathBeforeSwitch = session.workspace
     if (currentWsName === target) {
       await this.switchWorkspace(sessionId, 'original')
     }
 
-    const effectivePath = resolve(getWorkspacesDir(project.name, workspacesRootDir), target)
-    try {
-      await devServerManager.stop(effectivePath)
-    } catch {
-      // ignore
+    // Use stored workspace path from before switch, to avoid recalculating
+    // from config (config may have changed since creation)
+    if (wsPathBeforeSwitch) {
+      await devServerManager.stop(wsPathBeforeSwitch).catch(() => {})
+      await deleteWorkspaceByPath(wsPathBeforeSwitch)
+    } else {
+      const effectivePath = resolve(getWorkspacesDir(project.name, workspacesRootDir), target)
+      await devServerManager.stop(effectivePath).catch(() => {})
+      await deleteWorkspaceDir(project.name, target, workspacesRootDir)
     }
-
-    await deleteWorkspaceDir(project.name, target, workspacesRootDir)
     const updated = this.requireSession(sessionId)
     this.emit({ type: 'session_updated', session: updated })
     return updated

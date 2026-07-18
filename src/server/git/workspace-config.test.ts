@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { join } from 'node:path'
-import { loadWorkspaceConfig, saveWorkspaceConfig } from './workspace-config.js'
+import { loadWorkspaceConfig, saveWorkspaceConfig, validateWorkspacesDir } from './workspace-config.js'
 
 vi.mock('node:fs/promises', () => ({
   readFile: vi.fn(),
@@ -78,5 +78,43 @@ describe('saveWorkspaceConfig', () => {
     await saveWorkspaceConfig(WORKDIR, {})
 
     expect(writeFile).toHaveBeenCalledWith(expect.any(String), JSON.stringify({}, null, 2) + '\n', 'utf-8')
+  })
+})
+
+describe('validateWorkspacesDir', () => {
+  it('accepts valid absolute path', () => {
+    expect(() => validateWorkspacesDir('/home/user/workspaces')).not.toThrow()
+  })
+
+  it('rejects non-absolute path', () => {
+    expect(() => validateWorkspacesDir('relative/path')).toThrow('workspacesDir must be an absolute path')
+  })
+
+  it('rejects root directory', () => {
+    expect(() => validateWorkspacesDir('/')).toThrow('workspacesDir cannot be the root directory')
+  })
+
+  it('rejects path with parent references', () => {
+    expect(() => validateWorkspacesDir('/home/../workspaces')).toThrow(
+      'workspacesDir cannot contain parent directory references',
+    )
+  })
+
+  it('rejects empty string', () => {
+    expect(() => validateWorkspacesDir('')).toThrow('workspacesDir is required')
+  })
+})
+
+describe('loadWorkspaceConfig with invalid workspacesDir', () => {
+  it('returns null when workspacesDir is relative', async () => {
+    vi.mocked(readFile).mockResolvedValue(JSON.stringify({ workspacesDir: 'relative/path' }))
+    const result = await loadWorkspaceConfig(WORKDIR)
+    expect(result).toBeNull()
+  })
+
+  it('returns null when workspacesDir is root', async () => {
+    vi.mocked(readFile).mockResolvedValue(JSON.stringify({ workspacesDir: '/' }))
+    const result = await loadWorkspaceConfig(WORKDIR)
+    expect(result).toBeNull()
   })
 })

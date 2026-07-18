@@ -199,15 +199,21 @@ class DevServerManager {
     const config = await tryLoad(workdir)
     if (config) return config
 
-    // Walk up directories looking for .openfox/dev.json (max 10 levels)
+    // Walk up directories looking for project root (containing .git)
+    // Then try loading dev.json from there
     const parts = workdir.replace(/\\/g, '/').split('/')
-    const maxDepth = Math.min(parts.length - 1, 10)
-    for (let i = parts.length - 1; i >= parts.length - maxDepth; i--) {
+    for (let i = parts.length - 1; i > 0; i--) {
       const candidate = parts.slice(0, i).join('/')
-      if (candidate === workdir) continue
-      if (!candidate) break
+      if (candidate === workdir || !candidate) continue
+
+      try {
+        await readFile(join(candidate, '.git', 'HEAD'), 'utf-8')
+      } catch {
+        continue
+      }
+
       const parentConfig = await tryLoad(candidate)
-      if (parentConfig) return parentConfig
+      return parentConfig
     }
 
     return null
