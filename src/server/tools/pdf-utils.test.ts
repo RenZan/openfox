@@ -97,6 +97,12 @@ describe('pdf-utils', () => {
       const result = encodeImageToDataUrl({ width: 1, height: 1, data, kind: 99 })
       expect(result).toMatch(/^data:image\/png;base64,/)
     })
+
+    it('rejects images exceeding 20MB estimated decoded size', () => {
+      const data = new Uint8Array(10)
+      const result = encodeImageToDataUrl({ width: 3000, height: 3000, data, kind: 2 })
+      expect(result).toBeNull()
+    })
   })
 
   describe('extractPdfContent', () => {

@@ -111,7 +111,7 @@ export function encodeImageToDataUrl(imgData: RawImageData, maxDimension = 1024)
     let { width, height } = imgData
     const { data, kind } = imgData
 
-    if (width > 4096 || height > 4096) return null
+    if (width * height * 4 > 20_971_520) return null
 
     if (maxDimension > 0 && (width > maxDimension || height > maxDimension)) {
       const scale = maxDimension / Math.max(width, height)
