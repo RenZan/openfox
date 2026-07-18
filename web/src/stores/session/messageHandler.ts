@@ -176,13 +176,20 @@ export function handleServerMessage(
       cancelStreamingFlush()
       const wasPendingCreate = get().pendingSessionCreate === true
 
+      const confs = payload.pendingConfirmations ?? []
+      const sessionId = payload.session.id
+      const crossCleanup = { ...get().crossSessionConfirmations }
+      delete crossCleanup[sessionId]
+
       set({
         currentSession: payload.session,
         sessions: mergeSessionIntoSummary(get().sessions, payload.session),
-        unreadSessionIds: removeUnreadSessionId(get().unreadSessionIds, payload.session.id),
+        unreadSessionIds: removeUnreadSessionId(get().unreadSessionIds, sessionId),
         messages: payload.messages,
         currentTodos: [],
-        pendingPathConfirmations: payload.pendingConfirmations ?? [],
+        pendingPathConfirmations: confs,
+        crossSessionConfirmations: crossCleanup,
+        sessionsWithPendingConfirmations: Object.keys(crossCleanup),
         pendingQuestions: payload.pendingQuestions ?? [],
         error: null,
         ...(wasPendingCreate ? { pendingSessionCreate: payload.session.id } : {}),
@@ -533,10 +540,8 @@ export function handleServerMessage(
     }
 
     case 'chat.path_confirmation': {
-      if (!isMessageForCurrentSession(message, get().currentSession?.id ?? null)) {
-        markBackgroundSessionUnread()
-        break
-      }
+      const eventSessionId = message.sessionId
+      const isCurrentSession = eventSessionId === (get().currentSession?.id ?? null)
       const payload = message.payload as ChatPathConfirmationPayload
       const newConfirmation = {
         callId: payload.callId,
@@ -545,9 +550,72 @@ export function handleServerMessage(
         workdir: payload.workdir,
         reason: payload.reason,
       }
+
+      if (!isCurrentSession) {
+        markBackgroundSessionUnread()
+        if (eventSessionId) {
+          set((state) => ({
+            crossSessionConfirmations: {
+              ...state.crossSessionConfirmations,
+              [eventSessionId]: [...(state.crossSessionConfirmations[eventSessionId] ?? []), newConfirmation],
+            },
+            sessionsWithPendingConfirmations: state.sessionsWithPendingConfirmations.includes(eventSessionId)
+              ? state.sessionsWithPendingConfirmations
+              : [...state.sessionsWithPendingConfirmations, eventSessionId],
+          }))
+        }
+        break
+      }
+
       set((state) => ({
         pendingPathConfirmations: [...state.pendingPathConfirmations, newConfirmation],
       }))
+      break
+    }
+
+    case 'session.confirmation_pending': {
+      const pendingSessionId = message.sessionId
+      const payload = message.payload as ChatPathConfirmationPayload
+      const conf = {
+        callId: payload.callId,
+        tool: payload.tool,
+        paths: payload.paths,
+        workdir: payload.workdir,
+        reason: payload.reason,
+      }
+      if (pendingSessionId) {
+        set((state) => ({
+          crossSessionConfirmations: {
+            ...state.crossSessionConfirmations,
+            [pendingSessionId]: [...(state.crossSessionConfirmations[pendingSessionId] ?? []), conf],
+          },
+          sessionsWithPendingConfirmations: state.sessionsWithPendingConfirmations.includes(pendingSessionId)
+            ? state.sessionsWithPendingConfirmations
+            : [...state.sessionsWithPendingConfirmations, pendingSessionId],
+        }))
+      }
+      break
+    }
+
+    case 'session.confirmation_resolved': {
+      const resolvedId = message.sessionId
+      const resolvedPayload = message.payload as { sessionId: string; callId: string }
+      if (resolvedId) {
+        set((state) => {
+          const sessionConfs = state.crossSessionConfirmations[resolvedId] ?? []
+          const remaining = sessionConfs.filter((c) => c.callId !== resolvedPayload.callId)
+          const newCross = { ...state.crossSessionConfirmations }
+          if (remaining.length === 0) {
+            delete newCross[resolvedId]
+          } else {
+            newCross[resolvedId] = remaining
+          }
+          return {
+            crossSessionConfirmations: newCross,
+            sessionsWithPendingConfirmations: Object.keys(newCross),
+          }
+        })
+      }
       break
     }
 

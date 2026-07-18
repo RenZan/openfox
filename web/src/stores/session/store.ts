@@ -127,6 +127,8 @@ export const useSessionStore = create<SessionState>((set, get) => {
     contextState: null,
     subAgentContextStates: {},
     pendingPathConfirmations: [],
+    crossSessionConfirmations: {},
+    sessionsWithPendingConfirmations: [],
     pendingQuestions: [],
     visionFallbackByMessage: {},
     gitStatus: null,

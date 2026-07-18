@@ -865,6 +865,13 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
       wssExports.broadcastForSession(sessionId, { ...stateMsg, sessionId })
     }
 
+    // Broadcast to all clients that the confirmation was resolved
+    wssExports.broadcastAll({
+      type: 'session.confirmation_resolved',
+      sessionId,
+      payload: { sessionId, callId },
+    })
+
     res.json({ success: true })
   })
 

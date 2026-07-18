@@ -34,6 +34,7 @@ export function Sidebar({ projectId, isOpen = true, onClose }: SidebarProps) {
   const loadMoreSessions = useSessionStore((state) => state.loadMoreSessions)
   const sessionsHasMore = useSessionStore((state) => state.sessionsHasMore)
   const sessionsPaginationLoading = useSessionStore((state) => state.sessionsPaginationLoading)
+  const sessionsWithPendingConfirmations = useSessionStore((state) => state.sessionsWithPendingConfirmations)
 
   const currentProject = useProjectStore((state) => state.currentProject)
 
@@ -226,6 +227,7 @@ export function Sidebar({ projectId, isOpen = true, onClose }: SidebarProps) {
                   handleDeleteSession,
                   handleRenameSession,
                   projectId,
+                  sessionsWithPendingConfirmations,
                 )}
               </div>
               {sessionsPaginationLoading && (
@@ -247,6 +249,7 @@ function renderSessionGroups(
   handleDeleteSession: (sessionId: string, e?: React.MouseEvent) => void,
   handleRenameSession: (sessionId: string, e?: React.MouseEvent) => void,
   projectId: string,
+  sessionsWithPendingConfirmations: string[],
 ) {
   const groups = groupSessionsByDate(projectSessions)
 
@@ -266,6 +269,7 @@ function renderSessionGroups(
           const isActive = currentSession?.id === session.id
           const hasUnread = unreadSessionIds.includes(session.id)
           const isRunning = session.isRunning
+          const hasPendingConfirmation = sessionsWithPendingConfirmations.includes(session.id) && !isActive
           return (
             <div
               key={session.id}
@@ -310,6 +314,12 @@ function renderSessionGroups(
                 <div className="flex items-center gap-2 mt-1">
                   {isRunning ? (
                     <SpinIcon />
+                  ) : hasPendingConfirmation ? (
+                    <span
+                      aria-label="Pending confirmation"
+                      title="Path confirmation pending"
+                      className="w-2 h-2 rounded-full bg-blue-400 flex-shrink-0"
+                    />
                   ) : hasUnread && !isActive ? (
                     <span
                       aria-label="Unread activity"

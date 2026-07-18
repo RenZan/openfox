@@ -1645,3 +1645,216 @@ describe('useSessionStore session isolation', () => {
     )
   })
 })
+
+describe('cross-session path confirmations', () => {
+  beforeEach(() => {
+    wsSendMock.mockClear()
+    wsSubscribeMock.mockClear()
+    wsConnectMock.mockClear()
+    wsDisconnectMock.mockClear()
+    wsStatusMock.mockClear()
+    playNotificationMock.mockClear()
+    playAchievementMock.mockClear()
+    playInterventionMock.mockClear()
+    playWaitingForUserMock.mockClear()
+    playNewMessageMock.mockClear()
+    fetchMock.mockClear()
+  })
+
+  it('stores cross-session confirmation when chat.path_confirmation arrives for background session', async () => {
+    const useSessionStore = await loadSessionStore()
+
+    // Set current session to session-2
+    useSessionStore.setState((state) => ({
+      ...state,
+      currentSession: {
+        id: 'session-2',
+        projectId: 'project-1',
+        workdir: '/tmp/project-2',
+        mode: 'builder',
+        phase: 'build',
+        isRunning: true,
+        criteria: [],
+        summary: null,
+      } as any,
+    }))
+
+    // Receive path confirmation for session-1 (background)
+    useSessionStore.getState().handleServerMessage({
+      type: 'chat.path_confirmation',
+      sessionId: 'session-1',
+      payload: {
+        callId: 'call-git',
+        tool: 'run_command',
+        paths: ['--no-verify'],
+        workdir: '/tmp/project-1',
+        reason: 'git_no_verify',
+      },
+    })
+
+    const state = useSessionStore.getState()
+    expect(state.crossSessionConfirmations['session-1']).toBeDefined()
+    expect(state.crossSessionConfirmations['session-1']).toHaveLength(1)
+    expect(state.crossSessionConfirmations['session-1']![0]!.callId).toBe('call-git')
+    expect(state.sessionsWithPendingConfirmations).toContain('session-1')
+    // Should NOT add to local pendingPathConfirmations
+    expect(state.pendingPathConfirmations).toHaveLength(0)
+    // Should mark as unread
+    expect(state.unreadSessionIds).toContain('session-1')
+  })
+
+  it('stores cross-session confirmation via session.confirmation_pending message', async () => {
+    const useSessionStore = await loadSessionStore()
+
+    useSessionStore.setState((state) => ({
+      ...state,
+      sessions: [
+        { id: 'session-1', projectId: 'project-1', title: 'My Session', updatedAt: 'a', messageCount: 0 } as any,
+      ],
+    }))
+
+    useSessionStore.getState().handleServerMessage({
+      type: 'session.confirmation_pending',
+      sessionId: 'session-1',
+      payload: {
+        callId: 'call-git',
+        tool: 'run_command',
+        paths: ['--no-verify'],
+        workdir: '/tmp/project-1',
+        reason: 'git_no_verify',
+      },
+    })
+
+    const state = useSessionStore.getState()
+    expect(state.crossSessionConfirmations['session-1']).toHaveLength(1)
+    expect(state.sessionsWithPendingConfirmations).toContain('session-1')
+  })
+
+  it('removes cross-session confirmation via session.confirmation_resolved message', async () => {
+    const useSessionStore = await loadSessionStore()
+
+    // Pre-populate a cross-session confirmation
+    useSessionStore.setState((state) => ({
+      ...state,
+      crossSessionConfirmations: {
+        'session-1': [
+          {
+            callId: 'call-git',
+            tool: 'run_command',
+            paths: ['--no-verify'],
+            workdir: '/tmp/project-1',
+            reason: 'git_no_verify' as const,
+          },
+        ],
+      },
+      sessionsWithPendingConfirmations: ['session-1'],
+    }))
+
+    useSessionStore.getState().handleServerMessage({
+      type: 'session.confirmation_resolved',
+      sessionId: 'session-1',
+      payload: { sessionId: 'session-1', callId: 'call-git' },
+    })
+
+    const state = useSessionStore.getState()
+    expect(state.crossSessionConfirmations['session-1']).toBeUndefined()
+    expect(state.sessionsWithPendingConfirmations).not.toContain('session-1')
+  })
+
+  it('clears cross-session confirmation when navigating to that session via session.state', async () => {
+    const useSessionStore = await loadSessionStore()
+
+    // Pre-populate cross-session confirmation for session-1
+    useSessionStore.setState((state) => ({
+      ...state,
+      currentSession: { id: 'session-1', projectId: 'project-1' } as any,
+      crossSessionConfirmations: {
+        'session-1': [
+          {
+            callId: 'call-git',
+            tool: 'run_command',
+            paths: ['--no-verify'],
+            workdir: '/tmp/project-1',
+            reason: 'git_no_verify' as const,
+          },
+        ],
+      },
+      sessionsWithPendingConfirmations: ['session-1'],
+    }))
+
+    // Load session-1 (simulate session.state response after navigation)
+    useSessionStore.getState().handleServerMessage({
+      id: 'corr-1',
+      type: 'session.state',
+      sessionId: 'session-1',
+      payload: {
+        session: {
+          id: 'session-1',
+          projectId: 'project-1',
+          workdir: '/tmp/project-1',
+          mode: 'planner',
+          phase: 'plan',
+          isRunning: false,
+          criteria: [],
+          summary: null,
+          messages: [],
+        } as any,
+        messages: [],
+        pendingConfirmations: [
+          {
+            callId: 'call-git',
+            tool: 'run_command',
+            paths: ['--no-verify'],
+            workdir: '/tmp/project-1',
+            reason: 'git_no_verify' as const,
+          },
+        ],
+      },
+    })
+
+    const state = useSessionStore.getState()
+    // Cross-session tracking should be cleaned
+    expect(state.crossSessionConfirmations['session-1']).toBeUndefined()
+    expect(state.sessionsWithPendingConfirmations).not.toContain('session-1')
+    // Local pending confirmations should be populated
+    expect(state.pendingPathConfirmations).toHaveLength(1)
+    expect(state.pendingPathConfirmations[0]!.callId).toBe('call-git')
+  })
+
+  it('does not render cross-session confirmation inline in current session', async () => {
+    const useSessionStore = await loadSessionStore()
+
+    useSessionStore.setState((state) => ({
+      ...state,
+      currentSession: {
+        id: 'session-2',
+        projectId: 'project-1',
+        workdir: '/tmp/project-2',
+        mode: 'builder',
+        phase: 'build',
+        isRunning: true,
+        criteria: [],
+        summary: null,
+      } as any,
+    }))
+
+    // Receive confirmation for a different session
+    useSessionStore.getState().handleServerMessage({
+      type: 'chat.path_confirmation',
+      sessionId: 'session-1',
+      payload: {
+        callId: 'call-git',
+        tool: 'run_command',
+        paths: ['--no-verify'],
+        workdir: '/tmp/project-1',
+        reason: 'git_no_verify',
+      },
+    })
+
+    const state = useSessionStore.getState()
+    // Should NOT be in local pendingPathConfirmations
+    expect(state.pendingPathConfirmations).toHaveLength(0)
+    // Should be in cross-session tracking
+    expect(state.crossSessionConfirmations['session-1']).toHaveLength(1)
+  })
+})

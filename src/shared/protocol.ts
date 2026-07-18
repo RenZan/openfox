@@ -80,6 +80,8 @@ export type ServerMessageType =
   | 'session.deletedAll'
   | 'session.running' // Real-time running state change
   | 'session.name_generated' // Session name was auto-generated
+  | 'session.confirmation_pending' // Path confirmation waiting in another session (broadcast to all)
+  | 'session.confirmation_resolved' // Path confirmation was answered (broadcast to all)
   // Unified chat events (replaces plan.delta, agent.event, etc.)
   | 'chat.delta' // Text streaming
   | 'chat.thinking' // Thinking block content
@@ -190,6 +192,21 @@ export interface SessionRunningPayload {
 
 export interface SessionNameGeneratedPayload {
   name: string
+}
+
+export interface SessionConfirmationPendingPayload {
+  sessionId: string
+  sessionTitle?: string
+  callId: string
+  tool: string
+  paths: string[]
+  workdir: string
+  reason: PendingPathConfirmationPayload['reason']
+}
+
+export interface SessionConfirmationResolvedPayload {
+  sessionId: string
+  callId: string
 }
 
 // Chat payloads (unified streaming)
