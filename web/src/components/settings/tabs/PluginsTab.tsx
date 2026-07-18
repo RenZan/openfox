@@ -152,7 +152,7 @@ function PluginCard({
     }
   }
 
-  const handleRemove = async () => {
+  const handleRemove = () => {
     setShowRemoveConfirm(true)
   }
 
