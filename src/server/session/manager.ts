@@ -1013,7 +1013,7 @@ export class SessionManager {
 
       // If already in the target workspace, no-op
       if (target === 'original' && !session.workspace) return session
-      if (target !== 'original' && session.workspace?.endsWith(`/${target}`)) return session
+      if (target !== 'original' && session.workspace?.split('/').pop() === target) return session
 
       const previousPath = session.workspace
 
@@ -1124,7 +1124,7 @@ export class SessionManager {
 
     // Check if other sessions reference this workspace
     const otherSessionsUsingIt = this.listSessions().filter(
-      (s) => s.id !== sessionId && s.workspace?.endsWith(`/${target}`),
+      (s) => s.id !== sessionId && s.workspace?.split('/').pop() === target,
     )
     if (otherSessionsUsingIt.length > 0) {
       const otherIds = otherSessionsUsingIt.map((s) => s.id).join(', ')
