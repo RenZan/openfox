@@ -1,4 +1,5 @@
-import { Modal } from './SelfContainedModal'
+import type { ReactNode } from 'react'
+import { Modal } from './Modal'
 import { Button } from './Button'
 
 interface ConfirmModalProps {
@@ -6,7 +7,7 @@ interface ConfirmModalProps {
   onClose: () => void
   onConfirm: () => void
   title: string
-  message: string
+  message: ReactNode
   confirmLabel?: string
   confirmVariant?: 'danger' | 'primary'
   disabled?: boolean

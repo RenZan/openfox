@@ -262,7 +262,7 @@ function PluginCard({
         onClose={() => setShowRemoveConfirm(false)}
         onConfirm={handleConfirmRemove}
         title={`Remove "${plugin.displayName}"?`}
-        message={`Remove "${plugin.displayName}" plugin?`}
+        message={`Remove the "${plugin.displayName}" plugin from your installation.`}
         confirmLabel="Remove"
         confirmVariant="danger"
         disabled={removing}
