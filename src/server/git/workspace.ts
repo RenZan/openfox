@@ -155,11 +155,12 @@ export async function resolveAndValidateSourceBranch(cwd: string, sourceBranch: 
   if (projectDir) {
     const remoteExists = await captureStdout(projectDir, ['ls-remote', '--heads', 'origin', branchName])
     if (remoteExists !== null) {
-      // Fetch the branch from the project's origin into the workspace
-      await runGit(cwd, ['fetch', projectDir, branchName + ':' + branchName]).catch(async () => {
-        // fallback: fetch then create branch
-        await runGit(cwd, ['fetch', projectDir, branchName])
-        await runGit(cwd, ['branch', '--track', branchName, 'FETCH_HEAD'])
+      // Fetch the branch from the project's upstream via its remote-tracking ref
+      // In --shared clones, the project dir has the branch as refs/remotes/origin/..., not refs/heads/...
+      await runGit(cwd, ['fetch', projectDir, 'refs/remotes/origin/' + branchName + ':refs/heads/' + branchName]).catch(async () => {
+        // fallback: fetch from upstream then create branch
+        await runGit(projectDir, ['fetch', 'origin', branchName])
+        await runGit(cwd, ['fetch', projectDir, 'refs/remotes/origin/' + branchName + ':refs/heads/' + branchName])
       })
       return branchName
     }
