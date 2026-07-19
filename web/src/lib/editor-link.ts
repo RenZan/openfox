@@ -39,8 +39,3 @@ export function buildWorkspaceUrl(workdir: string): string {
 
   return `vscode://file/${encoded}`
 }
-
-export function getWslDistro(): string | null {
-  const platform = getPlatform()
-  return platform?.isWSL ? platform.wslDistro || null : null
-}

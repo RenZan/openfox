@@ -27,6 +27,10 @@ function readEtcOsRelease(): Record<string, string> | null {
   }
 }
 
+export function resetWslCache(): void {
+  cached = null
+}
+
 export function detectWsl(): WslInfo {
   if (cached) return cached
 

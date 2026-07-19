@@ -14,7 +14,7 @@ import { MetadataEntries, MetadataSectionHeader } from '../shared/MetadataEntrie
 import { CriteriaEditor } from './CriteriaEditor'
 import { DevServerFooter } from './DevServerFooter'
 import { BackgroundProcesses } from './BackgroundProcesses'
-import { BranchIcon, FolderIcon, OpenExternalIcon, ReloadIcon } from '../shared/icons'
+import { BranchIcon, FolderIcon, ReloadIcon } from '../shared/icons'
 import { AutoUpdateModal } from '../AutoUpdateModal'
 import { DiffViewer } from './DiffViewer'
 import { BranchModal } from './BranchModal'
@@ -113,8 +113,23 @@ export function SessionSidebar({ messages, workdir }: SessionSidebarProps) {
       {/* Workspace & branch info — above separator */}
       <div className="mt-4 space-y-1.5">
         <div className="flex items-center gap-2 text-sm">
-          <FolderIcon className="w-4 h-4 text-text-muted flex-shrink-0" />
-          <span className="truncate text-text-secondary">{workspaceName ?? 'original'}</span>
+          {showEditorLink && workdir ? (
+            <a
+              href={buildWorkspaceUrl(workdir)}
+              className="flex items-center gap-2 min-w-0 flex-1 no-underline group"
+              title="Open workspace in VSCode"
+            >
+              <FolderIcon className="w-4 h-4 text-text-muted flex-shrink-0" />
+              <span className="truncate text-text-secondary group-hover:text-accent-primary transition-colors">
+                {workspaceName ?? 'original'}
+              </span>
+            </a>
+          ) : (
+            <>
+              <FolderIcon className="w-4 h-4 text-text-muted flex-shrink-0" />
+              <span className="truncate text-text-secondary">{workspaceName ?? 'original'}</span>
+            </>
+          )}
           <button
             onClick={() => setShowWorkspaceModal(true)}
             className="ml-auto px-2 py-0.5 text-xs rounded bg-bg-tertiary text-text-secondary hover:bg-bg-secondary transition-colors"
@@ -134,19 +149,6 @@ export function SessionSidebar({ messages, workdir }: SessionSidebarProps) {
           </button>
         </div>
       </div>
-
-      {/* Open workspace in VSCode */}
-      {showEditorLink && workdir && (
-        <div className="mt-2">
-          <a
-            href={buildWorkspaceUrl(workdir)}
-            className="flex items-center gap-1.5 text-xs text-accent-primary hover:underline"
-          >
-            <OpenExternalIcon className="w-3.5 h-3.5" />
-            Open workspace in VSCode
-          </a>
-        </div>
-      )}
 
       {/* Diff viewer — between branch and dev server */}
       <DiffViewer />
