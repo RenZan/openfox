@@ -249,4 +249,14 @@ describe('resolveAndValidateSourceBranch', () => {
       .mockReturnValueOnce(makeMockProc('', '', 1) as any) // git rev-parse remote fails
     await expect(resolveAndValidateSourceBranch(CWD, 'nonexistent')).rejects.toThrow('not found')
   })
+
+  it('throws when projectDir is provided but branch is absent from remote ls-remote (empty output)', async () => {
+    vi.mocked(spawn)
+      .mockReturnValueOnce(makeMockProc('') as any) // git check-ref-format (validateRef)
+      .mockReturnValueOnce(makeMockProc('') as any) // git fetch
+      .mockReturnValueOnce(makeMockProc('', '', 1) as any) // git rev-parse local fails
+      .mockReturnValueOnce(makeMockProc('', '', 1) as any) // git rev-parse remote fails
+      .mockReturnValueOnce(makeMockProc('') as any) // git ls-remote succeeds but returns empty (branch absent)
+    await expect(resolveAndValidateSourceBranch(CWD, 'absent-branch', '/tmp/project')).rejects.toThrow('not found')
+  })
 })
