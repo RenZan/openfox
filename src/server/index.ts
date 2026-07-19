@@ -425,10 +425,11 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
     if (!project) return res.status(404).json({ error: 'Project not found' })
     const { name, sourceBranch } = req.body
     if (!name || typeof name !== 'string') return res.status(400).json({ error: 'name is required' })
-    const { createBranch } = await import('./git/workspace.js')
+    const { createBranch, resolveAndValidateSourceBranch } = await import('./git/workspace.js')
     try {
-      await createBranch(project.workdir, name, sourceBranch ?? undefined)
-      res.json({ branch: name, sourceBranch: sourceBranch ?? null })
+      const sb = sourceBranch ? await resolveAndValidateSourceBranch(project.workdir, sourceBranch) : undefined
+      await createBranch(project.workdir, name, sb)
+      res.json({ branch: name, sourceBranch: sb ?? null })
     } catch (err) {
       res.status(400).json({ error: err instanceof Error ? err.message : 'Failed to create branch' })
     }
@@ -473,13 +474,14 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
     const { name, sourceBranch } = req.body
     if (!name || typeof name !== 'string') return res.status(400).json({ error: 'name is required' })
     const effectiveWorkdir = session.workspace ?? session.workdir
-    const { createBranch, validateRef } = await import('./git/workspace.js')
+    const { createBranch, resolveAndValidateSourceBranch, validateRef } = await import('./git/workspace.js')
     const { updateSessionBranch } = await import('./db/sessions.js')
     try {
       await validateRef(effectiveWorkdir, name)
-      await createBranch(effectiveWorkdir, name, sourceBranch ?? undefined)
+      const sb = sourceBranch ? await resolveAndValidateSourceBranch(effectiveWorkdir, sourceBranch) : undefined
+      await createBranch(effectiveWorkdir, name, sb)
       updateSessionBranch(req.params.id, name)
-      res.json({ branch: name, sourceBranch: sourceBranch ?? null })
+      res.json({ branch: name, sourceBranch: sb ?? null })
     } catch (err) {
       res.status(400).json({ error: err instanceof Error ? err.message : 'Failed to create branch' })
     }

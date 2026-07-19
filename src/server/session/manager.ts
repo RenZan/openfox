@@ -38,6 +38,7 @@ import { getProject } from '../db/projects.js'
 import {
   ensureWorkspace,
   getDefaultBranch,
+  resolveAndValidateSourceBranch,
   getGitBranch,
   getCommitsBehind,
   runGit,
@@ -1031,7 +1032,8 @@ export class SessionManager {
       try {
         await runGit(wsPath, ['checkout', branch]).catch(async () => {
           const sb = sourceBranch ?? (await getDefaultBranch(projectDir))
-          await runGit(wsPath, ['checkout', '-b', branch, sb])
+          const validated = sourceBranch ? await resolveAndValidateSourceBranch(wsPath, sourceBranch) : sb
+          await runGit(wsPath, ['checkout', '-b', branch, validated])
         })
       } catch (err) {
         throw new Error(

@@ -121,6 +121,35 @@ export async function getDefaultBranch(projectDir: string): Promise<string> {
   return 'main'
 }
 
+/**
+ * Resolve and validate a source branch name for creating a new branch.
+ * Ensures the branch exists locally or on the remote, creating a tracking ref if needed.
+ * Returns the local ref name that can be used as the source for git checkout -b.
+ */
+export async function resolveAndValidateSourceBranch(cwd: string, sourceBranch: string): Promise<string> {
+  // fetch to ensure remote refs are up to date
+  await runGit(cwd, ['fetch', 'origin', '--no-tags', '--quiet']).catch(() => {})
+
+  // strip optional origin/ prefix to get the branch name
+  const branchName = sourceBranch.replace(/^origin\//, '')
+
+  // check if it exists locally
+  const localRef = await captureStdout(cwd, ['rev-parse', '--verify', '--quiet', 'refs/heads/' + branchName])
+  if (localRef !== null) return branchName
+
+  // check if it exists on origin
+  const remoteRef = await captureStdout(cwd, ['rev-parse', '--verify', '--quiet', 'refs/remotes/origin/' + branchName])
+  if (remoteRef !== null) {
+    // create a local tracking branch from origin
+    await runGit(cwd, ['checkout', '-b', branchName, 'origin/' + branchName]).catch(async () => {
+      await runGit(cwd, ['branch', '--track', branchName, 'origin/' + branchName])
+    })
+    return branchName
+  }
+
+  throw new Error(`Source branch "${sourceBranch}" not found locally or on origin. Use a valid branch name like "main" or "origin/main".`)
+}
+
 export function validateWorkspaceName(name: string): void {
   if (!name || typeof name !== 'string') throw new Error('Workspace name is required')
   if (name.includes('/') || name.includes('\\')) throw new Error('Workspace name cannot contain path separators')

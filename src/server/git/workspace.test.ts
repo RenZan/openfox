@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   getGitBranch,
   getDefaultBranch,
+  resolveAndValidateSourceBranch,
   validateRef,
   ensureWorkspace,
   listBranches,
@@ -214,5 +215,33 @@ describe('getDefaultBranch', () => {
       .mockReturnValueOnce(makeMockProc('', '', 1) as any) // git rev-parse fails
     const result = await getDefaultBranch(CWD)
     expect(result).toBe('main')
+  })
+})
+
+describe('resolveAndValidateSourceBranch', () => {
+  it('returns local branch name when it exists locally', async () => {
+    vi.mocked(spawn)
+      .mockReturnValueOnce(makeMockProc('') as any) // git fetch
+      .mockReturnValueOnce(makeMockProc('abc123\n') as any) // git rev-parse local ref
+    const result = await resolveAndValidateSourceBranch(CWD, 'main')
+    expect(result).toBe('main')
+  })
+
+  it('creates tracking branch when branch exists on origin', async () => {
+    vi.mocked(spawn)
+      .mockReturnValueOnce(makeMockProc('') as any) // git fetch
+      .mockReturnValueOnce(makeMockProc('', '', 1) as any) // git rev-parse local fails
+      .mockReturnValueOnce(makeMockProc('abc123\n') as any) // git rev-parse remote ref succeeds
+      .mockReturnValueOnce(makeMockProc('') as any) // git checkout -b from origin succeeds
+    const result = await resolveAndValidateSourceBranch(CWD, 'origin/feature')
+    expect(result).toBe('feature')
+  })
+
+  it('throws when branch does not exist locally or on origin', async () => {
+    vi.mocked(spawn)
+      .mockReturnValueOnce(makeMockProc('') as any) // git fetch
+      .mockReturnValueOnce(makeMockProc('', '', 1) as any) // git rev-parse local fails
+      .mockReturnValueOnce(makeMockProc('', '', 1) as any) // git rev-parse remote fails
+    await expect(resolveAndValidateSourceBranch(CWD, 'nonexistent')).rejects.toThrow('not found')
   })
 })

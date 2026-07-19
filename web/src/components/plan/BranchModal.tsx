@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useSessionStore } from '../../stores/session'
 import { authFetch } from '../../lib/api'
 import { useModalState } from '../../hooks/useModalState'
@@ -33,38 +33,21 @@ export function BranchModal({ isOpen, onClose, sessionId }: BranchModalProps) {
     resetState,
   } = useModalState(onClose)
   const [branches, setBranches] = useState<BranchInfo[]>([])
-  const [remoteBranches, setRemoteBranches] = useState<string[]>([])
   const [sourceBranch, setSourceBranch] = useState('')
-  const [showSuggestions, setShowSuggestions] = useState(false)
-
-  const allBranches = useMemo(() => {
-    const local = branches.map((b) => b.name)
-    const combined = [...new Set([...local, ...remoteBranches])]
-    return combined.sort()
-  }, [branches, remoteBranches])
-
-  const filteredSuggestions = useMemo(() => {
-    if (!sourceBranch) return []
-    const q = sourceBranch.toLowerCase()
-    return allBranches.filter((b) => b.toLowerCase().includes(q)).slice(0, 10)
-  }, [sourceBranch, allBranches])
 
   useEffect(() => {
     if (!isOpen) return
     resetState()
     setSourceBranch('')
     setBranches([])
-    setRemoteBranches([])
     authFetch(`/api/sessions/${sessionId}/branches`)
       .then((r) => r.json())
-      .then((data: { branches: BranchInfo[]; remoteBranches: string[] }) => {
+      .then((data: { branches: BranchInfo[] }) => {
         setBranches(data.branches)
-        setRemoteBranches(data.remoteBranches)
         setLoading(false)
       })
       .catch(() => {
         setBranches([])
-        setRemoteBranches([])
         setLoading(false)
       })
   }, [isOpen, sessionId, resetState, setLoading])
@@ -163,41 +146,18 @@ export function BranchModal({ isOpen, onClose, sessionId }: BranchModalProps) {
         />
 
         {newName.trim() && (
-          <div className="mt-2 relative">
-            <label className="text-xs text-text-muted mb-1 block">Source branch (optional)</label>
+          <div className="mt-2">
+            <label className="text-xs text-text-muted mb-1 block">From branch (optional — defaults to project default)</label>
             <div className="relative">
               <BranchIcon className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" />
               <input
                 type="text"
                 value={sourceBranch}
-                onChange={(e) => {
-                  setSourceBranch(e.target.value)
-                  setShowSuggestions(true)
-                }}
-                onFocus={() => setShowSuggestions(true)}
-                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                placeholder="origin/main (default)"
+                onChange={(e) => setSourceBranch(e.target.value)}
+                placeholder="origin/main"
                 className="w-full text-sm bg-bg-primary border border-border-default rounded pl-8 pr-2 py-1.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent-primary"
               />
             </div>
-            {showSuggestions && filteredSuggestions.length > 0 && (
-              <div className="absolute z-10 left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-bg-primary border border-border-default rounded shadow-lg">
-                {filteredSuggestions.map((b) => (
-                  <button
-                    key={b}
-                    type="button"
-                    onMouseDown={(e) => {
-                      e.preventDefault()
-                      setSourceBranch(b)
-                      setShowSuggestions(false)
-                    }}
-                    className="w-full text-left px-3 py-1.5 text-sm text-text-secondary hover:bg-bg-tertiary font-mono"
-                  >
-                    {b}
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
         )}
 
