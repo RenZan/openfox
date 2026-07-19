@@ -239,7 +239,7 @@ export async function ensureWorkspace(
   // If a specific branch was requested, check it out
   if (branch) {
     await runGit(wsPath, ['checkout', branch]).catch(async () => {
-      const sb = sourceBranch ?? (await getDefaultBranch(projectDir))
+      const sb = sourceBranch ? await resolveAndValidateSourceBranch(wsPath, sourceBranch) : await getDefaultBranch(projectDir)
       await runGit(wsPath, ['checkout', '-b', branch, sb])
     })
   }

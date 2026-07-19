@@ -425,8 +425,9 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
     if (!project) return res.status(404).json({ error: 'Project not found' })
     const { name, sourceBranch } = req.body
     if (!name || typeof name !== 'string') return res.status(400).json({ error: 'name is required' })
-    const { createBranch, resolveAndValidateSourceBranch } = await import('./git/workspace.js')
+    const { createBranch, resolveAndValidateSourceBranch, validateRef } = await import('./git/workspace.js')
     try {
+      await validateRef(project.workdir, name)
       const sb = sourceBranch ? await resolveAndValidateSourceBranch(project.workdir, sourceBranch) : undefined
       await createBranch(project.workdir, name, sb)
       res.json({ branch: name, sourceBranch: sb ?? null })
@@ -442,10 +443,9 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
     const session = sessionManager.getSession(req.params.id)
     if (!session) return res.status(404).json({ error: 'Session not found' })
     const effectiveWorkdir = session.workspace ?? session.workdir
-    const { listBranches, listRemoteBranches } = await import('./git/workspace.js')
+    const { listBranches } = await import('./git/workspace.js')
     const branches = await listBranches(effectiveWorkdir)
-    const remoteBranches = await listRemoteBranches(effectiveWorkdir)
-    res.json({ branches, remoteBranches })
+    res.json({ branches })
   })
 
   /** Switch to an existing branch in the session's effective workdir */
@@ -594,11 +594,11 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
     const session = sessionManager.getSession(req.params.id)
     if (!session) return res.status(404).json({ error: 'Session not found' })
 
-    const { target, branch } = req.body
+    const { target, branch, sourceBranch } = req.body
     if (!target || typeof target !== 'string') return res.status(400).json({ error: 'target is required' })
 
     try {
-      const updated = await sessionManager.switchWorkspace(req.params.id, target, branch)
+      const updated = await sessionManager.switchWorkspace(req.params.id, target, branch, sourceBranch)
       res.json({ session: updated })
     } catch (err) {
       res.status(400).json({ error: err instanceof Error ? err.message : 'Failed to switch workspace' })

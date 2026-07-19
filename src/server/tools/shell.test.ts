@@ -217,6 +217,14 @@ describe('detectEscapePattern', () => {
     expect(detectEscapePattern('git --work-tree=/other/repo status')).toContain('--work-tree')
   })
 
+  it('detects indirect cd escape via cd sub && cd ../..', () => {
+    expect(detectEscapePattern('cd sub && cd ../..')).toContain('cd')
+  })
+
+  it('detects cd with variable path containing ..', () => {
+    expect(detectEscapePattern('cd "$PWD/.."')).toContain('cd')
+  })
+
   it('detects quoted escape patterns (prevents bypass)', () => {
     expect(detectEscapePattern('cd ".." && ls')).toContain('cd')
     expect(detectEscapePattern("cd '..' && ls")).toContain('cd')
@@ -291,6 +299,30 @@ describe('detectGitMutation', () => {
 
   it('detects git push', () => {
     expect(detectGitMutation('git push origin main')).toContain('git push')
+  })
+
+  it('detects git branch -f (force)', () => {
+    expect(detectGitMutation('git branch -f main HEAD~2')).toContain('git branch')
+  })
+
+  it('detects git branch --force', () => {
+    expect(detectGitMutation('git branch --force main HEAD~2')).toContain('git branch')
+  })
+
+  it('detects git update-ref', () => {
+    expect(detectGitMutation('git update-ref refs/heads/main HEAD')).toContain('git update-ref')
+  })
+
+  it('detects git symbolic-ref', () => {
+    expect(detectGitMutation('git symbolic-ref HEAD refs/heads/other')).toContain('git symbolic-ref')
+  })
+
+  it('detects git commands inside double quotes', () => {
+    expect(detectGitMutation('git "checkout" main')).toContain('git')
+  })
+
+  it('detects git commands inside single quotes', () => {
+    expect(detectGitMutation("git 'reset' --hard")).toContain('git')
   })
 
   it('allows safe git commands', () => {

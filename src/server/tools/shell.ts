@@ -24,12 +24,25 @@ const ESCAPE_PATTERNS = [
 
 /**
  * Check if a command contains workspace escape patterns.
+ * Strips quotes globally so patterns like cd "$PWD/.." are caught (becomes cd $PWD/..).
  */
 export function detectEscapePattern(command: string): string | null {
+  // Strip quotes to normalize paths before matching
+  const normalized = command.replace(/'[^']*'/g, ' ').replace(/"[^"]*"/g, ' ')
   for (const pattern of ESCAPE_PATTERNS) {
-    const match = command.match(pattern)
+    const match = normalized.match(pattern)
     if (match) {
       return match[0].trim()
+    }
+  }
+  // Catch indirect escapes like cd sub && cd ../.. and cd "$PWD/.."
+  // Split by command separators and check each segment for cd with ..
+  const segments = command.split(/[;&|]|&&|\|\|/)
+  for (const segment of segments) {
+    const trimmed = segment.trim()
+    // Check if this segment does a cd to a parent/absolute/tilde path
+    if (/^cd\s+.+\.\./.test(trimmed) || /^cd\s+['"]?\//.test(trimmed) || /^cd\s+['"]?~/.test(trimmed) || /^cd\s+['"]?\.\./.test(trimmed)) {
+      return trimmed
     }
   }
   return null
@@ -37,14 +50,12 @@ export function detectEscapePattern(command: string): string | null {
 
 /**
  * Check if a command performs a Git mutation that changes branches or workspace state.
+ * Does NOT strip quotes — doing so would let git "checkout" main bypass detection.
  */
 export function detectGitMutation(command: string): string | null {
-  // Strip content inside quotes to avoid matching strings
-  const stripped = command.replace(/'[^']*'/g, ' ').replace(/"[^"]*"/g, ' ')
-
-  // Check for git commands with mutation verbs
-  const gitMatch = stripped.match(
-    /\bgit\s+(checkout|switch|branch\s+(-[dDmcMC]|--delete|--move|--copy)|-b\s+\S+|merge|rebase|reset|cherry-pick|worktree|clone|pull|push|fetch)/,
+  // Check for git commands with mutation verbs (on the raw command, no quote stripping)
+  const gitMatch = command.match(
+    /\bgit\s+['"]?(?:checkout|switch|branch\s+(-[dDmcMC]|--delete|--move|--copy|--force|-f)|-b\s+\S+|merge|rebase|reset|cherry-pick|worktree|clone|pull|push|fetch|update-ref|symbolic-ref)/,
   )
   if (gitMatch) {
     return gitMatch[0].trim()

@@ -54,7 +54,7 @@ describe('SessionManager', () => {
     getLspManagerMock.mockClear()
     shutdownLspManagerMock.mockClear()
     mockProviderManager.getCurrentModelContext.mockClear()
-    mockGetGitBranch.mockReturnValue(null) // default: no branch
+    mockGetGitBranch.mockResolvedValue(null) // default: no branch
   })
 
   afterEach(async () => {

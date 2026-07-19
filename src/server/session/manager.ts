@@ -219,6 +219,12 @@ export class SessionManager {
     // Build full session object
     const session = this.buildSessionFromDb(dbSession)
 
+    // Persist the current branch asynchronously — the session is valid without it,
+    // and checkBranchConsistency will work once it's set.
+    getGitBranch(effectiveWorkdir).then((branch) => {
+      if (branch) updateSessionBranch(session.id, branch)
+    })
+
     this.emit({ type: 'session_created', session })
 
     return session
