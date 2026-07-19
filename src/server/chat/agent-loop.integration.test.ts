@@ -365,4 +365,58 @@ describe('agentLoop integration', () => {
       .filter((e: any) => e.type === 'chat.done' && e.data?.reason === 'complete')
     expect(chatDoneEvents.length).toBeGreaterThanOrEqual(1)
   })
+
+  it('continues loop after a failed tool call and allows recovery in next iteration', async () => {
+    const append = vi.fn()
+    const failedToolCall: ToolCall = {
+      id: 'call-1',
+      name: 'edit_file',
+      arguments: { path: 'test.ts', old_string: 'foo', new_string: 'bar' },
+    }
+    const successfulToolCall: ToolCall = {
+      id: 'call-2',
+      name: 'edit_file',
+      arguments: { path: 'test.ts', old_string: 'foo', new_string: 'bar' },
+    }
+
+    ;(consumeStreamGenerator as any)
+      .mockResolvedValueOnce(makeStreamResult({ toolCalls: [failedToolCall], finishReason: 'tool_calls' }))
+      .mockResolvedValueOnce(makeStreamResult({ toolCalls: [successfulToolCall], finishReason: 'tool_calls' }))
+      .mockResolvedValueOnce(makeStreamResult({ content: 'Done', finishReason: 'stop' }))
+
+    // First execution: edit_file fails (old_string not found)
+    // Second execution: edit_file succeeds after model corrected the old_string
+    ;(executeTools as any)
+      .mockResolvedValueOnce({
+        toolMessages: [
+          { role: 'tool', content: 'Error: old_string not found in file.', source: 'history', toolCallId: 'call-1' },
+        ],
+        stepDoneCalled: false,
+      })
+      .mockResolvedValueOnce({
+        toolMessages: [
+          {
+            role: 'tool',
+            content: 'Successfully replaced 1 occurrence(s) in test.ts',
+            source: 'history',
+            toolCallId: 'call-2',
+          },
+        ],
+        stepDoneCalled: false,
+      })
+
+    await runTopLevelAgentLoop(makeConfig({ append }), turnMetrics)
+
+    // Should have called streamLLM 3 times (failed tool → successful tool → final)
+    expect(consumeStreamGenerator).toHaveBeenCalledTimes(3)
+
+    // Failed tool result did not set stepDoneCalled, so loop continued
+    expect(executeTools).toHaveBeenCalledTimes(2)
+
+    // Should emit chat.done at the end (normal completion)
+    const chatDoneEvents = append.mock.calls
+      .map((args: unknown[]) => args[0] as any)
+      .filter((e: any) => e.type === 'chat.done' && e.data?.reason === 'complete')
+    expect(chatDoneEvents.length).toBeGreaterThanOrEqual(1)
+  })
 })
