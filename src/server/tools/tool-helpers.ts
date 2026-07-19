@@ -4,6 +4,7 @@ import type { Tool, ToolContext } from './types.js'
 import type { LLMToolDefinition } from '../llm/types.js'
 import type { SessionManager } from '../session/manager.js'
 import { requestPathAccess, PathAccessDeniedError } from './path-security.js'
+import { AskUserInterrupt } from './ask.js'
 
 /**
  * Helper utilities provided to tool handlers by createTool.
@@ -190,8 +191,8 @@ export function createTool<TArgs>(name: string, definition: LLMToolDefinition, h
       try {
         return await handler(args as TArgs, context, helpers)
       } catch (error) {
-        // Re-throw path access errors for orchestrator to handle with helpful message
-        if (error instanceof PathAccessDeniedError) {
+        // Re-throw path access and ask-user errors for orchestrator to handle
+        if (error instanceof PathAccessDeniedError || error instanceof AskUserInterrupt) {
           throw error
         }
 

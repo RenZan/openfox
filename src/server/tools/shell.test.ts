@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { hasBackgroundAmpersand, runCommandTool } from './shell.js'
+import { hasBackgroundAmpersand, runCommandTool, detectEscapePattern, detectGitMutation } from './shell.js'
 import type { ToolContext } from './types.js'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -190,4 +190,114 @@ describe('runCommandTool truncation with ANSI codes', () => {
     expect(result.truncated).toBe(false)
     expect(result.output).toContain('[Exit code: 0]')
   }, 15000)
+})
+
+describe('detectEscapePattern', () => {
+  it('detects cd .. as escape', () => {
+    expect(detectEscapePattern('cd .. && ls')).toContain('cd')
+  })
+
+  it('detects cd / as escape', () => {
+    expect(detectEscapePattern('cd /tmp')).toContain('cd')
+  })
+
+  it('detects cd ~ as escape', () => {
+    expect(detectEscapePattern('cd ~/other-project')).toContain('cd')
+  })
+
+  it('detects git -C as escape', () => {
+    expect(detectEscapePattern('git -C /some/path status')).toContain('git -C')
+  })
+
+  it('detects GIT_DIR environment variable', () => {
+    expect(detectEscapePattern('GIT_DIR=/other/repo git log')).toContain('GIT_DIR')
+  })
+
+  it('detects git --work-tree', () => {
+    expect(detectEscapePattern('git --work-tree=/other/repo status')).toContain('--work-tree')
+  })
+
+  it('detects quoted escape patterns (prevents bypass)', () => {
+    expect(detectEscapePattern('cd ".." && ls')).toContain('cd')
+    expect(detectEscapePattern("cd '..' && ls")).toContain('cd')
+    expect(detectEscapePattern('cd "/etc"')).toContain('cd')
+    expect(detectEscapePattern("cd '/etc'")).toContain('cd')
+    expect(detectEscapePattern('cd "~"')).toContain('cd')
+  })
+
+  it('allows safe patterns', () => {
+    expect(detectEscapePattern('ls')).toBeNull()
+    expect(detectEscapePattern('cd src && npm run test')).toBeNull()
+    expect(detectEscapePattern('cat file.txt')).toBeNull()
+  })
+})
+
+describe('detectGitMutation', () => {
+  it('detects git checkout', () => {
+    expect(detectGitMutation('git checkout main')).toContain('git checkout')
+  })
+
+  it('detects git switch', () => {
+    expect(detectGitMutation('git switch feature')).toContain('git switch')
+  })
+
+  it('detects git branch -d', () => {
+    expect(detectGitMutation('git branch -d old-feature')).toContain('git branch')
+  })
+
+  it('detects git branch -D', () => {
+    expect(detectGitMutation('git branch -D old-feature')).toContain('git branch')
+  })
+
+  it('detects git branch -m (rename)', () => {
+    expect(detectGitMutation('git branch -m old-name new-name')).toContain('git branch')
+  })
+
+  it('detects git branch -M (force rename)', () => {
+    expect(detectGitMutation('git branch -M old-name new-name')).toContain('git branch')
+  })
+
+  it('detects git branch -c (copy)', () => {
+    expect(detectGitMutation('git branch -c old-name new-name')).toContain('git branch')
+  })
+
+  it('detects git branch -C (force copy)', () => {
+    expect(detectGitMutation('git branch -C old-name new-name')).toContain('git branch')
+  })
+
+  it('detects git merge', () => {
+    expect(detectGitMutation('git merge feature')).toContain('git merge')
+  })
+
+  it('detects git rebase', () => {
+    expect(detectGitMutation('git rebase main')).toContain('git rebase')
+  })
+
+  it('detects git reset', () => {
+    expect(detectGitMutation('git reset --hard HEAD~1')).toContain('git reset')
+  })
+
+  it('detects git worktree', () => {
+    expect(detectGitMutation('git worktree add /tmp/test main')).toContain('git worktree')
+  })
+
+  it('detects git clone', () => {
+    expect(detectGitMutation('git clone https://example.com/repo')).toContain('git clone')
+  })
+
+  it('detects git pull', () => {
+    expect(detectGitMutation('git pull origin main')).toContain('git pull')
+  })
+
+  it('detects git push', () => {
+    expect(detectGitMutation('git push origin main')).toContain('git push')
+  })
+
+  it('allows safe git commands', () => {
+    expect(detectGitMutation('git status')).toBeNull()
+    expect(detectGitMutation('git log --oneline')).toBeNull()
+    expect(detectGitMutation('git diff')).toBeNull()
+    expect(detectGitMutation('git --version')).toBeNull()
+    expect(detectGitMutation('git branch --show-current')).toBeNull()
+  })
 })

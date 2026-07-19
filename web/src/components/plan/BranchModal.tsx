@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSessionStore } from '../../stores/session'
 import { authFetch } from '../../lib/api'
 import { useModalState } from '../../hooks/useModalState'
@@ -33,18 +33,38 @@ export function BranchModal({ isOpen, onClose, sessionId }: BranchModalProps) {
     resetState,
   } = useModalState(onClose)
   const [branches, setBranches] = useState<BranchInfo[]>([])
+  const [remoteBranches, setRemoteBranches] = useState<string[]>([])
+  const [sourceBranch, setSourceBranch] = useState('')
+  const [showSuggestions, setShowSuggestions] = useState(false)
+
+  const allBranches = useMemo(() => {
+    const local = branches.map((b) => b.name)
+    const combined = [...new Set([...local, ...remoteBranches])]
+    return combined.sort()
+  }, [branches, remoteBranches])
+
+  const filteredSuggestions = useMemo(() => {
+    if (!sourceBranch) return []
+    const q = sourceBranch.toLowerCase()
+    return allBranches.filter((b) => b.toLowerCase().includes(q)).slice(0, 10)
+  }, [sourceBranch, allBranches])
 
   useEffect(() => {
     if (!isOpen) return
     resetState()
+    setSourceBranch('')
+    setBranches([])
+    setRemoteBranches([])
     authFetch(`/api/sessions/${sessionId}/branches`)
       .then((r) => r.json())
-      .then((data: { branches: BranchInfo[] }) => {
+      .then((data: { branches: BranchInfo[]; remoteBranches: string[] }) => {
         setBranches(data.branches)
+        setRemoteBranches(data.remoteBranches)
         setLoading(false)
       })
       .catch(() => {
         setBranches([])
+        setRemoteBranches([])
         setLoading(false)
       })
   }, [isOpen, sessionId, resetState, setLoading])
@@ -79,10 +99,12 @@ export function BranchModal({ isOpen, onClose, sessionId }: BranchModalProps) {
     setError(null)
     setBusy(true)
     try {
+      const body: Record<string, string> = { name: newName.trim() }
+      if (sourceBranch) body.sourceBranch = sourceBranch
       const res = await authFetch(`/api/sessions/${sessionId}/checkout-new`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newName.trim() }),
+        body: JSON.stringify(body),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Failed to create branch' }))
@@ -96,7 +118,7 @@ export function BranchModal({ isOpen, onClose, sessionId }: BranchModalProps) {
       setError(e instanceof Error ? e.message : 'Failed to create branch')
       setBusy(false)
     }
-  }, [newName, sessionId, refreshSession, onClose, setError, setBusy])
+  }, [newName, sourceBranch, sessionId, refreshSession, onClose, setError, setBusy])
 
   return (
     <ModalShell isOpen={isOpen} onClose={handleClose} title="Switch Branch" busy={busy} loading={loading}>
@@ -139,6 +161,45 @@ export function BranchModal({ isOpen, onClose, sessionId }: BranchModalProps) {
           canCreate={canCreate}
           busy={busy}
         />
+
+        {newName.trim() && (
+          <div className="mt-2 relative">
+            <label className="text-xs text-text-muted mb-1 block">Source branch (optional)</label>
+            <div className="relative">
+              <BranchIcon className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" />
+              <input
+                type="text"
+                value={sourceBranch}
+                onChange={(e) => {
+                  setSourceBranch(e.target.value)
+                  setShowSuggestions(true)
+                }}
+                onFocus={() => setShowSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                placeholder="origin/main (default)"
+                className="w-full text-sm bg-bg-primary border border-border-default rounded pl-8 pr-2 py-1.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent-primary"
+              />
+            </div>
+            {showSuggestions && filteredSuggestions.length > 0 && (
+              <div className="absolute z-10 left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-bg-primary border border-border-default rounded shadow-lg">
+                {filteredSuggestions.map((b) => (
+                  <button
+                    key={b}
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault()
+                      setSourceBranch(b)
+                      setShowSuggestions(false)
+                    }}
+                    className="w-full text-left px-3 py-1.5 text-sm text-text-secondary hover:bg-bg-tertiary font-mono"
+                  >
+                    {b}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {error && <p className="mt-3 text-sm text-accent-error bg-accent-error/10 p-2 rounded">{error}</p>}
       </div>

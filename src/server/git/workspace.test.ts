@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 import {
   getGitBranch,
+  getDefaultBranch,
   validateRef,
   ensureWorkspace,
   listBranches,
@@ -158,11 +159,12 @@ describe('ensureWorkspace', () => {
     expect(spawn).toHaveBeenCalledTimes(2)
   })
 
-  it('creates branch in workspace when requested branch does not exist', async () => {
+  it('uses getDefaultBranch as source when requested branch does not exist', async () => {
     vi.mocked(spawn)
       .mockReturnValueOnce(makeMockProc('') as any) // git clone --shared
       .mockReturnValueOnce(makeMockProc('', 'fatal: not a git repository', 128) as any) // git checkout fails
-      .mockReturnValueOnce(makeMockProc('main\n') as any) // getGitBranch (source)
+      .mockReturnValueOnce(makeMockProc('') as any) // git fetch origin --no-tags --quiet (getDefaultBranch)
+      .mockReturnValueOnce(makeMockProc('refs/remotes/origin/main\n') as any) // git symbolic-ref origin/HEAD (getDefaultBranch)
       .mockReturnValueOnce(makeMockProc('') as any) // git checkout -b succeeds
     vi.mocked(mkdir).mockResolvedValue(undefined)
     vi.mocked(stat)
@@ -184,5 +186,33 @@ describe('ensureWorkspace', () => {
 
     const result = await ensureWorkspace(CWD, 'existing-ws', PROJECT_NAME)
     expect(result.name).toBe('existing-ws')
+  })
+})
+
+describe('getDefaultBranch', () => {
+  it('returns origin/HEAD after fetch', async () => {
+    vi.mocked(spawn)
+      .mockReturnValueOnce(makeMockProc('') as any) // git fetch (runGit)
+      .mockReturnValueOnce(makeMockProc('refs/remotes/origin/main\n') as any) // git symbolic-ref
+    const result = await getDefaultBranch(CWD)
+    expect(result).toBe('main')
+  })
+
+  it('falls back to current branch when origin/HEAD is not set', async () => {
+    vi.mocked(spawn)
+      .mockReturnValueOnce(makeMockProc('') as any) // git fetch (runGit)
+      .mockReturnValueOnce(makeMockProc('', '', 1) as any) // git symbolic-ref fails
+      .mockReturnValueOnce(makeMockProc('develop\n') as any) // git rev-parse (current branch)
+    const result = await getDefaultBranch(CWD)
+    expect(result).toBe('develop')
+  })
+
+  it('falls back to "main" when nothing else works', async () => {
+    vi.mocked(spawn)
+      .mockReturnValueOnce(makeMockProc('') as any) // git fetch (runGit)
+      .mockReturnValueOnce(makeMockProc('', '', 1) as any) // git symbolic-ref fails
+      .mockReturnValueOnce(makeMockProc('', '', 1) as any) // git rev-parse fails
+    const result = await getDefaultBranch(CWD)
+    expect(result).toBe('main')
   })
 })

@@ -10,6 +10,49 @@ import { terminateProcessTree } from '../utils/process-tree.js'
 import { stripTailPipe } from './shell-tail.js'
 import { getSetting, SETTINGS_KEYS } from '../db/settings.js'
 
+/**
+ * Patterns that escape the effective workspace directory.
+ * Handles optional quotes around paths to prevent bypass via quoting.
+ */
+const ESCAPE_PATTERNS = [
+  /\bcd\s+['"]?(?:\.\.|\/|~)/,
+  /\bgit\s+-C\s+/,
+  /GIT_DIR=/,
+  /\bgit\s+--work-tree[\s=]/,
+  /\bgit\s+--git-dir[\s=]/,
+]
+
+/**
+ * Check if a command contains workspace escape patterns.
+ */
+export function detectEscapePattern(command: string): string | null {
+  for (const pattern of ESCAPE_PATTERNS) {
+    const match = command.match(pattern)
+    if (match) {
+      return match[0].trim()
+    }
+  }
+  return null
+}
+
+/**
+ * Check if a command performs a Git mutation that changes branches or workspace state.
+ */
+export function detectGitMutation(command: string): string | null {
+  // Strip content inside quotes to avoid matching strings
+  const stripped = command.replace(/'[^']*'/g, ' ').replace(/"[^"]*"/g, ' ')
+
+  // Check for git commands with mutation verbs
+  const gitMatch = stripped.match(
+    /\bgit\s+(checkout|switch|branch\s+(-[dDmcMC]|--delete|--move|--copy)|-b\s+\S+|merge|rebase|reset|cherry-pick|worktree|clone|pull|push|fetch)/,
+  )
+  if (gitMatch) {
+    return gitMatch[0].trim()
+  }
+
+  return null
+}
+
 let rtkAvailable: boolean | undefined
 
 async function checkRtkAvailability(): Promise<boolean> {
@@ -97,6 +140,22 @@ export const runCommandTool = createTool<RunCommandArgs>(
     if (hasBackgroundAmpersand(args.command)) {
       return helpers.error(
         'Use background_process tool (action: "start") for background/long-running commands instead of \'&\'. See the tool description for details.',
+      )
+    }
+
+    // Detect workspace escape patterns (cd ../.., git -C, GIT_DIR, etc.)
+    const escapeMatch = detectEscapePattern(args.command)
+    if (escapeMatch) {
+      return helpers.error(
+        `Command contains workspace escape pattern "${escapeMatch}". Use the workspace tool to switch workspaces directly rather than escaping the current workspace.`,
+      )
+    }
+
+    // Detect Git mutations (checkout, switch, branch creation, etc.)
+    const mutationMatch = detectGitMutation(args.command)
+    if (mutationMatch) {
+      return helpers.error(
+        `Command "${mutationMatch}" modifies Git state, which is not allowed directly. Use the workspace tool to switch workspaces or branches. This ensures consistency across sessions and prevents cross-session branch conflicts.`,
       )
     }
 

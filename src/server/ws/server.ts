@@ -620,11 +620,9 @@ export function createWebSocketServer(
 
       // Update activeWorkdir when workspace changed so git polling picks up the right dir
       const effectiveWorkdir = updatedSession.workspace ?? updatedSession.workdir
-      let workspaceChanged = false
 
       for (const [, client] of clients) {
         if (client.activeSessionId === updatedSession.id && client.activeWorkdir !== effectiveWorkdir) {
-          workspaceChanged = true
           const prevWorkdir = client.activeWorkdir
           client.activeWorkdir = effectiveWorkdir
           if (prevWorkdir) {
@@ -643,9 +641,9 @@ export function createWebSocketServer(
         createSessionStateMessage(updatedSession, messages, pendingConfirmations, pendingQuestions),
       )
 
-      // If workspace changed, fetch git status in background and push as git.status message
-      // This avoids blocking session.state broadcast on git IO
-      if (workspaceChanged && effectiveWorkdir) {
+      // Always send git.status after a session update to sync workspace/branch in the UI,
+      // even when the workspace path hasn't changed (e.g. branch-only change).
+      if (effectiveWorkdir) {
         ;(async () => {
           const branch = await moduleGitBranch(effectiveWorkdir)
           if (!branch) return

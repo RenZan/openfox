@@ -77,6 +77,17 @@ export function listBranches(cwd: string): Promise<BranchInfo[]> {
   })
 }
 
+export function listRemoteBranches(cwd: string): Promise<string[]> {
+  return captureStdout(cwd, ['branch', '-r', '--format', '%(refname:short)']).then((out) => {
+    if (!out) return []
+    return out
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map((b) => b.trim())
+  })
+}
+
 /**
  * Count how many commits the workspace's current branch is behind the same
  * branch on origin (the original repo). Returns 0 if up to date, null if the
@@ -93,6 +104,23 @@ export function validateRef(cwd: string, name: string): Promise<void> {
   return runGit(cwd, ['check-ref-format', `refs/heads/${name}`])
 }
 
+/**
+ * Resolve the default branch for a project directory.
+ * Fetches origin to ensure remote refs are up to date, then reads origin/HEAD.
+ * Falls back to the current branch, then 'main'.
+ */
+export async function getDefaultBranch(projectDir: string): Promise<string> {
+  await runGit(projectDir, ['fetch', 'origin', '--no-tags', '--quiet']).catch(() => {})
+  const originHead = await captureStdout(projectDir, ['symbolic-ref', 'refs/remotes/origin/HEAD'])
+  if (originHead) {
+    const branch = originHead.trim().replace('refs/remotes/origin/', '')
+    if (branch) return branch
+  }
+  const current = await getGitBranch(projectDir)
+  if (current) return current
+  return 'main'
+}
+
 export function validateWorkspaceName(name: string): void {
   if (!name || typeof name !== 'string') throw new Error('Workspace name is required')
   if (name.includes('/') || name.includes('\\')) throw new Error('Workspace name cannot contain path separators')
@@ -105,8 +133,9 @@ export function checkoutBranch(cwd: string, name: string): Promise<void> {
   return runGit(cwd, ['checkout', name])
 }
 
-export function createBranch(cwd: string, name: string): Promise<void> {
-  return runGit(cwd, ['checkout', '-b', name])
+export function createBranch(cwd: string, name: string, sourceBranch?: string): Promise<void> {
+  const args = sourceBranch ? ['checkout', '-b', name, sourceBranch] : ['checkout', '-b', name]
+  return runGit(cwd, args)
 }
 
 export interface WorkspaceInfo {
@@ -154,6 +183,7 @@ export async function ensureWorkspace(
   name: string,
   projectName: string,
   branch?: string,
+  sourceBranch?: string,
 ): Promise<WorkspaceResult> {
   const workspacesDir = getWorkspacesDir(projectName)
   const wsPath = resolve(workspacesDir, name)
@@ -180,8 +210,8 @@ export async function ensureWorkspace(
   // If a specific branch was requested, check it out
   if (branch) {
     await runGit(wsPath, ['checkout', branch]).catch(async () => {
-      const sourceBranch = (await getGitBranch(projectDir)) ?? 'main'
-      await runGit(wsPath, ['checkout', '-b', branch, sourceBranch])
+      const sb = sourceBranch ?? (await getDefaultBranch(projectDir))
+      await runGit(wsPath, ['checkout', '-b', branch, sb])
     })
   }
 

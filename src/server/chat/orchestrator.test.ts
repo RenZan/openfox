@@ -218,6 +218,8 @@ function createSessionManager(state: Record<string, any>) {
     addTokensUsed: vi.fn(),
     getCurrentModelSettings: vi.fn(() => undefined),
     getLspManager: vi.fn(() => ({ name: 'lsp' })),
+    getEffectiveWorkdir: vi.fn((_id: string) => state['current']?.workspace ?? state['current']?.workdir ?? '/test'),
+    checkBranchConsistency: vi.fn().mockResolvedValue(null),
     setRunning: vi.fn(),
     getCachedPrompt: vi.fn(() => undefined),
     setCachedPrompt: vi.fn(),

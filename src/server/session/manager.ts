@@ -30,12 +30,14 @@ import {
   updateSessionRunning,
   updateSessionCachedPrompt,
   updateSessionWorkdir,
+  updateSessionBranch,
   getSessionCachedPrompt,
   type DangerLevel,
 } from '../db/sessions.js'
 import { getProject } from '../db/projects.js'
 import {
   ensureWorkspace,
+  getDefaultBranch,
   getGitBranch,
   getCommitsBehind,
   runGit,
@@ -140,6 +142,38 @@ export class SessionManager {
 
   getCurrentModelContext(): number {
     return this.providerManager.getCurrentModelContext()
+  }
+
+  /**
+   * Get the effective working directory for a session.
+   * Uses workspace path when active, otherwise the project workdir.
+   */
+  getEffectiveWorkdir(sessionId: string): string {
+    const session = this.requireSession(sessionId)
+    return session.workspace ?? session.workdir
+  }
+
+  /**
+   * Return (effectiveWorkdir, actualBranch) for a session.
+   */
+  async getActualBranchPair(sessionId: string): Promise<{ workdir: string; branch: string | null }> {
+    const effectiveWorkdir = this.getEffectiveWorkdir(sessionId)
+    const branch = await getGitBranch(effectiveWorkdir)
+    return { workdir: effectiveWorkdir, branch }
+  }
+
+  /**
+   * Check that the session's persisted branch matches the actual branch on disk.
+   * If they differ (and persisted branch exists), returns a warning message.
+   */
+  async checkBranchConsistency(sessionId: string): Promise<string | null> {
+    const session = this.getSession(sessionId)
+    if (!session?.branch) return null
+    const actualBranch = await getGitBranch(session.workspace ?? session.workdir)
+    if (actualBranch && actualBranch !== session.branch) {
+      return `Branch mismatch: session expects "${session.branch}" but workspace is on "${actualBranch}". The workspace branch was changed externally.`
+    }
+    return null
   }
 
   // ============================================================================
@@ -984,6 +1018,29 @@ export class SessionManager {
     return getOrCreateLspManager(sessionId, effectiveWorkdir)
   }
 
+  private async applyBranchIfNeeded(
+    projectDir: string,
+    projectName: string,
+    workspaceName: string,
+    branch: string,
+    sourceBranch?: string,
+  ): Promise<void> {
+    const wsPath = resolve(getWorkspacesDir(projectName), workspaceName)
+    const currentBranch = await getGitBranch(wsPath)
+    if (currentBranch !== branch) {
+      try {
+        await runGit(wsPath, ['checkout', branch]).catch(async () => {
+          const sb = sourceBranch ?? (await getDefaultBranch(projectDir))
+          await runGit(wsPath, ['checkout', '-b', branch, sb])
+        })
+      } catch (err) {
+        throw new Error(
+          `Failed to apply branch "${branch}" to workspace "${workspaceName}": ${err instanceof Error ? err.message : String(err)}`,
+        )
+      }
+    }
+  }
+
   // ============================================================================
   // Workspace Lifecycle
   // ============================================================================
@@ -994,55 +1051,64 @@ export class SessionManager {
    * Emits a single type of event — switching is always "opening" a workspace.
    * Switches are serialized per-session to prevent race conditions.
    */
-  async switchWorkspace(sessionId: string, target: string, branch?: string): Promise<Session> {
-    // Validate workspace name for named targets
-    if (target !== 'original') {
-      validateWorkspaceName(target)
-    }
+  async switchWorkspace(sessionId: string, target: string, branch?: string, sourceBranch?: string): Promise<Session> {
+    if (target !== 'original') validateWorkspaceName(target)
 
-    // Per-session switch serialization
     const existingLock = this.switchLocks.get(sessionId)
-    if (existingLock) {
-      await existingLock
-    }
+    if (existingLock) await existingLock
 
     const lockPromise = (async () => {
       const session = this.requireSession(sessionId)
       const project = getProject(session.projectId)
       if (!project) throw new Error(`Project not found: ${session.projectId}`)
 
-      // If already in the target workspace, no-op
-      if (target === 'original' && !session.workspace) return session
-      if (target !== 'original' && session.workspace?.split('/').pop() === target) return session
+      const isBranchChangeOnly =
+        target !== 'original' && session.workspace?.split('/').pop() === target && branch !== undefined
+
+      if (target === 'original' && !session.workspace && !branch) return session
+      if (target !== 'original' && session.workspace?.split('/').pop() === target && !branch) return session
+      if (isBranchChangeOnly) {
+        const currentBranch = await getGitBranch(session.workspace ?? session.workdir)
+        if (currentBranch === branch) return session
+      }
 
       const previousPath = session.workspace
 
-      // Stop previous workspace's dev server if any
-      if (previousPath) {
-        try {
-          await devServerManager.stop(previousPath)
-        } catch (err) {
-          logger.error('Error stopping dev server for workspace switch', {
-            sessionId,
-            workspace: previousPath,
-            error: err,
+      if (previousPath && !isBranchChangeOnly) {
+        const otherSessionsUsingPath = this.listSessions().filter(
+          (s) => s.id !== sessionId && s.workspace === previousPath,
+        )
+        if (otherSessionsUsingPath.length === 0) {
+          try {
+            await devServerManager.stop(previousPath)
+          } catch (err) {
+            logger.error('Error stopping dev server for workspace switch', {
+              sessionId,
+              workspace: previousPath,
+              error: err,
+            })
+          }
+        } else {
+          logger.info('Skipping dev server stop — other sessions still use path', {
+            path: previousPath,
+            otherSessions: otherSessionsUsingPath.map((s) => s.id),
           })
         }
       }
 
       if (target === 'original') {
         updateSessionWorkdir(sessionId, project.workdir, null)
-      } else {
-        // Workspace creation lock per project+name to prevent concurrent clones
+      } else if (!isBranchChangeOnly) {
         const createLockKey = `${project.name}:${target}`
         const existingCreateLock = this.workspaceCreationLocks.get(createLockKey)
-        if (existingCreateLock) {
-          await existingCreateLock
-        }
+        if (existingCreateLock) await existingCreateLock
+
         const createLockPromise = (async () => {
           const exists = await workspaceExists(project.name, target)
           if (!exists) {
-            await ensureWorkspace(project.workdir, target, project.name, branch)
+            await ensureWorkspace(project.workdir, target, project.name, branch, sourceBranch)
+          } else if (branch) {
+            await this.applyBranchIfNeeded(project.workdir, project.name, target, branch, sourceBranch)
           }
         })()
         this.workspaceCreationLocks.set(createLockKey, createLockPromise)
@@ -1053,20 +1119,24 @@ export class SessionManager {
         }
         const wsPath = resolve(getWorkspacesDir(project.name), target)
         updateSessionWorkdir(sessionId, project.workdir, wsPath)
+      } else {
+        // Branch-only change on the current workspace — no dev server stop or db update
+        await this.applyBranchIfNeeded(project.workdir, project.name, target, branch!, sourceBranch)
       }
 
-      // Restart LSP to pick up the new workdir
       try {
         await shutdownLspManager(sessionId)
       } catch (err) {
         logger.error('Error shutting down LSP for workspace switch', { sessionId, error: err })
       }
 
-      // Read the actual branch we're now on
       const effectiveWorkdir = target === 'original' ? project.workdir : resolve(getWorkspacesDir(project.name), target)
       const actualBranch = await getGitBranch(effectiveWorkdir)
 
-      // Check if the workspace is behind the original (staleness hint)
+      if (actualBranch) {
+        updateSessionBranch(sessionId, actualBranch)
+      }
+
       let stalenessHint = ''
       if (target !== 'original' && actualBranch) {
         await runGit(effectiveWorkdir, ['fetch', 'origin', '--no-tags', '--quiet']).catch(() => {})
@@ -1101,9 +1171,7 @@ export class SessionManager {
 
     this.switchLocks.set(sessionId, lockPromise)
     lockPromise.finally(() => {
-      if (this.switchLocks.get(sessionId) === lockPromise) {
-        this.switchLocks.delete(sessionId)
-      }
+      if (this.switchLocks.get(sessionId) === lockPromise) this.switchLocks.delete(sessionId)
     })
 
     return lockPromise
