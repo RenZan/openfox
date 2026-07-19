@@ -297,10 +297,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
           const existingCross = get().crossSessionConfirmations
           const crossCleanup = { ...existingCross }
           if (oldSessionId && oldConfirmations.length > 0) {
-            crossCleanup[oldSessionId] = [
-              ...(crossCleanup[oldSessionId] ?? []),
-              ...oldConfirmations,
-            ]
+            crossCleanup[oldSessionId] = [...(crossCleanup[oldSessionId] ?? []), ...oldConfirmations]
           }
           cancelStreamingFlush()
           set({
@@ -393,6 +390,24 @@ export const useSessionStore = create<SessionState>((set, get) => {
             }),
             sessionsHasMore: projectId ? (data.hasMore ?? false) : true,
           }))
+
+          // Restore cross-session confirmation state from server
+          const pendingBySession = data.pendingConfirmationsBySession as
+            | Record<string, PendingPathConfirmation[]>
+            | undefined
+          if (pendingBySession) {
+            const currentSessionId = get().currentSession?.id
+            const crossSessionConfirmations: Record<string, PendingPathConfirmation[]> = {}
+            for (const [sid, confs] of Object.entries(pendingBySession)) {
+              if (sid !== currentSessionId) {
+                crossSessionConfirmations[sid] = confs
+              }
+            }
+            set({
+              crossSessionConfirmations,
+              sessionsWithPendingConfirmations: Object.keys(crossSessionConfirmations),
+            })
+          }
         } catch {
           /* empty */
         } finally {

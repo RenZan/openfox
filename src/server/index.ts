@@ -491,6 +491,7 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
 
   app.get('/api/sessions', async (req, res) => {
     const { getRecentUserPromptsForSession } = await import('./events/index.js')
+    const { getPendingConfirmationsBySession } = await import('./tools/path-security.js')
 
     const projectId = req.query['projectId'] as string | undefined
     const limit = Math.min(parseInt(req.query['limit'] as string) || 20, 100)
@@ -512,7 +513,26 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
       recentUserPrompts: getRecentUserPromptsForSession(session.id, 10),
     }))
 
-    res.json({ sessions: sessionsWithPrompts, hasMore })
+    // Collect pending confirmations for returned sessions
+    const allPending = getPendingConfirmationsBySession()
+    const pendingConfirmationsBySession: Record<
+      string,
+      Array<{
+        callId: string
+        tool: string
+        paths: string[]
+        workdir: string
+        reason: 'outside_workdir' | 'sensitive_file' | 'both' | 'dangerous_command' | 'git_no_verify'
+      }>
+    > = {}
+    for (const s of sessions) {
+      const confs = allPending[s.id]
+      if (confs) {
+        pendingConfirmationsBySession[s.id] = confs
+      }
+    }
+
+    res.json({ sessions: sessionsWithPrompts, hasMore, pendingConfirmationsBySession })
   })
 
   app.post('/api/sessions', async (req, res) => {
