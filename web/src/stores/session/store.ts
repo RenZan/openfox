@@ -6,7 +6,8 @@ import { wsClient } from '../../lib/ws'
 import { useConfigStore } from '../config'
 import { useProjectStore } from '../project'
 import { useBackgroundProcessesStore } from '../background-processes'
-import type { SessionState } from './types'
+import { useSettingsStore, SETTINGS_KEYS, initialSettingsReady } from '../settings'
+import type { SessionState, PendingPathConfirmation } from './types'
 import { getBuffer, setFlushFn, cancelStreamingFlush } from './streamingBuffer'
 import { handleServerMessage as handleMessage } from './messageHandler'
 
@@ -137,6 +138,10 @@ export const useSessionStore = create<SessionState>((set, get) => {
     sessionsHasMore: true,
     sessionsPaginationLoading: false,
     pendingSessionCreate: false as boolean | string,
+    hiddenDisplayItemCount: 0,
+    totalMessageCount: 0,
+    totalDisplayItemCount: 0,
+    isPartial: false,
 
     connect: async () => {
       const status = get().connectionStatus
@@ -311,7 +316,32 @@ export const useSessionStore = create<SessionState>((set, get) => {
           set({ unreadSessionIds: get().unreadSessionIds.filter((id) => id !== sessionId) })
         }
 
-        const res = await authFetch(`/api/sessions/${sessionId}`)
+        let maxVisibleItems: number | undefined
+        const rawSetting = useSettingsStore.getState().settings[SETTINGS_KEYS.DISPLAY_MAX_VISIBLE_ITEMS]
+        if (rawSetting !== undefined && rawSetting !== '') {
+          const parsed = parseInt(rawSetting, 10)
+          if (!Number.isNaN(parsed) && parsed > 0) {
+            maxVisibleItems = parsed
+          }
+        } else if (useSettingsStore.getState().loading[SETTINGS_KEYS.DISPLAY_MAX_VISIBLE_ITEMS]) {
+          try {
+            const timeoutPromise = new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('timeout')), 500),
+            )
+            await Promise.race([initialSettingsReady, timeoutPromise.catch(() => {})])
+            const retryRaw = useSettingsStore.getState().settings[SETTINGS_KEYS.DISPLAY_MAX_VISIBLE_ITEMS]
+            if (retryRaw !== undefined && retryRaw !== '') {
+              const parsed = parseInt(retryRaw, 10)
+              if (!Number.isNaN(parsed) && parsed > 0) {
+                maxVisibleItems = parsed
+              }
+            }
+          } catch {
+            /* timeout: use fallback, no query param */
+          }
+        }
+        const params = maxVisibleItems !== undefined ? `?maxVisibleItems=${maxVisibleItems}` : ''
+        const res = await authFetch(`/api/sessions/${sessionId}${params}`)
         if (!res.ok) return
 
         const data = await res.json()
@@ -321,7 +351,12 @@ export const useSessionStore = create<SessionState>((set, get) => {
           messages: loadedMessages,
           contextState: data.contextState,
           queuedMessages: (data.queueState as QueuedMessage[] | undefined) ?? [],
+          pendingPathConfirmations: (data.pendingConfirmations ?? []) as PendingPathConfirmation[],
           pendingQuestions: (data.pendingQuestions ?? []) as PendingQuestionPayload[],
+          isPartial: data.isPartial ?? false,
+          totalMessageCount: (data.totalMessageCount as number | undefined) ?? loadedMessages.length,
+          totalDisplayItemCount: (data.totalDisplayItemCount as number | undefined) ?? 0,
+          hiddenDisplayItemCount: (data.hiddenDisplayItemCount as number | undefined) ?? 0,
         })
 
         wsClient.send('session.load', { sessionId })
@@ -470,6 +505,10 @@ export const useSessionStore = create<SessionState>((set, get) => {
         contextState: null,
         restoredInput: null,
         pendingSessionCreate: false as boolean | string,
+        isPartial: false,
+        totalMessageCount: 0,
+        totalDisplayItemCount: 0,
+        hiddenDisplayItemCount: 0,
         unreadSessionIds: state.currentSession
           ? state.unreadSessionIds.filter((id) => id !== state.currentSession!.id)
           : state.unreadSessionIds,

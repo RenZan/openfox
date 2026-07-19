@@ -53,6 +53,8 @@ export function PlanPanel({
   const sessions = useSessionStore((state) => state.sessions)
   const isRunning = useIsRunning()
   const stopGeneration = useSessionStore((state) => state.stopGeneration)
+  const isPartial = useSessionStore((state) => state.isPartial)
+  const serverHiddenCount = useSessionStore((state) => state.hiddenDisplayItemCount)
 
   const agentDefaults = useAgentsStore((state) => state.defaults)
   const agentUserItems = useAgentsStore((state) => state.userItems)
@@ -92,11 +94,14 @@ export function PlanPanel({
   const { displayItems, hiddenCount } = useMemo((): { displayItems: DisplayItem[]; hiddenCount: number } => {
     const items = groupMessages(rawMessages, previousDisplayItemsRef.current)
     previousDisplayItemsRef.current = items
+    if (isPartial && serverHiddenCount > 0) {
+      return { displayItems: items, hiddenCount: serverHiddenCount }
+    }
     if (maxVisibleItems > 0 && items.length > maxVisibleItems) {
       return { displayItems: items.slice(-maxVisibleItems), hiddenCount: items.length - maxVisibleItems }
     }
     return { displayItems: items, hiddenCount: 0 }
-  }, [rawMessages, maxVisibleItems])
+  }, [rawMessages, maxVisibleItems, isPartial, serverHiddenCount])
 
   const { isAutoScrollActive, setAutoScroll } = useAutoScroll(scrollContainerRef, session)
   const { sendMessage, launchWorkflow } = useScrolledSend(setAutoScroll)

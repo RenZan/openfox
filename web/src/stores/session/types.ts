@@ -62,6 +62,10 @@ export interface SessionState {
   sessionsHasMore: boolean
   sessionsPaginationLoading: boolean
   pendingSessionCreate: boolean | string
+  hiddenDisplayItemCount: number
+  totalMessageCount: number
+  totalDisplayItemCount: number
+  isPartial: boolean
   connect: () => Promise<void>
   reconnect: () => void
   disconnect: () => void

@@ -1644,4 +1644,130 @@ describe('useSessionStore session isolation', () => {
       }),
     )
   })
+
+  describe('loadSession maxVisibleItems', () => {
+    const mockSessionResponse = {
+      success: true,
+      session: {
+        id: 'session-1',
+        projectId: 'p',
+        workdir: '/tmp/p',
+        mode: 'planner' as const,
+        phase: 'plan' as const,
+        isRunning: false,
+        criteria: [],
+        summary: null,
+        messages: [],
+      },
+      messages: [],
+      contextState: null,
+      queueState: [],
+      pendingQuestions: [],
+    }
+
+    async function setupWithSettings(maxVisibleItemsValue?: string, isPending?: boolean) {
+      vi.resetModules()
+      const settingsMod = await import('../settings')
+      const updates: Record<string, unknown> = {}
+      if (maxVisibleItemsValue !== undefined) {
+        updates.settings = { [settingsMod.SETTINGS_KEYS.DISPLAY_MAX_VISIBLE_ITEMS]: maxVisibleItemsValue }
+      }
+      if (isPending) {
+        updates.loading = { [settingsMod.SETTINGS_KEYS.DISPLAY_MAX_VISIBLE_ITEMS]: true }
+      }
+      if (Object.keys(updates).length > 0) {
+        settingsMod.useSettingsStore.setState(updates)
+      }
+      const sessionMod = await import('../session')
+      return sessionMod.useSessionStore
+    }
+
+    function setupFetch() {
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(mockSessionResponse),
+      })
+    }
+
+    it('includes maxVisibleItems in URL when setting is available', async () => {
+      const useSessionStore = await setupWithSettings('50')
+      setupFetch()
+
+      await useSessionStore.getState().loadSession('session-1')
+
+      expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('maxVisibleItems=50'), expect.any(Object))
+    })
+
+    it('includes maxVisibleItems when setting is 300', async () => {
+      const useSessionStore = await setupWithSettings('300')
+      setupFetch()
+
+      await useSessionStore.getState().loadSession('session-1')
+
+      expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('maxVisibleItems=300'), expect.any(Object))
+    })
+
+    it('does not include maxVisibleItems when setting is not available', async () => {
+      const useSessionStore = await setupWithSettings(undefined)
+      setupFetch()
+
+      await useSessionStore.getState().loadSession('session-1')
+
+      expect(fetchMock).toHaveBeenCalledWith('/api/sessions/session-1', expect.any(Object))
+    })
+
+    it('does not include maxVisibleItems when setting is empty string', async () => {
+      const useSessionStore = await setupWithSettings('')
+      setupFetch()
+
+      await useSessionStore.getState().loadSession('session-1')
+
+      expect(fetchMock).toHaveBeenCalledWith('/api/sessions/session-1', expect.any(Object))
+    })
+
+    it('does not include maxVisibleItems when setting is non-numeric', async () => {
+      const useSessionStore = await setupWithSettings('abc')
+      setupFetch()
+
+      await useSessionStore.getState().loadSession('session-1')
+
+      expect(fetchMock).toHaveBeenCalledWith('/api/sessions/session-1', expect.any(Object))
+    })
+
+    it('awaits settings when still loading and uses available value', async () => {
+      const useSessionStore = await setupWithSettings(undefined, true)
+
+      setupFetch()
+
+      const loadPromise = useSessionStore.getState().loadSession('session-1')
+
+      const settingsMod = await import('../settings')
+      settingsMod.useSettingsStore.setState({
+        settings: { [settingsMod.SETTINGS_KEYS.DISPLAY_MAX_VISIBLE_ITEMS]: '75' },
+        loading: { [settingsMod.SETTINGS_KEYS.DISPLAY_MAX_VISIBLE_ITEMS]: false },
+      })
+      settingsMod.resolveInitialSettingsReady()
+
+      await loadPromise
+
+      expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('maxVisibleItems=75'), expect.any(Object))
+    })
+
+    it('falls back to no param when settings loading times out', async () => {
+      vi.useFakeTimers()
+      const useSessionStore = await setupWithSettings(undefined, true)
+
+      setupFetch()
+
+      const loadPromise = useSessionStore.getState().loadSession('session-1')
+
+      vi.advanceTimersByTime(600)
+
+      await loadPromise
+
+      expect(fetchMock).toHaveBeenCalledWith('/api/sessions/session-1', expect.any(Object))
+      vi.useRealTimers()
+    })
+  })
 })
