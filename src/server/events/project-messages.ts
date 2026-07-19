@@ -1,50 +1,10 @@
-import type { Message, ToolCall, ToolResult } from '../../shared/types.js'
+import type { Message } from '../../shared/types.js'
 
 export interface ProjectedMessagesResult {
   messages: Message[]
   totalMessageCount: number
   totalDisplayItemCount: number
   hiddenDisplayItemCount: number
-}
-
-const MAX_CONTENT_LENGTH = 10_000
-const MAX_TOOL_OUTPUT_LENGTH = 5_000
-const MAX_TOOL_ARGS_LENGTH = 2_000
-
-function truncateStr(s: string, maxLen: number): string {
-  if (s.length <= maxLen) return s
-  const half = Math.floor((maxLen - 3) / 2)
-  return s.slice(0, half) + '...' + s.slice(s.length - half)
-}
-
-function truncateToolResult(result: ToolResult): ToolResult {
-  return result.output !== undefined
-    ? { ...result, output: truncateStr(result.output, MAX_TOOL_OUTPUT_LENGTH) }
-    : result
-}
-
-function truncateToolCall(tc: ToolCall): ToolCall {
-  const truncatedArgs = truncateToolArgs(tc.arguments)
-  const truncated = truncatedArgs !== tc.arguments ? { arguments: truncatedArgs } : {}
-  return {
-    ...tc,
-    ...truncated,
-    ...(tc.result !== undefined ? { result: truncateToolResult(tc.result) } : {}),
-  }
-}
-
-function truncateToolArgs(args: Record<string, unknown>): Record<string, unknown> {
-  const raw = JSON.stringify(args)
-  if (raw.length <= MAX_TOOL_ARGS_LENGTH) return args
-  return { _truncated: true }
-}
-
-function truncateMessage(msg: Message): Message {
-  return {
-    ...msg,
-    content: truncateStr(msg.content, MAX_CONTENT_LENGTH),
-    ...(msg.toolCalls !== undefined ? { toolCalls: msg.toolCalls.map(truncateToolCall) } : {}),
-  }
 }
 
 interface DisplayItem {
@@ -135,7 +95,7 @@ export function projectMessagesForDisplay(messages: Message[], maxVisibleItems: 
   }
 
   return {
-    messages: projectedMessages.map(truncateMessage),
+    messages: projectedMessages,
     totalMessageCount,
     totalDisplayItemCount,
     hiddenDisplayItemCount: totalDisplayItemCount - maxVisibleItems,

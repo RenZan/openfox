@@ -81,20 +81,6 @@ export function useDisplaySettings() {
   }
 }
 
-let settingsReadyResolve: (() => void) | undefined
-
-export const initialSettingsReady: Promise<void> = new Promise((resolve) => {
-  settingsReadyResolve = resolve
-})
-
-/** Exposed for testing — resolves the initialSettingsReady promise */
-export function resolveInitialSettingsReady(): void {
-  if (settingsReadyResolve) {
-    settingsReadyResolve()
-    settingsReadyResolve = undefined
-  }
-}
-
 export const useSettingsStore = create<SettingsState>((set) => ({
   settings: {},
   loading: {},
@@ -117,6 +103,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     try {
       const res = await authFetch(`/api/settings?keys=${encodeURIComponent(keys.join(','))}`)
       const data = await res.json()
+      // Update all settings at once
       set({
         settings: data,
         loading: Object.fromEntries(keys.map((k) => [k, false])),
@@ -125,10 +112,6 @@ export const useSettingsStore = create<SettingsState>((set) => ({
       set({
         loading: Object.fromEntries(keys.map((k) => [k, false])),
       })
-    }
-    if (settingsReadyResolve) {
-      settingsReadyResolve()
-      settingsReadyResolve = undefined
     }
   },
 

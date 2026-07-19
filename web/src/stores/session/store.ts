@@ -6,7 +6,7 @@ import { wsClient } from '../../lib/ws'
 import { useConfigStore } from '../config'
 import { useProjectStore } from '../project'
 import { useBackgroundProcessesStore } from '../background-processes'
-import { useSettingsStore, SETTINGS_KEYS, initialSettingsReady } from '../settings'
+import { useSettingsStore, SETTINGS_KEYS } from '../settings'
 import type { SessionState, PendingPathConfirmation } from './types'
 import { getBuffer, setFlushFn, cancelStreamingFlush } from './streamingBuffer'
 import { handleServerMessage as handleMessage } from './messageHandler'
@@ -316,31 +316,9 @@ export const useSessionStore = create<SessionState>((set, get) => {
           set({ unreadSessionIds: get().unreadSessionIds.filter((id) => id !== sessionId) })
         }
 
-        let maxVisibleItems: number | undefined
-        const rawSetting = useSettingsStore.getState().settings[SETTINGS_KEYS.DISPLAY_MAX_VISIBLE_ITEMS]
-        if (rawSetting !== undefined && rawSetting !== '') {
-          const parsed = parseInt(rawSetting, 10)
-          if (!Number.isNaN(parsed) && parsed > 0) {
-            maxVisibleItems = parsed
-          }
-        } else if (useSettingsStore.getState().loading[SETTINGS_KEYS.DISPLAY_MAX_VISIBLE_ITEMS]) {
-          try {
-            const timeoutPromise = new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error('timeout')), 500),
-            )
-            await Promise.race([initialSettingsReady, timeoutPromise.catch(() => {})])
-            const retryRaw = useSettingsStore.getState().settings[SETTINGS_KEYS.DISPLAY_MAX_VISIBLE_ITEMS]
-            if (retryRaw !== undefined && retryRaw !== '') {
-              const parsed = parseInt(retryRaw, 10)
-              if (!Number.isNaN(parsed) && parsed > 0) {
-                maxVisibleItems = parsed
-              }
-            }
-          } catch {
-            /* timeout: use fallback, no query param */
-          }
-        }
-        const params = maxVisibleItems !== undefined ? `?maxVisibleItems=${maxVisibleItems}` : ''
+        const maxVisibleItemsSetting = useSettingsStore.getState().settings[SETTINGS_KEYS.DISPLAY_MAX_VISIBLE_ITEMS]
+        const maxVisibleItems = maxVisibleItemsSetting ? parseInt(maxVisibleItemsSetting, 10) : undefined
+        const params = maxVisibleItems && maxVisibleItems > 0 ? `?maxVisibleItems=${maxVisibleItems}` : ''
         const res = await authFetch(`/api/sessions/${sessionId}${params}`)
         if (!res.ok) return
 
