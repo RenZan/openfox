@@ -34,16 +34,19 @@ export function BranchModal({ isOpen, onClose, sessionId }: BranchModalProps) {
   } = useModalState(onClose)
   const [branches, setBranches] = useState<BranchInfo[]>([])
   const [sourceBranch, setSourceBranch] = useState('')
+  const [defaultBranch, setDefaultBranch] = useState('')
 
   useEffect(() => {
     if (!isOpen) return
     resetState()
     setSourceBranch('')
     setBranches([])
+    setDefaultBranch('')
     authFetch(`/api/sessions/${sessionId}/branches`)
       .then((r) => r.json())
-      .then((data: { branches: BranchInfo[] }) => {
+      .then((data: { branches: BranchInfo[]; defaultBranch?: string }) => {
         setBranches(data.branches)
+        setDefaultBranch(data.defaultBranch ?? '')
         setLoading(false)
       })
       .catch(() => {
@@ -147,14 +150,14 @@ export function BranchModal({ isOpen, onClose, sessionId }: BranchModalProps) {
 
         {newName.trim() && (
           <div className="mt-2">
-            <label className="text-xs text-text-muted mb-1 block">From branch (optional — defaults to project default)</label>
+            <label className="text-xs text-text-muted mb-1 block">From branch (optional — defaults to {defaultBranch || 'project default'})</label>
             <div className="relative">
               <BranchIcon className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" />
               <input
                 type="text"
                 value={sourceBranch}
                 onChange={(e) => setSourceBranch(e.target.value)}
-                placeholder="origin/main"
+                placeholder={defaultBranch || 'main'}
                 className="w-full text-sm bg-bg-primary border border-border-default rounded pl-8 pr-2 py-1.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent-primary"
               />
             </div>

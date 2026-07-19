@@ -448,9 +448,12 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
     const session = sessionManager.getSession(req.params.id)
     if (!session) return res.status(404).json({ error: 'Session not found' })
     const effectiveWorkdir = session.workspace ?? session.workdir
-    const { listBranches } = await import('./git/workspace.js')
-    const branches = await listBranches(effectiveWorkdir)
-    res.json({ branches })
+    const { listBranches, getDefaultBranch } = await import('./git/workspace.js')
+    const [branches, defaultBranch] = await Promise.all([
+      listBranches(effectiveWorkdir),
+      getDefaultBranch(session.workdir), // project root, not workspace, for real upstream origin/HEAD
+    ])
+    res.json({ branches, defaultBranch })
   })
 
   /** Switch to an existing branch in the session's effective workdir */
