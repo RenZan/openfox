@@ -1863,13 +1863,28 @@ describe('cross-session path confirmations', () => {
 
     useSessionStore.setState((state) => ({
       ...state,
-      currentSession: { id: 'session-1', projectId: 'project-1', workdir: '/tmp/project-1', mode: 'builder', phase: 'build', isRunning: true, criteria: [], summary: null } as any,
+      currentSession: {
+        id: 'session-1',
+        projectId: 'project-1',
+        workdir: '/tmp/project-1',
+        mode: 'builder',
+        phase: 'build',
+        isRunning: true,
+        criteria: [],
+        summary: null,
+      } as any,
     }))
 
     useSessionStore.getState().handleServerMessage({
       type: 'chat.path_confirmation',
       sessionId: 'session-1',
-      payload: { callId: 'call-git', tool: 'run_command', paths: ['--no-verify'], workdir: '/tmp/project-1', reason: 'git_no_verify' },
+      payload: {
+        callId: 'call-git',
+        tool: 'run_command',
+        paths: ['--no-verify'],
+        workdir: '/tmp/project-1',
+        reason: 'git_no_verify',
+      },
     })
 
     const state = useSessionStore.getState()
@@ -1884,18 +1899,39 @@ describe('cross-session path confirmations', () => {
 
     useSessionStore.setState((state) => ({
       ...state,
-      currentSession: { id: 'session-1', projectId: 'project-1', workdir: '/tmp/project-1', mode: 'builder', phase: 'build', isRunning: true, criteria: [], summary: null } as any,
+      currentSession: {
+        id: 'session-1',
+        projectId: 'project-1',
+        workdir: '/tmp/project-1',
+        mode: 'builder',
+        phase: 'build',
+        isRunning: true,
+        criteria: [],
+        summary: null,
+      } as any,
     }))
 
     useSessionStore.getState().handleServerMessage({
       type: 'chat.path_confirmation',
       sessionId: 'session-1',
-      payload: { callId: 'call-git', tool: 'run_command', paths: ['--no-verify'], workdir: '/tmp/project-1', reason: 'git_no_verify' },
+      payload: {
+        callId: 'call-git',
+        tool: 'run_command',
+        paths: ['--no-verify'],
+        workdir: '/tmp/project-1',
+        reason: 'git_no_verify',
+      },
     })
     useSessionStore.getState().handleServerMessage({
       type: 'chat.path_confirmation',
       sessionId: 'session-1',
-      payload: { callId: 'call-git', tool: 'run_command', paths: ['--no-verify'], workdir: '/tmp/project-1', reason: 'git_no_verify' },
+      payload: {
+        callId: 'call-git',
+        tool: 'run_command',
+        paths: ['--no-verify'],
+        workdir: '/tmp/project-1',
+        reason: 'git_no_verify',
+      },
     })
 
     const state = useSessionStore.getState()
@@ -1908,12 +1944,24 @@ describe('cross-session path confirmations', () => {
     useSessionStore.getState().handleServerMessage({
       type: 'session.confirmation_pending',
       sessionId: 'session-1',
-      payload: { callId: 'call-git', tool: 'run_command', paths: ['--no-verify'], workdir: '/tmp/project-1', reason: 'git_no_verify' },
+      payload: {
+        callId: 'call-git',
+        tool: 'run_command',
+        paths: ['--no-verify'],
+        workdir: '/tmp/project-1',
+        reason: 'git_no_verify',
+      },
     })
     useSessionStore.getState().handleServerMessage({
       type: 'session.confirmation_pending',
       sessionId: 'session-1',
-      payload: { callId: 'call-git', tool: 'run_command', paths: ['--no-verify'], workdir: '/tmp/project-1', reason: 'git_no_verify' },
+      payload: {
+        callId: 'call-git',
+        tool: 'run_command',
+        paths: ['--no-verify'],
+        workdir: '/tmp/project-1',
+        reason: 'git_no_verify',
+      },
     })
 
     const state = useSessionStore.getState()
@@ -1927,8 +1975,24 @@ describe('cross-session path confirmations', () => {
       ...state,
       currentSession: null,
       crossSessionConfirmations: {
-        'session-1': [{ callId: 'call-git', tool: 'run_command', paths: ['--no-verify'], workdir: '/tmp/project-1', reason: 'git_no_verify' as const }],
-        'session-2': [{ callId: 'call-other', tool: 'read_file', paths: ['/tmp/other.txt'], workdir: '/tmp/project-2', reason: 'outside_workdir' as const }],
+        'session-1': [
+          {
+            callId: 'call-git',
+            tool: 'run_command',
+            paths: ['--no-verify'],
+            workdir: '/tmp/project-1',
+            reason: 'git_no_verify' as const,
+          },
+        ],
+        'session-2': [
+          {
+            callId: 'call-other',
+            tool: 'read_file',
+            paths: ['/tmp/other.txt'],
+            workdir: '/tmp/project-2',
+            reason: 'outside_workdir' as const,
+          },
+        ],
       },
       sessionsWithPendingConfirmations: ['session-1', 'session-2'],
     }))
@@ -1946,9 +2010,24 @@ describe('cross-session path confirmations', () => {
 
     useSessionStore.setState((state) => ({
       ...state,
-      currentSession: { id: 'session-1', projectId: 'project-1', workdir: '/tmp/project-1', mode: 'builder', phase: 'build', isRunning: true, criteria: [], summary: null } as any,
+      currentSession: {
+        id: 'session-1',
+        projectId: 'project-1',
+        workdir: '/tmp/project-1',
+        mode: 'builder',
+        phase: 'build',
+        isRunning: true,
+        criteria: [],
+        summary: null,
+      } as any,
       pendingPathConfirmations: [
-        { callId: 'call-git', tool: 'run_command', paths: ['--no-verify'], workdir: '/tmp/project-1', reason: 'git_no_verify' as const },
+        {
+          callId: 'call-git',
+          tool: 'run_command',
+          paths: ['--no-verify'],
+          workdir: '/tmp/project-1',
+          reason: 'git_no_verify' as const,
+        },
       ],
       crossSessionConfirmations: {},
       sessionsWithPendingConfirmations: [],
@@ -1962,5 +2041,93 @@ describe('cross-session path confirmations', () => {
     expect(state.crossSessionConfirmations['session-1']).toHaveLength(1)
     expect(state.crossSessionConfirmations['session-1']![0]!.callId).toBe('call-git')
     expect(state.sessionsWithPendingConfirmations).toContain('session-1')
+  })
+})
+
+describe('cross-tab sidebar sync', () => {
+  beforeEach(() => {
+    wsSendMock.mockClear()
+    wsSubscribeMock.mockClear()
+    wsConnectMock.mockClear()
+    wsDisconnectMock.mockClear()
+    wsStatusMock.mockClear()
+    playNotificationMock.mockClear()
+    playAchievementMock.mockClear()
+    playInterventionMock.mockClear()
+    playWaitingForUserMock.mockClear()
+    playNewMessageMock.mockClear()
+    fetchMock.mockClear()
+  })
+
+  it('adds new session to list on session.created message', async () => {
+    const useSessionStore = await loadSessionStore()
+
+    useSessionStore.setState({
+      sessions: [
+        { id: 'session-1', projectId: 'project-1', title: 'Existing', updatedAt: 'a', messageCount: 0 } as any,
+      ],
+    })
+
+    useSessionStore.getState().handleServerMessage({
+      type: 'session.created',
+      sessionId: 'session-2',
+      payload: {
+        session: {
+          id: 'session-2',
+          projectId: 'project-1',
+          title: 'New Session',
+          workdir: '/tmp/project-1',
+          mode: 'planner',
+          phase: 'plan',
+          isRunning: false,
+          createdAt: '2026-07-19T10:00:00Z',
+          updatedAt: '2026-07-19T10:00:00Z',
+          messageCount: 0,
+          criteriaCount: 0,
+          criteriaCompleted: 0,
+        },
+      },
+    })
+
+    const state = useSessionStore.getState()
+    expect(state.sessions).toHaveLength(2)
+    expect(state.sessions[0]!.id).toBe('session-2')
+    expect(state.sessions[0]!.title).toBe('New Session')
+  })
+
+  it('updates existing session on session.created if already in list', async () => {
+    const useSessionStore = await loadSessionStore()
+
+    useSessionStore.setState({
+      sessions: [
+        { id: 'session-1', projectId: 'project-1', title: 'Old Title', updatedAt: 'a', messageCount: 0 } as any,
+      ],
+    })
+
+    useSessionStore.getState().handleServerMessage({
+      type: 'session.created',
+      sessionId: 'session-1',
+      payload: {
+        session: {
+          id: 'session-1',
+          projectId: 'project-1',
+          title: 'Updated Title',
+          workdir: '/tmp/project-1',
+          mode: 'builder',
+          phase: 'build',
+          isRunning: false,
+          createdAt: '2026-07-19T10:00:00Z',
+          updatedAt: '2026-07-19T10:05:00Z',
+          messageCount: 5,
+          criteriaCount: 2,
+          criteriaCompleted: 1,
+        },
+      },
+    })
+
+    const state = useSessionStore.getState()
+    expect(state.sessions).toHaveLength(1)
+    expect(state.sessions[0]!.title).toBe('Updated Title')
+    expect(state.sessions[0]!.messageCount).toBe(5)
   })
 })

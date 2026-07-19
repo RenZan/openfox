@@ -76,6 +76,7 @@ export type ServerMessageType =
   // Session events
   | 'session.state'
   | 'session.list'
+  | 'session.created'
   | 'session.deleted'
   | 'session.deletedAll'
   | 'session.running' // Real-time running state change
@@ -186,27 +187,16 @@ export interface SessionListPayload {
   sessions: SessionSummary[]
 }
 
+export interface SessionCreatedPayload {
+  session: SessionSummary
+}
+
 export interface SessionRunningPayload {
   isRunning: boolean
 }
 
 export interface SessionNameGeneratedPayload {
   name: string
-}
-
-export interface SessionConfirmationPendingPayload {
-  sessionId: string
-  sessionTitle?: string
-  callId: string
-  tool: string
-  paths: string[]
-  workdir: string
-  reason: PendingPathConfirmationPayload['reason']
-}
-
-export interface SessionConfirmationResolvedPayload {
-  sessionId: string
-  callId: string
 }
 
 // Chat payloads (unified streaming)

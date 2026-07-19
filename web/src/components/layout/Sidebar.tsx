@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useLocation, Link } from 'wouter'
 import { useSessionStore } from '../../stores/session'
+import type { PendingPathConfirmation } from '../../stores/session/types'
 import { useProjectStore } from '../../stores/project'
 import type { SessionSummary } from '@shared/types.js'
 import { ProjectSettingsModal } from '../settings/ProjectSettingsModal'
@@ -252,7 +253,7 @@ function renderSessionGroups(
   handleRenameSession: (sessionId: string, e?: React.MouseEvent) => void,
   projectId: string,
   sessionsWithPendingConfirmations: string[],
-  pendingPathConfirmations: { callId: string }[],
+  pendingPathConfirmations: PendingPathConfirmation[],
 ) {
   const groups = groupSessionsByDate(projectSessions)
 
@@ -273,8 +274,7 @@ function renderSessionGroups(
           const hasUnread = unreadSessionIds.includes(session.id)
           const isRunning = session.isRunning
           const hasPendingConfirmation =
-            sessionsWithPendingConfirmations.includes(session.id) ||
-            (isActive && pendingPathConfirmations.length > 0)
+            sessionsWithPendingConfirmations.includes(session.id) || (isActive && pendingPathConfirmations.length > 0)
           return (
             <div
               key={session.id}

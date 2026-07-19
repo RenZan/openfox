@@ -531,6 +531,29 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
 
     // maxTokens is no longer passed - it comes from providerManager.getCurrentModelContext() at query time
     const session = sessionManager.createSession(projectId, title, providerId ?? null, model ?? null)
+    wssExports.broadcastAll({
+      type: 'session.created',
+      sessionId: session.id,
+      payload: {
+        session: {
+          id: session.id,
+          projectId: session.projectId,
+          title: session.metadata.title,
+          workdir: session.workdir,
+          workspace: session.workspace,
+          mode: session.mode,
+          phase: session.phase,
+          isRunning: session.isRunning,
+          providerId: session.providerId,
+          providerModel: session.providerModel,
+          createdAt: session.createdAt,
+          updatedAt: session.updatedAt,
+          criteriaCount: session.criteria.length,
+          criteriaCompleted: session.criteria.filter((c) => c.status.type === 'passed').length,
+          messageCount: session.messageCount ?? session.messages.length,
+        },
+      },
+    })
     res.status(201).json({ session })
   })
 
@@ -605,6 +628,11 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
     cancelPathConfirmationsForSession(sessionId, 'Session deleted')
 
     sessionManager.deleteSession(sessionId)
+    wssExports.broadcastAll({
+      type: 'session.deleted',
+      sessionId,
+      payload: { sessionId },
+    })
     res.json({ success: true })
   })
 
@@ -615,6 +643,11 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
       return res.status(404).json({ error: 'Project not found' })
     }
     sessionManager.deleteAllSessions(projectId, project.workdir)
+    wssExports.broadcastAll({
+      type: 'session.deletedAll',
+      sessionId: projectId,
+      payload: {},
+    })
     res.json({ success: true })
   })
 

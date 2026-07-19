@@ -26,6 +26,7 @@ import type {
   MetadataUpdatedPayload,
   ContextStatePayload,
   QueueStatePayload,
+  SessionCreatedPayload,
 } from '@shared/protocol.js'
 import { useDevServerStore } from '../dev-server'
 import { useBackgroundProcessesStore } from '../background-processes'
@@ -206,6 +207,16 @@ export function handleServerMessage(
       const payload = message.payload as SessionListPayload
       set((state) => ({
         sessions: mergeSessionList(payload.sessions, state.sessions, state.currentSession),
+      }))
+      break
+    }
+
+    case 'session.created': {
+      const payload = message.payload as SessionCreatedPayload
+      set((state) => ({
+        sessions: state.sessions.some((s) => s.id === payload.session.id)
+          ? state.sessions.map((s) => (s.id === payload.session.id ? { ...s, ...payload.session } : s))
+          : [payload.session, ...state.sessions],
       }))
       break
     }
