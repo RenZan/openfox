@@ -2,9 +2,11 @@ import { useState } from 'react'
 import { useSessionStats } from '../../hooks/useSessionStats'
 import { useGitStatus } from '../../hooks/useGitStatus'
 import { useConfigStore } from '../../stores/config'
+import { useSettingsStore, SETTINGS_KEYS } from '../../stores/settings'
 import { useSessionStore } from '../../stores/session'
 import { useUpdateStore } from '../../stores/update'
 import { authFetch } from '../../lib/api'
+import { buildWorkspaceUrl } from '../../lib/editor-link'
 import { formatTime, formatSpeed } from '../../lib/format-stats'
 import { formatMetadataKeyLabel } from '../../lib/metadata-keys'
 import { StatsModal } from './StatsModal'
@@ -36,6 +38,8 @@ export function SessionSidebar({ messages, workdir }: SessionSidebarProps) {
   const session = useSessionStore((state) => state.currentSession)
 
   const workspaceName = session?.workspace ? (session.workspace.split('/').pop() ?? null) : null
+
+  const showEditorLink = useSettingsStore((s) => s.settings[SETTINGS_KEYS.DISPLAY_SHOW_OPEN_IN_EDITOR]) === 'true'
 
   const updateStatus = useUpdateStore((state) => state.status)
   const checkForUpdate = useUpdateStore((state) => state.check)
@@ -109,8 +113,23 @@ export function SessionSidebar({ messages, workdir }: SessionSidebarProps) {
       {/* Workspace & branch info — above separator */}
       <div className="mt-4 space-y-1.5">
         <div className="flex items-center gap-2 text-sm">
-          <FolderIcon className="w-4 h-4 text-text-muted flex-shrink-0" />
-          <span className="truncate text-text-secondary">{workspaceName ?? 'original'}</span>
+          {showEditorLink && workdir ? (
+            <a
+              href={buildWorkspaceUrl(workdir)}
+              className="flex items-center gap-2 min-w-0 flex-1 no-underline group"
+              title="Open workspace in VSCode"
+            >
+              <FolderIcon className="w-4 h-4 text-text-muted flex-shrink-0" />
+              <span className="truncate text-text-secondary group-hover:text-accent-primary transition-colors">
+                {workspaceName ?? 'original'}
+              </span>
+            </a>
+          ) : (
+            <>
+              <FolderIcon className="w-4 h-4 text-text-muted flex-shrink-0" />
+              <span className="truncate text-text-secondary">{workspaceName ?? 'original'}</span>
+            </>
+          )}
           <button
             onClick={() => setShowWorkspaceModal(true)}
             className="ml-auto px-2 py-0.5 text-xs rounded bg-bg-tertiary text-text-secondary hover:bg-bg-secondary transition-colors"
@@ -188,11 +207,7 @@ export function SessionSidebar({ messages, workdir }: SessionSidebarProps) {
             currentWorkspace={workspaceName}
             currentBranch={branch ?? null}
           />
-          <BranchModal
-            isOpen={showBranchModal}
-            onClose={() => setShowBranchModal(false)}
-            sessionId={session.id}
-          />
+          <BranchModal isOpen={showBranchModal} onClose={() => setShowBranchModal(false)} sessionId={session.id} />
         </>
       )}
     </div>

@@ -56,6 +56,7 @@ import {
   isValidToken,
   tokenFromPassword,
 } from './auth.js'
+import { detectWsl, type WslInfo } from './utils/wsl.js'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 /**
@@ -117,6 +118,9 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
   if (useMock) {
     logger.info('Using MOCK LLM client - deterministic responses for testing')
   }
+
+  // Detect WSL platform eagerly (reads /proc and env vars, cached after first call)
+  const platformInfo: WslInfo = detectWsl()
 
   // Auto-detect backend and model from LLM server
   async function initLLM(): Promise<void> {
@@ -1284,6 +1288,7 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
       activeProviderId: providerManager.getActiveProviderId(),
       defaultModelSelection: config.defaultModelSelection,
       visionFallback,
+      platform: platformInfo,
     })
   })
 
