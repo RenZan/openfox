@@ -43,7 +43,7 @@ import {
   type FoldedSessionState,
 } from './folding.js'
 
-function combineEventsWithSnapshot(
+export function combineEventsWithSnapshot(
   sessionId: string,
   snapshot: import('./types.js').SessionSnapshot | undefined,
   events: import('./types.js').StoredEvent[],

@@ -10,7 +10,7 @@ import { handleTerminalMessage, unsubscribeAllFromTerminal } from './terminal.js
 import type { Config } from '../config.js'
 import type { LLMClientWithModel } from '../llm/client.js'
 import type { SessionManager } from '../session/index.js'
-import { getEventStore } from '../events/index.js'
+import { getEventStore, combineEventsWithSnapshot } from '../events/index.js'
 import { applyMaxVisibleItems } from '../db/settings.js'
 
 import type { Message, Provider, ProviderBackend, StatsIdentity, Attachment } from '../../shared/types.js'
@@ -625,20 +625,7 @@ export function createWebSocketServer(
       const updatedSession = event.session
       const eventStore = getEventStore()
       const { snapshot, events: eventsSinceSnapshot } = eventStore.getEventsSinceSnapshot(updatedSession.id)
-
-      let events: import('../events/types.js').StoredEvent[]
-      if (snapshot) {
-        const snapshotEvent: import('../events/types.js').StoredEvent = {
-          seq: 0,
-          timestamp: snapshot.snapshotAt,
-          sessionId: updatedSession.id,
-          type: 'turn.snapshot',
-          data: snapshot,
-        }
-        events = [snapshotEvent, ...eventsSinceSnapshot]
-      } else {
-        events = eventsSinceSnapshot
-      }
+      const events = combineEventsWithSnapshot(updatedSession.id, snapshot, eventsSinceSnapshot)
 
       const { messages } = buildMessagesFromStoredEvents(events)
       const pendingConfirmations = foldPendingConfirmations(events)

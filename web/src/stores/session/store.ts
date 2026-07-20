@@ -602,6 +602,9 @@ export const useSessionStore = create<SessionState>((set, get) => {
         if (data.session) {
           set({ currentSession: data.session })
         }
+        if (data.messages) {
+          set({ messages: data.messages, hiddenCount: (data.hiddenCount as number) ?? 0 })
+        }
       } catch (error) {
         console.error('Error switching mode:', error)
       }
@@ -667,6 +670,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         set({
           currentSession: data.session,
           messages: data.messages ?? [],
+          hiddenCount: (data.hiddenCount as number) ?? 0,
           contextState: data.contextState,
         })
         return data.session

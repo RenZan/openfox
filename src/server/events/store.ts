@@ -134,7 +134,6 @@ export class EventStore {
   private subscribers: Map<string, Set<Subscriber>> = new Map()
   private globalSubscribers: Map<number, GlobalSubscriber> = new Map()
   private globalSubscriberIdCounter = 0
-  messagesCache: Map<string, { messages: unknown[]; timestamp: number }> = new Map()
 
   constructor(db: Database.Database) {
     this.db = db
@@ -222,8 +221,6 @@ export class EventStore {
 
     this.notifySubscribers(sessionId, stored)
 
-    this.messagesCache.delete(sessionId)
-
     return stored
   }
 
@@ -265,8 +262,6 @@ export class EventStore {
     for (const stored of results) {
       this.notifySubscribers(sessionId, stored)
     }
-
-    this.messagesCache.delete(sessionId)
 
     return results
   }

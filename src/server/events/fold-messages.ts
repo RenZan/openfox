@@ -127,6 +127,11 @@ export function buildMessagesFromStoredEvents(
   events: StoredEvent[],
   maxVisibleItems?: number,
 ): { messages: Message[]; hiddenCount: number } {
+  // hiddenCount counts "user-facing messages" (distinct message.start IDs),
+  // not all rendered items. This is intentional: tool results and other
+  // expanded items are treated as belonging to their parent message, so
+  // truncation that removes a message also removes its children without
+  // inflating the hidden count.
   const snapshotEvent = [...events].reverse().find((event) => event.type === 'turn.snapshot')
   if (snapshotEvent) {
     const snapshot = snapshotEvent.data as SessionSnapshot
