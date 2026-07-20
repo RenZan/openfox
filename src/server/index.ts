@@ -682,6 +682,8 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
     const { getEventStore } = await import('./events/index.js')
     const { buildMessagesFromStoredEvents, foldPendingConfirmations } = await import('./events/folding.js')
     const { getPendingQuestionsForSession } = await import('./tools/index.js')
+    const { applyMaxVisibleItems } = await import('./db/settings.js')
+    type StoredEvent = import('./events/types.js').StoredEvent
 
     const session = sessionManager.getSession(req.params.id)
     if (!session) {
@@ -689,14 +691,39 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
     }
 
     const eventStore = getEventStore()
-    const events = eventStore.getEvents(req.params.id)
-    const messages = buildMessagesFromStoredEvents(events)
+    const { snapshot, events: eventsSinceSnapshot } = eventStore.getEventsSinceSnapshot(req.params.id)
+
+    let events: StoredEvent[]
+    if (snapshot) {
+      const snapshotEvent: StoredEvent = {
+        seq: 0,
+        timestamp: snapshot.snapshotAt,
+        sessionId: req.params.id,
+        type: 'turn.snapshot',
+        data: snapshot,
+      }
+      events = [snapshotEvent, ...eventsSinceSnapshot]
+    } else {
+      events = eventsSinceSnapshot
+    }
+
+    const { messages } = buildMessagesFromStoredEvents(events)
     const contextState = sessionManager.getContextState(req.params.id)
     const queueState = sessionManager.getQueueState(req.params.id)
     const pendingQuestions = getPendingQuestionsForSession(req.params.id)
     const pendingConfirmations = foldPendingConfirmations(events)
 
-    res.json({ session, messages, contextState, queueState, pendingQuestions, pendingConfirmations })
+    const { truncated: truncatedMessages, hiddenCount } = applyMaxVisibleItems(messages)
+
+    res.json({
+      session,
+      messages: truncatedMessages,
+      hiddenCount,
+      contextState,
+      queueState,
+      pendingQuestions,
+      pendingConfirmations,
+    })
   })
 
   app.delete('/api/sessions/:id', async (req, res) => {
@@ -768,8 +795,8 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
 
     // Get updated session with messages
     const eventStore = getEventStore()
-    const events = eventStore.getEvents(sessionId)
-    const messages = buildMessagesFromStoredEvents(events)
+    const { events } = eventStore.getEventsSinceSnapshot(sessionId)
+    const { messages } = buildMessagesFromStoredEvents(events)
     const updatedSession = sessionManager.getSession(sessionId)
 
     res.json({ session: updatedSession, messages, contextState })
@@ -912,8 +939,8 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
     sessionManager.setMode(sessionId, mode)
 
     const eventStore = getEventStore()
-    const events = eventStore.getEvents(sessionId)
-    const messages = buildMessagesFromStoredEvents(events)
+    const { events } = eventStore.getEventsSinceSnapshot(sessionId)
+    const { messages } = buildMessagesFromStoredEvents(events)
     const updatedSession = sessionManager.getSession(sessionId)
 
     res.json({ session: updatedSession, messages })
@@ -989,14 +1016,40 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
     const { buildMessagesFromStoredEvents, foldPendingConfirmations } = await import('./events/folding.js')
     const { createSessionStateMessage } = await import('./ws/protocol.js')
     const { getPendingQuestionsForSession } = await import('./tools/index.js')
+    const { applyMaxVisibleItems } = await import('./db/settings.js')
+    type StoredEvent = import('./events/types.js').StoredEvent
     const eventStore = getEventStore()
-    const events = eventStore.getEvents(sessionId)
-    const messages = buildMessagesFromStoredEvents(events)
+    const { snapshot, events: eventsSinceSnapshot } = eventStore.getEventsSinceSnapshot(sessionId)
+
+    let events: StoredEvent[]
+    if (snapshot) {
+      const snapshotEvent: StoredEvent = {
+        seq: 0,
+        timestamp: snapshot.snapshotAt,
+        sessionId,
+        type: 'turn.snapshot',
+        data: snapshot,
+      }
+      events = [snapshotEvent, ...eventsSinceSnapshot]
+    } else {
+      events = eventsSinceSnapshot
+    }
+
+    const { messages } = buildMessagesFromStoredEvents(events)
     const pendingConfirmations = foldPendingConfirmations(events)
     const pendingQuestions = getPendingQuestionsForSession(sessionId)
+
+    const { truncated: truncatedMessages, hiddenCount } = applyMaxVisibleItems(messages)
     const session = sessionManager.getSession(sessionId)
     if (session) {
-      const stateMsg = createSessionStateMessage(session, messages, pendingConfirmations, pendingQuestions)
+      const stateMsg = createSessionStateMessage(
+        session,
+        truncatedMessages,
+        pendingConfirmations,
+        pendingQuestions,
+        undefined,
+        hiddenCount,
+      )
       wssExports.broadcastForSession(sessionId, { ...stateMsg, sessionId })
     }
 
@@ -1206,7 +1259,7 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
     const { buildMessagesFromStoredEvents } = await import('./events/folding.js')
     const eventStore = getEventStore()
     const events = eventStore.getEvents(sessionId)
-    const messages = buildMessagesFromStoredEvents(events)
+    const { messages } = buildMessagesFromStoredEvents(events)
 
     const msgIndex = messages.findIndex((m) => m.id === messageId)
     if (msgIndex === -1) {

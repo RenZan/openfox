@@ -19,6 +19,7 @@ import { createSessionStateMessage } from '../ws/protocol.js'
 import { getPendingQuestionsForSession } from '../tools/index.js'
 import { getSessionMessageCount } from '../utils/session-utils.js'
 import { getRuntimeConfig } from '../runtime-config.js'
+import { applyMaxVisibleItems } from '../db/settings.js'
 
 // ============================================================================
 // Ultra-Lightweight Prompt
@@ -188,12 +189,22 @@ export function applyGeneratedSessionName(sessionId: string, name: string, deps:
   const updatedSession = deps.sessionManager.getSession(sessionId)
   if (updatedSession) {
     const events = deps.eventStore.getEvents(sessionId)
-    const messages = buildMessagesFromStoredEvents(events)
+    const { messages } = buildMessagesFromStoredEvents(events)
     const pendingConfirmations = foldPendingConfirmations(events)
     const pendingQuestions = getPendingQuestionsForSession(sessionId)
+
+    const { truncated: truncatedMessages, hiddenCount } = applyMaxVisibleItems(messages)
+
     deps.broadcastForSession(
       sessionId,
-      createSessionStateMessage(updatedSession, messages, pendingConfirmations, pendingQuestions),
+      createSessionStateMessage(
+        updatedSession,
+        truncatedMessages,
+        pendingConfirmations,
+        pendingQuestions,
+        undefined,
+        hiddenCount,
+      ),
     )
   }
 }

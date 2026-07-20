@@ -120,6 +120,7 @@ export function createSessionStateMessage(
   pendingConfirmations: PendingPathConfirmationPayload[] = [],
   pendingQuestions?: PendingQuestionPayload[],
   gitStatus?: GitStatusPayload,
+  hiddenCount?: number,
   correlationId?: string,
 ): ServerMessage<SessionStatePayload> {
   // Enrich messages so toolCalls have their results attached
@@ -132,6 +133,7 @@ export function createSessionStateMessage(
       pendingConfirmations,
       ...(pendingQuestions ? { pendingQuestions } : {}),
       ...(gitStatus ? { gitStatus } : {}),
+      ...(hiddenCount !== undefined ? { hiddenCount } : {}),
     },
     correlationId,
   )

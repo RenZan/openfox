@@ -1619,3 +1619,105 @@ describe('EventStore - Event Cleanup', () => {
     })
   })
 })
+
+// ============================================================================
+// In-memory message cache (Criterion 7B)
+// ============================================================================
+
+describe('EventStore — in-memory message cache', () => {
+  let db: Database.Database
+  let store: EventStore
+
+  beforeEach(() => {
+    db = new Database(':memory:')
+    store = new EventStore(db)
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS sessions (
+        id TEXT PRIMARY KEY,
+        is_running INTEGER DEFAULT 0,
+        updated_at INTEGER
+      )
+    `)
+  })
+
+  afterEach(() => {
+    db.close()
+  })
+
+  it('should store and retrieve cached messages for a session', () => {
+    const sessionId = 'cached-session-1'
+    const messages = [{ id: 'msg-1', content: 'Hello' }]
+    const timestamp = Date.now()
+
+    store.messagesCache = store.messagesCache ?? new Map()
+    store.messagesCache.set(sessionId, { messages, timestamp })
+
+    const cached = store.messagesCache.get(sessionId)
+    expect(cached).toBeDefined()
+    expect(cached!.messages).toEqual(messages)
+    expect(cached!.timestamp).toBe(timestamp)
+  })
+
+  it('should invalidate cache when events are appended to the same session', () => {
+    const sessionId = 'cached-session-2'
+
+    store.messagesCache = store.messagesCache ?? new Map()
+    store.messagesCache.set(sessionId, { messages: [{ id: 'old' }], timestamp: Date.now() })
+
+    store.append(sessionId, {
+      type: 'message.start',
+      data: { messageId: 'msg-1', role: 'user', content: 'Hello' },
+    })
+
+    expect(store.messagesCache.has(sessionId)).toBe(false)
+  })
+
+  it('should not invalidate cache for other sessions when appending', () => {
+    const sessionId1 = 'cached-session-3a'
+    const sessionId2 = 'cached-session-3b'
+
+    store.messagesCache = store.messagesCache ?? new Map()
+    store.messagesCache.set(sessionId1, { messages: [{ id: 'm1' }], timestamp: Date.now() })
+    store.messagesCache.set(sessionId2, { messages: [{ id: 'm2' }], timestamp: Date.now() })
+
+    store.append(sessionId1, {
+      type: 'message.start',
+      data: { messageId: 'msg-1', role: 'user', content: 'Hello' },
+    })
+
+    expect(store.messagesCache.has(sessionId1)).toBe(false)
+    expect(store.messagesCache.has(sessionId2)).toBe(true)
+  })
+
+  it('should not invalidate cache when appendBatch is called for a different session', () => {
+    const sessionId = 'cached-session-4'
+
+    store.messagesCache = store.messagesCache ?? new Map()
+    store.messagesCache.set(sessionId, { messages: [{ id: 'm1' }], timestamp: Date.now() })
+
+    store.appendBatch('other-session', [
+      { type: 'message.start', data: { messageId: 'msg-1', role: 'user', content: 'Other' } },
+    ])
+
+    expect(store.messagesCache.has(sessionId)).toBe(true)
+  })
+
+  it('should invalidate cache when appendBatch is called for the same session', () => {
+    const sessionId = 'cached-session-5'
+
+    store.messagesCache = store.messagesCache ?? new Map()
+    store.messagesCache.set(sessionId, { messages: [{ id: 'old' }], timestamp: Date.now() })
+
+    store.appendBatch(sessionId, [
+      { type: 'message.start', data: { messageId: 'msg-1', role: 'user', content: 'New' } },
+    ])
+
+    expect(store.messagesCache.has(sessionId)).toBe(false)
+  })
+
+  it('should have a messagesCache property initialized as a Map', () => {
+    expect(store.messagesCache).toBeDefined()
+    expect(store.messagesCache instanceof Map).toBe(true)
+    expect(store.messagesCache.size).toBe(0)
+  })
+})

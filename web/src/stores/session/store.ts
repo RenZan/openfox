@@ -123,6 +123,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     currentSession: null,
     unreadSessionIds: [],
     messages: [],
+    hiddenCount: 0,
     currentTodos: [],
     contextState: null,
     subAgentContextStates: {},
@@ -332,6 +333,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         set({
           currentSession: data.session,
           messages: loadedMessages,
+          hiddenCount: (data.hiddenCount as number | undefined) ?? 0,
           contextState: data.contextState,
           queuedMessages: (data.queueState as QueuedMessage[] | undefined) ?? [],
           pendingPathConfirmations: (data.pendingConfirmations ?? []) as PendingPathConfirmation[],
@@ -500,6 +502,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       set((state) => ({
         currentSession: null,
         messages: [],
+        hiddenCount: 0,
         currentTodos: [],
         contextState: null,
         restoredInput: null,

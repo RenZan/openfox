@@ -105,6 +105,7 @@ describe('ws/protocol', () => {
         [],
         undefined,
         undefined,
+        undefined,
         'corr-1',
       )
 

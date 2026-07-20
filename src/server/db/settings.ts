@@ -111,3 +111,15 @@ export function getAllSettings(): Record<string, string> {
   }
   return result
 }
+
+export function applyMaxVisibleItems<T>(items: T[]): { truncated: T[]; hiddenCount: number } {
+  const setting = getSetting(SETTINGS_KEYS.DISPLAY_MAX_VISIBLE_ITEMS)
+  const maxVisibleItems = setting ? parseInt(setting, 10) : 0
+  let truncated = items
+  let hiddenCount = 0
+  if (maxVisibleItems > 0 && items.length > maxVisibleItems) {
+    truncated = items.slice(-maxVisibleItems)
+    hiddenCount = items.length - maxVisibleItems
+  }
+  return { truncated, hiddenCount }
+}

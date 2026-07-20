@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useSessionStore, useIsRunning } from '../../stores/session'
-import { useDisplaySettings } from '../../stores/settings'
 
 import { type TurnStats } from '../../lib/types'
+import type { Message } from '@shared/types.js'
 
 import { SessionLayout } from '../layout/SessionLayout'
 import { SessionHeader } from './SessionHeader'
@@ -29,11 +29,15 @@ import { useKeybindings, useBinding, useAgentSwitchingBindings } from '../../hoo
 interface PlanPanelProps {
   criteriaSidebarOpen?: boolean
   onCriteriaSidebarToggle?: () => void
+  rawMessages?: Message[]
+  hiddenCount?: number
 }
 
 export function PlanPanel({
   criteriaSidebarOpen: externalCriteriaSidebarOpen,
   onCriteriaSidebarToggle,
+  rawMessages: propRawMessages,
+  hiddenCount: propHiddenCount,
 }: PlanPanelProps = {}) {
   const criteriaSidebarOpen = externalCriteriaSidebarOpen ?? true
   const [input, setInput] = useState('')
@@ -49,17 +53,21 @@ export function PlanPanel({
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   const session = useSessionStore((state) => state.currentSession)
-  const rawMessages = useSessionStore((state) => state.messages)
+  const storeMessages = useSessionStore((state) => state.messages)
+  const storeHiddenCount = useSessionStore((state) => state.hiddenCount)
   const sessions = useSessionStore((state) => state.sessions)
   const isRunning = useIsRunning()
   const stopGeneration = useSessionStore((state) => state.stopGeneration)
+
+  const messages = propRawMessages ?? storeMessages
+  const hiddenCount = propHiddenCount ?? storeHiddenCount ?? 0
 
   const agentDefaults = useAgentsStore((state) => state.defaults)
   const agentUserItems = useAgentsStore((state) => state.userItems)
   const topLevelAgents = [...agentDefaults, ...agentUserItems].filter((a) => !a.subagent)
 
   const { history, selectedIndex, showHistory, openHistory, closeHistory, navigateUp, navigateDown, selectCurrent } =
-    usePromptHistory(rawMessages, sessions, session?.id)
+    usePromptHistory(messages, sessions, session?.id)
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -85,18 +93,13 @@ export function PlanPanel({
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
-  const { maxVisibleItems } = useDisplaySettings()
-
   const previousDisplayItemsRef = useRef<DisplayItem[]>([])
 
-  const { displayItems, hiddenCount } = useMemo((): { displayItems: DisplayItem[]; hiddenCount: number } => {
-    const items = groupMessages(rawMessages, previousDisplayItemsRef.current)
+  const { displayItems } = useMemo((): { displayItems: DisplayItem[] } => {
+    const items = groupMessages(messages, previousDisplayItemsRef.current)
     previousDisplayItemsRef.current = items
-    if (maxVisibleItems > 0 && items.length > maxVisibleItems) {
-      return { displayItems: items.slice(-maxVisibleItems), hiddenCount: items.length - maxVisibleItems }
-    }
-    return { displayItems: items, hiddenCount: 0 }
-  }, [rawMessages, maxVisibleItems])
+    return { displayItems: items }
+  }, [messages])
 
   const { isAutoScrollActive, setAutoScroll } = useAutoScroll(scrollContainerRef, session)
   const { sendMessage, launchWorkflow } = useScrolledSend(setAutoScroll)
@@ -180,7 +183,7 @@ export function PlanPanel({
       <SessionLayout
         criteriaSidebarOpen={criteriaSidebarOpen}
         onCriteriaSidebarToggle={onCriteriaSidebarToggle}
-        messages={rawMessages}
+        messages={messages}
       >
         <SessionHeader />
 

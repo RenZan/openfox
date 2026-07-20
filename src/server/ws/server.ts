@@ -11,6 +11,7 @@ import type { Config } from '../config.js'
 import type { LLMClientWithModel } from '../llm/client.js'
 import type { SessionManager } from '../session/index.js'
 import { getEventStore } from '../events/index.js'
+import { applyMaxVisibleItems } from '../db/settings.js'
 
 import type { Message, Provider, ProviderBackend, StatsIdentity, Attachment } from '../../shared/types.js'
 import type { ProviderManager } from '../provider-manager.js'
@@ -623,10 +624,27 @@ export function createWebSocketServer(
     if (event.type === 'session_updated') {
       const updatedSession = event.session
       const eventStore = getEventStore()
-      const events = eventStore.getEvents(updatedSession.id)
-      const messages = buildMessagesFromStoredEvents(events)
+      const { snapshot, events: eventsSinceSnapshot } = eventStore.getEventsSinceSnapshot(updatedSession.id)
+
+      let events: import('../events/types.js').StoredEvent[]
+      if (snapshot) {
+        const snapshotEvent: import('../events/types.js').StoredEvent = {
+          seq: 0,
+          timestamp: snapshot.snapshotAt,
+          sessionId: updatedSession.id,
+          type: 'turn.snapshot',
+          data: snapshot,
+        }
+        events = [snapshotEvent, ...eventsSinceSnapshot]
+      } else {
+        events = eventsSinceSnapshot
+      }
+
+      const { messages } = buildMessagesFromStoredEvents(events)
       const pendingConfirmations = foldPendingConfirmations(events)
       const pendingQuestions = getPendingQuestionsForSession(updatedSession.id)
+
+      const { truncated: truncatedMessages, hiddenCount } = applyMaxVisibleItems(messages)
 
       // Update activeWorkdir when workspace changed so git polling picks up the right dir
       const effectiveWorkdir = updatedSession.workspace ?? updatedSession.workdir
@@ -648,7 +666,14 @@ export function createWebSocketServer(
       // Broadcast session.state immediately — synchronous, no await
       broadcastForSession(
         updatedSession.id,
-        createSessionStateMessage(updatedSession, messages, pendingConfirmations, pendingQuestions),
+        createSessionStateMessage(
+          updatedSession,
+          truncatedMessages,
+          pendingConfirmations,
+          pendingQuestions,
+          undefined,
+          hiddenCount,
+        ),
       )
 
       // Always send git.status after a session update to sync workspace/branch in the UI,
