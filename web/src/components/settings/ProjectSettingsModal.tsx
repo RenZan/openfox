@@ -6,6 +6,7 @@ import { useProjectStore } from '../../stores/project'
 import { useWorkspaceConfigStore } from '../../stores/workspace-config'
 import { wsClient } from '../../lib/ws'
 import { authFetch } from '../../lib/api'
+import { isValidRootDir } from '@shared/workspace.js'
 
 interface ProjectSettingsModalProps {
   isOpen: boolean
@@ -123,34 +124,6 @@ export function ProjectSettingsModal({ isOpen, onClose, project }: ProjectSettin
     handleClose,
   ])
 
-  const DANGEROUS_PATHS = [
-    '/',
-    '/etc',
-    '/dev',
-    '/proc',
-    '/sys',
-    '/boot',
-    '/bin',
-    '/sbin',
-    '/lib',
-    '/lib64',
-    '/usr',
-    '/var',
-    '/opt',
-    '/root',
-    '/run',
-    '/tmp',
-    '/home',
-    '/mnt',
-    '/media',
-    '/lost+found',
-  ]
-
-  const isValidRootDir = (path: string): boolean => {
-    const normalized = path.replace(/\/+$/, '') || '/'
-    return !DANGEROUS_PATHS.includes(normalized)
-  }
-
   const handleSave = async () => {
     const trimmedRootDir = rootDir.trim()
     const prevRootDir = wsConfig?.rootDir ?? ''
@@ -181,11 +154,16 @@ export function ProjectSettingsModal({ isOpen, onClose, project }: ProjectSettin
       const res = await authFetch(`/api/workspace/config/validate?workdir=${encodeURIComponent(project.workdir)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rootDir: trimmedRootDir, workdir: project.workdir }),
+        body: JSON.stringify({
+          rootDir: trimmedRootDir,
+          workdir: project.workdir,
+          projectName: project.name,
+        }),
       })
 
       if (!res.ok) {
-        setSaveError('Failed to validate workspace root directory')
+        const data = await res.json().catch(() => ({}))
+        setSaveError(data?.error ?? 'Failed to validate workspace root directory')
         setSaving(false)
         return
       }
@@ -221,11 +199,17 @@ export function ProjectSettingsModal({ isOpen, onClose, project }: ProjectSettin
       const res = await authFetch(`/api/workspace/config/validate?workdir=${encodeURIComponent(project.workdir)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rootDir: pendingRootDir, workdir: project.workdir, createIfMissing: true }),
+        body: JSON.stringify({
+          rootDir: pendingRootDir,
+          workdir: project.workdir,
+          projectName: project.name,
+          createIfMissing: true,
+        }),
       })
 
       if (!res.ok) {
-        setSaveError('Failed to create directory')
+        const data = await res.json().catch(() => ({}))
+        setSaveError(data?.error ?? 'Failed to create directory')
         setSaving(false)
         return
       }

@@ -59,6 +59,10 @@ export async function getWorkspacesDir(projectName: string, projectDir: string):
   return join(getGlobalDataDir(), 'workspaces', projectName)
 }
 
+export function getDefaultGlobalWorkspacesDir(projectName: string): string {
+  return join(getGlobalDataDir(), 'workspaces', projectName)
+}
+
 export function getGitBranch(cwd: string): Promise<string | null> {
   return captureStdout(cwd, ['rev-parse', '--abbrev-ref', 'HEAD']).then((r) => r?.trim() ?? null)
 }

@@ -1,31 +1,72 @@
 import { Router } from 'express'
-import { stat, mkdir, readdir } from 'node:fs/promises'
+import { stat, mkdir, readdir, access } from 'node:fs/promises'
+import { constants } from 'node:fs'
 import { resolve, isAbsolute, join } from 'node:path'
+import { homedir } from 'node:os'
 import { loadWorkspaceConfig, saveWorkspaceConfig } from '../git/workspace-config.js'
 import type { WorkspaceConfig } from '../../shared/workspace.js'
+import { isValidRootDir } from '../../shared/workspace.js'
 
-const DANGEROUS_PATHS = [
-  '/',
-  '/etc',
-  '/dev',
-  '/proc',
-  '/sys',
-  '/boot',
-  '/bin',
-  '/sbin',
-  '/lib',
-  '/lib64',
-  '/usr',
-  '/var',
-  '/opt',
-  '/root',
-  '/run',
-  '/tmp',
-  '/home',
-  '/mnt',
-  '/media',
-  '/lost+found',
-]
+function getServerMode(): 'development' | 'production' {
+  return process.env['OPENFOX_DEV'] === 'true' ? 'development' : 'production'
+}
+
+function getDefaultGlobalDir(projectName: string): string {
+  const mode = getServerMode()
+  const suffix = mode === 'development' ? '-dev' : ''
+  const home = homedir()
+  const dataDir = process.env['XDG_DATA_HOME'] ?? join(home, '.local', 'share')
+  return join(dataDir, `openfox${suffix}`, 'workspaces', projectName)
+}
+
+async function isWritable(path: string): Promise<boolean> {
+  try {
+    await access(path, constants.W_OK)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function resolveRootDir(rootDir: string, workdir: string): string {
+  return isAbsolute(rootDir) ? rootDir : resolve(workdir, rootDir)
+}
+
+async function checkDirExists(path: string): Promise<boolean> {
+  try {
+    const st = await stat(path)
+    return st.isDirectory()
+  } catch {
+    return false
+  }
+}
+
+async function validatePathWritable(path: string): Promise<string | null> {
+  if (await isWritable(path)) return null
+  return 'Workspace root directory exists but is not writable'
+}
+
+async function findOrphanedWorkspaces(dir: string): Promise<{ name: string }[]> {
+  const results: { name: string }[] = []
+  try {
+    const entries = await readdir(dir, { withFileTypes: true })
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        try {
+          const gitStat = await stat(join(dir, entry.name, '.git'))
+          if (gitStat.isDirectory()) {
+            results.push({ name: entry.name })
+          }
+        } catch {
+          // Not a valid git workspace
+        }
+      }
+    }
+  } catch {
+    // Directory doesn't exist or not readable
+  }
+  return results
+}
 
 export function createWorkspaceConfigRoutes(): Router {
   const router = Router()
@@ -52,7 +93,19 @@ export function createWorkspaceConfigRoutes(): Router {
       config.setup = setup
     }
     if (typeof rootDir === 'string') {
-      config.rootDir = rootDir
+      const trimmed = rootDir.trim()
+      if (trimmed) {
+        const resolvedPath = resolveRootDir(trimmed, workdir)
+        if (!isValidRootDir(resolvedPath)) {
+          return res.status(400).json({ error: 'Invalid workspace root directory: cannot use system-critical paths' })
+        }
+        const dirExists = await checkDirExists(resolvedPath)
+        if (dirExists) {
+          const writableErr = await validatePathWritable(resolvedPath)
+          if (writableErr) return res.status(400).json({ error: writableErr })
+        }
+        config.rootDir = trimmed
+      }
     }
     try {
       await saveWorkspaceConfig(workdir, config)
@@ -63,7 +116,7 @@ export function createWorkspaceConfigRoutes(): Router {
   })
 
   router.post('/config/validate', async (req, res) => {
-    const { rootDir, workdir, createIfMissing } = req.body
+    const { rootDir, workdir, projectName, createIfMissing } = req.body
     if (!rootDir || typeof rootDir !== 'string') {
       return res.status(400).json({ error: 'rootDir is required' })
     }
@@ -71,61 +124,45 @@ export function createWorkspaceConfigRoutes(): Router {
       return res.status(400).json({ error: 'workdir is required' })
     }
 
-    const resolvedPath = isAbsolute(rootDir) ? rootDir : resolve(workdir, rootDir)
+    const resolvedPath = resolveRootDir(rootDir, workdir)
 
-    const normalized = resolvedPath.replace(/\/+$/, '') || '/'
-    if (DANGEROUS_PATHS.includes(normalized)) {
+    if (!isValidRootDir(resolvedPath)) {
       return res.status(400).json({ error: 'Invalid workspace root directory: cannot use system-critical paths' })
     }
 
-    let exists = false
-    try {
-      const st = await stat(resolvedPath)
-      exists = st.isDirectory()
-    } catch {
-      // Directory does not exist
+    let dirExists = await checkDirExists(resolvedPath)
+    if (dirExists) {
+      const writableErr = await validatePathWritable(resolvedPath)
+      if (writableErr) return res.status(400).json({ error: writableErr })
     }
 
     let created = false
-    if (!exists && createIfMissing) {
+    if (!dirExists && createIfMissing) {
       await mkdir(resolvedPath, { recursive: true })
-      exists = true
+      dirExists = true
       created = true
     }
 
     const workspaces: { name: string }[] = []
     try {
       const currentConfig = await loadWorkspaceConfig(workdir)
-      if (currentConfig?.rootDir) {
-        const oldRootDir = isAbsolute(currentConfig.rootDir)
-          ? currentConfig.rootDir
-          : resolve(workdir, currentConfig.rootDir)
+      const previousRootDir = currentConfig?.rootDir ? resolveRootDir(currentConfig.rootDir, workdir) : null
 
-        if (oldRootDir !== resolvedPath) {
-          try {
-            const entries = await readdir(oldRootDir, { withFileTypes: true })
-            for (const entry of entries) {
-              if (entry.isDirectory()) {
-                try {
-                  const gitStat = await stat(join(oldRootDir, entry.name, '.git'))
-                  if (gitStat.isDirectory()) {
-                    workspaces.push({ name: entry.name })
-                  }
-                } catch {
-                  // Not a valid git workspace
-                }
-              }
-            }
-          } catch {
-            // Old rootDir doesn't exist or is not readable
-          }
+      if (previousRootDir && previousRootDir !== resolvedPath) {
+        const orphans = await findOrphanedWorkspaces(previousRootDir)
+        workspaces.push(...orphans)
+      } else if (!previousRootDir && projectName && typeof projectName === 'string') {
+        const defaultDir = getDefaultGlobalDir(projectName)
+        if (defaultDir !== resolvedPath) {
+          const orphans = await findOrphanedWorkspaces(defaultDir)
+          workspaces.push(...orphans)
         }
       }
     } catch {
       // No previous config
     }
 
-    res.json({ exists, resolvedPath, created, workspaces })
+    res.json({ exists: dirExists, resolvedPath, created, workspaces })
   })
 
   return router
