@@ -65,11 +65,13 @@ The agent examines the PR:
 
 ### Phase 3 — Fix
 
-The user approves the fix plan. The agent applies fixes in the workspace and commits.
+The user approves the fix plan. The agent applies fixes in the workspace.
 
 ```bash
 # 4. Apply fixes (agent uses write_file / edit_file tools)
-#    NOTE: agent does NOT commit or push until user says so
+#    NOTE: Do NOT commit or push yet — that happens in Phase 5 after user tests.
+#    Precommit hooks take >40s; if you do commit later, use a 120s timeout:
+#    git commit -m "message"   # timeout: 120000ms
 ```
 
 ### Phase 4 — User Tests
@@ -94,7 +96,11 @@ Handoff format:
 >
 > **What to test:**
 >
-> - _specific things to click/look for_
+> Write each test item from the user's perspective. Describe what they do
+> (e.g. 'tell the agent to…', 'click the branch modal button…', 'open
+> settings and toggle…') and what they should observe as a result.
+>
+> - _specific things to try_
 > - _edge cases_"
 
 The user opens the link and kicks the tires. Loop back to Phase 3 if adjustments are needed.
@@ -107,29 +113,35 @@ When the user says **"Merge it"**, the agent:
 # 6. Switch back to the review workspace
 workspace switch review-pr-<N>
 
-# 7. Push fixes to the PR branch
+# 7. Commit fixes (if any were applied in Phase 3)
+git add -A && git commit -m "review: <description>"   # timeout: 120000ms
+
+# 8. Push fixes to the PR branch
+#    After rebasing in Phase 1, the local branch has diverged from the remote,
+#    so a force-push is needed. Use --force-with-lease first; fall back to
+#    --force if the remote ref has moved since we last fetched.
 #    Same-repo:
-git push origin HEAD:<remote-branch-name>
+git push origin HEAD:<remote-branch-name> --force-with-lease || git push origin HEAD:<remote-branch-name> --force
 #    Fork (maintainer_can_modify=true):
 git remote add fork-<N> git@github.com:<user>/openfox.git
-git push fork-<N> HEAD:<remote-branch-name>
+git push fork-<N> HEAD:<remote-branch-name> --force-with-lease || git push fork-<N> HEAD:<remote-branch-name> --force
 git remote remove fork-<N>
 
-# 8. Safety net — ensure PR targets develop (should already be develop from Phase 1)
+# 9. Safety net — ensure PR targets develop (should already be develop from Phase 1)
 gh api repos/co-l/openfox/pulls/<N> -X PATCH -f base=develop
 
-# 9. Squash-merge via API
+# 10. Squash-merge via API
 gh api repos/co-l/openfox/pulls/<N>/merge -X PUT \
   -f merge_method=squash \
   -f commit_title="feat: description (#<N>)"
 
-# 10. Return to main project
+# 11. Return to main project
 workspace switch original
 
-# 11. Update develop locally
+# 12. Update develop locally
 git checkout develop && git pull origin develop --ff-only
 
-# 12. Clean up the review workspace
+# 13. Clean up the review workspace
 workspace delete review-pr-<N>
 ```
 
@@ -157,7 +169,7 @@ npm run test:unit && npm run test:e2e
 
 # ── Fix (agent proposes → user approves) ──
 # agent applies fixes via edit_file
-git add -A && git commit -m "review: fix windows path handling in npm spawn"
+# NOTE: Do NOT commit or push yet — that happens after user tests.
 
 # ── Agent starts dev server and hands off ──
 dev_server start
@@ -167,8 +179,9 @@ dev_server start
 
 # ── Merge (user says "merge it") ──
 workspace switch review-pr-103
+git add -A && git commit -m "review: fix windows path handling in npm spawn"   # timeout: 120000ms
 git remote add fork-103 git@github.com:RenZan/openfox.git
-git push fork-103 HEAD:feature/manage-pdf-images
+git push fork-103 HEAD:feature/manage-pdf-images --force-with-lease || git push fork-103 HEAD:feature/manage-pdf-images --force
 git remote remove fork-103
 gh api repos/co-l/openfox/pulls/103 -X PATCH -f base=develop
 gh api repos/co-l/openfox/pulls/103/merge -X PUT \
@@ -220,8 +233,6 @@ workspace delete review-pr-<N>
 ```
 
 ## Common Pitfalls
-
-### Orphaned workspaces
 
 ### `gh pr merge` GraphQL deprecation
 
