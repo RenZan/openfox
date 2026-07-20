@@ -6,6 +6,7 @@ import { getRuntimeConfig } from '../runtime-config.js'
 import { extractPdfContent } from '../tools/pdf-utils.js'
 import type { PdfBlock } from '../tools/pdf-utils.js'
 import { contentHash, cacheSet } from '../utils/cache.js'
+import { decodeDataUrl } from '../utils/data-url.js'
 
 export async function loadVisionModelFromGlobalConfig(): Promise<
   { baseUrl: string; model: string; timeout: number; backend: VisionBackend } | undefined
@@ -61,16 +62,6 @@ function isImageAttachment(att: Attachment): boolean {
 
 function isPdfAttachment(att: Attachment): boolean {
   return att.mimeType === 'application/pdf'
-}
-
-function decodePdfDataUrl(data: string): Buffer | null {
-  const match = data.match(/^data:.*?;base64,(.+)$/)
-  if (!match?.[1]) return null
-  try {
-    return Buffer.from(match[1], 'base64')
-  } catch {
-    return null
-  }
 }
 
 function hasImageMetadata(result: { metadata?: Record<string, unknown> }): boolean {
@@ -149,7 +140,7 @@ async function describePdfAttachment(
     return output
   }
 
-  const buffer = decodePdfDataUrl(att.data)
+  const buffer = decodeDataUrl(att.data)
   if (!buffer) {
     const fallback = `[PDF: ${filenameLabel}] (could not decode)`
     cacheSet(descriptionCache, cacheKey, fallback)

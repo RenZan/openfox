@@ -331,15 +331,19 @@ export async function extractPdfContent(buffer: Buffer): Promise<PdfResult> {
   const maxImages = OUTPUT_LIMITS.read_file.maxPdfImages
   const imageCounter = { count: 0, limitReached: false }
 
-  let title: string | null
-  let author: string | null
+  let title: string | null = null
+  let author: string | null = null
 
   try {
     const rawMeta = await doc.getMetadata()
     const info = rawMeta.info as Record<string, unknown> | undefined
     title = (info?.['Title'] as string) || null
     author = (info?.['Author'] as string) || null
+  } catch {
+    // metadata is optional, continue with null values
+  }
 
+  try {
     for (let i = 1; i <= limitedPageCount; i++) {
       const page = await doc.getPage(i)
       try {
@@ -350,8 +354,7 @@ export async function extractPdfContent(buffer: Buffer): Promise<PdfResult> {
       }
     }
   } catch {
-    title = null
-    author = null
+    // page extraction failed, keep whatever blocks were collected
   } finally {
     doc.cleanup()
   }

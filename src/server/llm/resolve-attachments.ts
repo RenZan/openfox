@@ -3,6 +3,7 @@ import type { Attachment } from '../../shared/types.js'
 import { extractPdfContent, extractPdfText } from '../tools/pdf-utils.js'
 import { TEXT_MIME_EXACT, TEXT_MIME_PREFIXES } from '../../shared/constants.js'
 import { contentHash, cacheSet } from '../utils/cache.js'
+import { decodeDataUrl } from '../utils/data-url.js'
 
 export type ContentPart = { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }
 
@@ -10,14 +11,6 @@ const pdfBlockCache = new Map<string, ContentPart[]>()
 
 export function clearPdfBlockCache(): void {
   pdfBlockCache.clear()
-}
-
-function decodeDataUrlToText(data: string): string {
-  const match = data.match(/^data:.*?;base64,(.+)$/)
-  if (match?.[1]) {
-    return Buffer.from(match[1], 'base64').toString('utf8')
-  }
-  return data
 }
 
 export async function extractPdfFromDataUrl(data: string, filename: string): Promise<string> {
@@ -73,7 +66,7 @@ async function resolveAttachmentToText(attachment: Attachment, supportsVision: b
   const mimeType = attachment.mimeType
 
   if (TEXT_MIME_EXACT.includes(mimeType) || TEXT_MIME_PREFIXES.some((p) => mimeType.startsWith(p))) {
-    const text = decodeDataUrlToText(attachment.data)
+    const text = decodeDataUrl(attachment.data)?.toString('utf8') ?? attachment.data
     return `[File: ${attachment.filename || 'file'}]\n${text}`
   }
 
