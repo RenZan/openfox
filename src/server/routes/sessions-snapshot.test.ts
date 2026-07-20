@@ -8,18 +8,11 @@ vi.mock('../db/settings.js', () => {
   return {
     getSetting: (key: string) => store.get(key) ?? null,
     setSetting: (key: string, value: string) => store.set(key, value),
-    SETTINGS_KEYS: { DISPLAY_MAX_VISIBLE_ITEMS: 'display.maxVisibleItems' },
-    applyMaxVisibleItems: <T>(items: T[]) => {
+    getMaxVisibleItems: () => {
       const setting = store.get('display.maxVisibleItems')
-      const maxVisibleItems = setting ? parseInt(setting, 10) : 0
-      let truncated = items
-      let hiddenCount = 0
-      if (maxVisibleItems > 0 && items.length > maxVisibleItems) {
-        truncated = items.slice(-maxVisibleItems)
-        hiddenCount = items.length - maxVisibleItems
-      }
-      return { truncated, hiddenCount }
+      return setting ? parseInt(setting, 10) : 0
     },
+    SETTINGS_KEYS: { DISPLAY_MAX_VISIBLE_ITEMS: 'display.maxVisibleItems' },
     __store: store,
   }
 })
@@ -129,7 +122,12 @@ describe('GET /api/sessions/:id — snapshot-optimized loading', () => {
     }))
 
     vi.doMock('../events/folding.js', () => ({
-      buildMessagesFromStoredEvents: vi.fn(() => ({ messages: mockMessages, hiddenCount: 0 })),
+      buildMessagesFromStoredEvents: vi.fn((_events: unknown, maxVisibleItems?: number) => {
+        if (maxVisibleItems !== undefined && maxVisibleItems > 0 && mockMessages.length > maxVisibleItems) {
+          return { messages: mockMessages.slice(-maxVisibleItems), hiddenCount: mockMessages.length - maxVisibleItems }
+        }
+        return { messages: mockMessages, hiddenCount: 0 }
+      }),
       foldPendingConfirmations: vi.fn(() => []),
     }))
 
@@ -144,7 +142,7 @@ describe('GET /api/sessions/:id — snapshot-optimized loading', () => {
       const { getEventStore } = await import('../events/index.js')
       const { buildMessagesFromStoredEvents, foldPendingConfirmations } = await import('../events/folding.js')
       const { getPendingQuestionsForSession } = await import('../tools/index.js')
-      const { applyMaxVisibleItems } = await import('../db/settings.js')
+      const { getMaxVisibleItems } = await import('../db/settings.js')
 
       const session = mockSession
       if (!session) {
@@ -153,18 +151,16 @@ describe('GET /api/sessions/:id — snapshot-optimized loading', () => {
 
       const eventStore = getEventStore()
       const { events } = eventStore.getEventsSinceSnapshot(req.params.id)
-      const { messages } = buildMessagesFromStoredEvents(events)
+      const maxVisibleItems = req.query['full'] === 'true' ? undefined : getMaxVisibleItems() || undefined
+      const { messages, hiddenCount } = buildMessagesFromStoredEvents(events, maxVisibleItems)
       const contextState = null
       const queueState = null
       const pendingQuestions = getPendingQuestionsForSession(req.params.id)
       const pendingConfirmations = foldPendingConfirmations(events)
 
-      const { truncated: truncatedMessages, hiddenCount } =
-        req.query['full'] === 'true' ? { truncated: messages, hiddenCount: 0 } : applyMaxVisibleItems(messages)
-
       res.json({
         session,
-        messages: truncatedMessages,
+        messages,
         hiddenCount,
         contextState,
         queueState,

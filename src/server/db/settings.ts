@@ -116,14 +116,3 @@ export function getMaxVisibleItems(): number {
   const setting = getSetting(SETTINGS_KEYS.DISPLAY_MAX_VISIBLE_ITEMS)
   return setting ? parseInt(setting, 10) : 0
 }
-
-export function applyMaxVisibleItems<T>(items: T[]): { truncated: T[]; hiddenCount: number } {
-  const maxVisibleItems = getMaxVisibleItems()
-  let truncated = items
-  let hiddenCount = 0
-  if (maxVisibleItems > 0 && items.length > maxVisibleItems) {
-    truncated = items.slice(-maxVisibleItems)
-    hiddenCount = items.length - maxVisibleItems
-  }
-  return { truncated, hiddenCount }
-}
