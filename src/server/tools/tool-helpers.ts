@@ -74,8 +74,9 @@ export function requestUserConfirmation(context: ToolContext, toolLabel: string,
     return Promise.resolve(false)
   }
   if (typeof context.onEvent !== 'function') return Promise.resolve(false)
-  // Use a fresh UUID so two confirmations within the same tool call don't collide
-  const callId = randomUUID()
+  // Use the tool call ID so the frontend can match this confirmation to the tool call UI.
+  // Fall back to a fresh UUID if no toolCallId is available.
+  const callId = context.toolCallId ?? randomUUID()
   // Persist to EventStore so the confirmation survives navigation/reload
   try {
     const eventStore = getEventStore()
