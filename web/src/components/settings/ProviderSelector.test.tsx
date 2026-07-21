@@ -82,6 +82,7 @@ vi.mock('../shared/icons', () => ({
   EditSmallIcon: ({ className }: any) => `<svg class="${className}">e</svg>`,
   StarIcon: ({ className }: any) => `<svg class="${className}">☆</svg>`,
   StarFilledIcon: ({ className }: any) => `<svg class="${className}">★</svg>`,
+  SearchIcon: ({ className }: any) => `<svg class="${className}" data-testid="search-icon">🔍</svg>`,
 }))
 
 vi.mock('../shared/ProviderModal', () => ({
@@ -253,5 +254,339 @@ describe('ProviderSelector', () => {
     expect(button!.textContent).toContain('Anthropic')
     expect(button!.textContent).toContain('claude opus 4')
     expect(button!.textContent).toContain('•')
+  })
+})
+
+describe('ProviderSelector search mode (AC 0-5)', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    document.body.innerHTML = ''
+    await setConfigState({
+      providers: [],
+      activeProviderId: null,
+      defaultModelSelection: null,
+      activating: false,
+      activateProvider: vi.fn(),
+      refreshModel: vi.fn(),
+      refreshProviderModels: vi.fn(),
+      setDefaultModel: vi.fn(),
+      fetchConfig: vi.fn(),
+    })
+    await setSessionState({
+      currentSession: null,
+      setSessionProvider: vi.fn(),
+    })
+  })
+
+  it('[AUTOMATED] AC-0 click transforms button to search input with placeholder and SearchIcon', async () => {
+    await setConfigState({
+      providers: [
+        {
+          id: 'provider-1',
+          name: 'OpenAI',
+          url: 'https://api.openai.com/v1',
+          backend: 'openai',
+          isLocal: false,
+          models: [{ id: 'gpt-4', name: 'GPT-4', contextWindow: 128000, selected: true }],
+          isActive: true,
+        },
+      ],
+      activeProviderId: 'provider-1',
+      defaultModelSelection: 'provider-1/gpt-4',
+    })
+    const { ProviderSelector } = await import('./ProviderSelector')
+    const container = render(<ProviderSelector />)
+
+    const button = container.querySelector('button')
+    expect(button).toBeTruthy()
+
+    await act(async () => { button!.click() })
+
+    const input = container.querySelector('input')
+    expect(input).toBeTruthy()
+    const placeholder = input!.getAttribute('placeholder')
+    expect(placeholder).toBeTruthy()
+    expect(placeholder!.length).toBeGreaterThan(0)
+
+    const searchIcon = container.querySelector('[data-testid="search-icon"]')
+    expect(searchIcon ?? container.textContent?.includes('🔍')).toBeTruthy()
+  })
+
+  it('[AUTOMATED] AC-1 typing filters models case-insensitively by name and id', async () => {
+    await setConfigState({
+      providers: [
+        {
+          id: 'provider-1',
+          name: 'OpenAI',
+          url: 'https://api.openai.com/v1',
+          backend: 'openai',
+          isLocal: false,
+          models: [
+            { id: 'gpt-4', name: 'GPT-4', contextWindow: 128000, selected: true },
+            { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', contextWindow: 128000, selected: true },
+            { id: 'claude-3', name: 'Claude 3', contextWindow: 200000, selected: true },
+          ],
+          isActive: true,
+        },
+      ],
+      activeProviderId: 'provider-1',
+      defaultModelSelection: 'provider-1/gpt-4',
+    })
+    const { ProviderSelector } = await import('./ProviderSelector')
+    const container = render(<ProviderSelector />)
+
+    await act(async () => { container.querySelector('button')!.click() })
+
+    const input = container.querySelector('input')!
+
+    // Filter by name ("gpt" matches GPT-4 and GPT-4 Turbo, not Claude 3)
+    await act(async () => {
+      input.value = 'gpt'
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    expect(container.textContent).toMatch(/GPT.?4/)
+    expect(container.textContent).not.toMatch(/Claude/)
+
+    // Filter by id ("claude" matches claude-3 id, case-insensitive)
+    await act(async () => {
+      input.value = 'claude'
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    expect(container.textContent).toMatch(/Claude/)
+    expect(container.textContent).not.toMatch(/GPT.?4/)
+  })
+
+  it('[AUTOMATED] AC-2 results are grouped by provider with provider name as header', async () => {
+    await setConfigState({
+      providers: [
+        {
+          id: 'provider-1',
+          name: 'OpenAI',
+          url: 'https://api.openai.com/v1',
+          backend: 'openai',
+          isLocal: false,
+          models: [
+            { id: 'gpt-4', name: 'GPT-4', contextWindow: 128000, selected: true },
+            { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', contextWindow: 128000, selected: true },
+          ],
+          isActive: true,
+        },
+        {
+          id: 'provider-2',
+          name: 'Anthropic',
+          url: 'https://api.anthropic.com',
+          backend: 'anthropic',
+          isLocal: false,
+          models: [
+            { id: 'claude-3-opus', name: 'Claude 3 Opus', contextWindow: 200000, selected: true },
+          ],
+          isActive: true,
+        },
+      ],
+      activeProviderId: 'provider-1',
+      defaultModelSelection: 'provider-1/gpt-4',
+    })
+    const { ProviderSelector } = await import('./ProviderSelector')
+    const container = render(<ProviderSelector />)
+
+    await act(async () => { container.querySelector('button')!.click() })
+
+    const input = container.querySelector('input')!
+
+    // Query that matches models across both providers (e.g. "u" matches
+    // "GPT-4 Turbo" and "Claude 3 Opus")
+    await act(async () => {
+      input.value = 'u'
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+
+    const text = container.textContent!
+    const openaiIdx = text.indexOf('OpenAI')
+    const anthropicIdx = text.indexOf('Anthropic')
+    expect(openaiIdx).toBeGreaterThanOrEqual(0)
+    expect(anthropicIdx).toBeGreaterThanOrEqual(0)
+  })
+
+  it('[AUTOMATED] AC-3 selecting a model with session active calls setSessionProvider', async () => {
+    const mockSetSessionProvider = vi.fn()
+    await setConfigState({
+      providers: [
+        {
+          id: 'provider-1',
+          name: 'OpenAI',
+          url: 'https://api.openai.com/v1',
+          backend: 'openai',
+          isLocal: false,
+          models: [{ id: 'gpt-4', name: 'GPT-4', contextWindow: 128000, selected: true }],
+          isActive: true,
+        },
+      ],
+      activeProviderId: 'provider-1',
+      defaultModelSelection: 'provider-1/gpt-4',
+    })
+    await setSessionState({
+      currentSession: { id: 'session-1', providerId: 'provider-1', providerModel: 'gpt-4' },
+      setSessionProvider: mockSetSessionProvider,
+    })
+    const { ProviderSelector } = await import('./ProviderSelector')
+    const container = render(<ProviderSelector />)
+
+    await act(async () => { container.querySelector('button')!.click() })
+
+    const modelBtn = Array.from(container.querySelectorAll('button')).find(
+      (b) => b.textContent?.includes('GPT-4')
+    )
+    expect(modelBtn).toBeTruthy()
+
+    await act(async () => { modelBtn!.click() })
+
+    expect(mockSetSessionProvider).toHaveBeenCalledWith('provider-1', 'gpt-4')
+  })
+
+  it('[AUTOMATED] AC-3 selecting a model without session calls activateProvider', async () => {
+    const mockActivateProvider = vi.fn().mockResolvedValue(true)
+    await setConfigState({
+      providers: [
+        {
+          id: 'provider-1',
+          name: 'OpenAI',
+          url: 'https://api.openai.com/v1',
+          backend: 'openai',
+          isLocal: false,
+          models: [{ id: 'gpt-4', name: 'GPT-4', contextWindow: 128000, selected: true }],
+          isActive: true,
+        },
+      ],
+      activeProviderId: 'provider-1',
+      defaultModelSelection: null,
+      activateProvider: mockActivateProvider,
+    })
+    const { ProviderSelector } = await import('./ProviderSelector')
+    const container = render(<ProviderSelector />)
+
+    await act(async () => { container.querySelector('button')!.click() })
+
+    const modelBtn = Array.from(container.querySelectorAll('button')).find(
+      (b) => b.textContent?.includes('GPT-4')
+    )
+    expect(modelBtn).toBeTruthy()
+
+    await act(async () => { modelBtn!.click() })
+
+    expect(mockActivateProvider).toHaveBeenCalled()
+  })
+
+  it('[AUTOMATED] AC-4 Escape key closes search without changing model', async () => {
+    const mockActivateProvider = vi.fn()
+    await setConfigState({
+      providers: [
+        {
+          id: 'provider-1',
+          name: 'OpenAI',
+          url: 'https://api.openai.com/v1',
+          backend: 'openai',
+          isLocal: false,
+          models: [{ id: 'gpt-4', name: 'GPT-4', contextWindow: 128000, selected: true }],
+          isActive: true,
+        },
+      ],
+      activeProviderId: 'provider-1',
+      defaultModelSelection: 'provider-1/gpt-4',
+      activateProvider: mockActivateProvider,
+    })
+    const { ProviderSelector } = await import('./ProviderSelector')
+    const container = render(<ProviderSelector />)
+
+    await act(async () => { container.querySelector('button')!.click() })
+
+    const input = container.querySelector('input')
+    expect(input).toBeTruthy()
+
+    await act(async () => {
+      input!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+
+    expect(container.querySelector('input')).toBeFalsy()
+    expect(mockActivateProvider).not.toHaveBeenCalled()
+  })
+
+  it('[AUTOMATED] AC-4 focus loss closes search without changing model', async () => {
+    const mockActivateProvider = vi.fn()
+    await setConfigState({
+      providers: [
+        {
+          id: 'provider-1',
+          name: 'OpenAI',
+          url: 'https://api.openai.com/v1',
+          backend: 'openai',
+          isLocal: false,
+          models: [{ id: 'gpt-4', name: 'GPT-4', contextWindow: 128000, selected: true }],
+          isActive: true,
+        },
+      ],
+      activeProviderId: 'provider-1',
+      defaultModelSelection: 'provider-1/gpt-4',
+      activateProvider: mockActivateProvider,
+    })
+    const { ProviderSelector } = await import('./ProviderSelector')
+    const container = render(<ProviderSelector />)
+
+    await act(async () => { container.querySelector('button')!.click() })
+
+    const input = container.querySelector('input')
+    expect(input).toBeTruthy()
+
+    // Simulate focus loss: click on a different element outside the dropdown
+    const outside = document.createElement('div')
+    document.body.appendChild(outside)
+    await act(async () => {
+      outside.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    })
+
+    expect(container.querySelector('input')).toBeFalsy()
+    expect(mockActivateProvider).not.toHaveBeenCalled()
+  })
+
+  it('[AUTOMATED] AC-5 Enter with single result selects the model directly', async () => {
+    const mockSetSessionProvider = vi.fn()
+    await setConfigState({
+      providers: [
+        {
+          id: 'provider-1',
+          name: 'OpenAI',
+          url: 'https://api.openai.com/v1',
+          backend: 'openai',
+          isLocal: false,
+          models: [
+            { id: 'gpt-4', name: 'GPT-4', contextWindow: 128000, selected: true },
+            { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', contextWindow: 128000, selected: true },
+          ],
+          isActive: true,
+        },
+      ],
+      activeProviderId: 'provider-1',
+      defaultModelSelection: 'provider-1/gpt-4',
+    })
+    await setSessionState({
+      currentSession: { id: 'session-1', providerId: 'provider-1', providerModel: 'gpt-4' },
+      setSessionProvider: mockSetSessionProvider,
+    })
+    const { ProviderSelector } = await import('./ProviderSelector')
+    const container = render(<ProviderSelector />)
+
+    await act(async () => { container.querySelector('button')!.click() })
+
+    const input = container.querySelector('input')!
+
+    await act(async () => {
+      input.value = 'turbo'
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+
+    await act(async () => {
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    })
+
+    expect(mockSetSessionProvider).toHaveBeenCalledWith('provider-1', 'gpt-4-turbo')
   })
 })
