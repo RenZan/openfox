@@ -24,6 +24,7 @@ export function AutoPromptCard({ message }: AutoPromptCardProps) {
     compaction: 'prompt injected',
     subagent: 'instructions',
     workspace: `${metadata?.workspaceName ?? ''} · ${metadata?.branchName ?? ''}`,
+    branch: `🌿 ${metadata?.branchName ?? ''}`,
   }
   const label = typeLabels[metaType] ?? 'injected'
 

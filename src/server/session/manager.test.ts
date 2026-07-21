@@ -507,37 +507,6 @@ describe('SessionManager', () => {
     })
   })
 
-  describe('checkBranchConsistency', () => {
-    it('returns null when session has no persisted branch', async () => {
-      const session = manager.createSession(projectId)
-      expect(session.branch).toBeUndefined()
-      const result = await manager.checkBranchConsistency(session.id)
-      expect(result).toBeNull()
-    })
-
-    it('returns null when persisted branch matches actual branch', async () => {
-      const session = manager.createSession(projectId)
-      const { updateSessionBranch } = await import('../db/sessions.js')
-      updateSessionBranch(session.id, 'main')
-      mockGetGitBranch.mockResolvedValue('main')
-
-      const result = await manager.checkBranchConsistency(session.id)
-      expect(result).toBeNull()
-    })
-
-    it('returns warning string when persisted branch differs from actual branch', async () => {
-      const session = manager.createSession(projectId)
-      const { updateSessionBranch } = await import('../db/sessions.js')
-      updateSessionBranch(session.id, 'feature-x')
-      mockGetGitBranch.mockResolvedValue('main')
-
-      const result = await manager.checkBranchConsistency(session.id)
-      expect(result).toContain('Branch mismatch')
-      expect(result).toContain('feature-x')
-      expect(result).toContain('main')
-    })
-  })
-
   describe('branch persistence', () => {
     it('persists branch after update and reads it back', async () => {
       const session = manager.createSession(projectId)

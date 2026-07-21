@@ -498,6 +498,22 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
         }
       }
 
+      // Inject system reminder (mirrors workspace switch pattern)
+      const reminderContent = `<system-reminder>\nThis session is now operating on branch "${branch}".\nAll file and git operations should use this branch.\n</system-reminder>`
+      sessionManager.addMessage(req.params.id, {
+        role: 'user',
+        content: reminderContent,
+        isSystemGenerated: true,
+        messageKind: 'auto-prompt',
+        metadata: {
+          type: 'branch',
+          name: 'Branch',
+          color: '#22c55e',
+          kind: 'definition',
+          branchName: branch,
+        },
+      })
+
       res.json({ branch })
     } catch (err) {
       res.status(400).json({ error: err instanceof Error ? err.message : 'Failed to checkout branch' })
@@ -536,6 +552,22 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
           }
         }
       }
+
+      // Inject system reminder (mirrors workspace switch pattern)
+      const reminderContent = `<system-reminder>\nThis session is now operating on branch "${name}".\nAll file and git operations should use this branch.\n</system-reminder>`
+      sessionManager.addMessage(req.params.id, {
+        role: 'user',
+        content: reminderContent,
+        isSystemGenerated: true,
+        messageKind: 'auto-prompt',
+        metadata: {
+          type: 'branch',
+          name: 'Branch',
+          color: '#22c55e',
+          kind: 'definition',
+          branchName: name,
+        },
+      })
 
       res.json({ branch: name, sourceBranch: sourceBranch ?? null })
     } catch (err) {

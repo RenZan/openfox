@@ -175,20 +175,6 @@ export class SessionManager {
     return { workdir: effectiveWorkdir, branch }
   }
 
-  /**
-   * Check that the session's persisted branch matches the actual branch on disk.
-   * If they differ (and persisted branch exists), returns a warning message.
-   */
-  async checkBranchConsistency(sessionId: string): Promise<string | null> {
-    const session = this.getSession(sessionId)
-    if (!session?.branch) return null
-    const actualBranch = await getGitBranch(this.getEffectiveWorkdir(sessionId))
-    if (actualBranch && actualBranch !== session.branch) {
-      return `Branch mismatch: session expects "${session.branch}" but workspace is on "${actualBranch}". The workspace branch was changed externally.`
-    }
-    return null
-  }
-
   // ============================================================================
   // Session Lifecycle
   // ============================================================================
@@ -231,8 +217,7 @@ export class SessionManager {
     // Build full session object
     const session = this.buildSessionFromDb(dbSession)
 
-    // Persist the current branch asynchronously — the session is valid without it,
-    // and checkBranchConsistency will work once it's set.
+    // Persist the current branch asynchronously — the session is valid without it.
     getGitBranch(effectiveWorkdir)
       .then((branch) => {
         if (branch) {
@@ -1183,8 +1168,7 @@ export class SessionManager {
 
       if (actualBranch) {
         updateSessionBranch(sessionId, actualBranch)
-        // Sync the branch for all other sessions that share this workspace,
-        // so checkBranchConsistency works for them too
+        // Sync the branch for all other sessions that share this workspace
         const otherSessionsOnWorkspace = this.listSessions().filter(
           (s) => s.id !== sessionId && s.workspace === effectiveWorkdir,
         )
