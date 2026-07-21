@@ -303,7 +303,11 @@ export async function deleteWorkspace(projectName: string, name: string, project
     throw new Error(`Workspace "${name}" does not exist`)
   }
   const { rm } = await import('node:fs/promises')
-  await rm(wsPath, { recursive: true, force: true })
+  try {
+    execSync(`rm -rf "${wsPath}"`, { stdio: 'ignore', timeout: 10_000 })
+  } catch {
+    await rm(wsPath, { recursive: true, force: true })
+  }
   logger.info('Deleted workspace', { projectName, name, path: wsPath })
 }
 

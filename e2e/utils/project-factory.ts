@@ -4,10 +4,11 @@
  * Creates temporary directories with sample project structures.
  */
 
-import { mkdir, writeFile, rm } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { execSync } from 'node:child_process'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { forceRemove } from './force-remove.js'
 
 // ============================================================================
 // Types
@@ -208,7 +209,7 @@ export async function createTestProject(options: TestProjectOptions = {}): Promi
   return {
     path: projectPath,
     async cleanup() {
-      await rm(projectPath, { recursive: true, force: true })
+      await forceRemove(projectPath)
     },
   }
 }
