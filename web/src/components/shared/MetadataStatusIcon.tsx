@@ -9,9 +9,20 @@ const statusConfig: Record<string, { icon: string; color: string }> = {
   open: { icon: '○', color: 'text-accent-warning' },
   pending: { icon: '○', color: 'text-text-muted' },
   in_progress: { icon: '◌', color: 'text-accent-warning' },
+  validated: { icon: '✓', color: 'text-accent-success' },
 }
 
-export const statusOrder = ['open', 'in_progress', 'pending', 'completed', 'resolved', 'dismissed', 'passed', 'failed']
+export const statusOrder = [
+  'open',
+  'in_progress',
+  'pending',
+  'completed',
+  'validated',
+  'resolved',
+  'dismissed',
+  'passed',
+  'failed',
+]
 
 export function getStatusConfig(status: string): { icon: string; color: string } {
   return statusConfig[status] ?? { icon: '○', color: 'text-text-muted' }
