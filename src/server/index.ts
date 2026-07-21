@@ -410,7 +410,10 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
     if (!project) return res.status(404).json({ error: 'Project not found' })
     const { branch } = req.body
     if (!branch || typeof branch !== 'string') return res.status(400).json({ error: 'branch is required' })
-    const { checkoutBranch } = await import('./git/workspace.js')
+    const { checkoutBranch, isGitRepository } = await import('./git/workspace.js')
+    if (!(await isGitRepository(project.workdir))) {
+      return res.status(400).json({ error: 'Project is not a git repository' })
+    }
     try {
       await checkoutBranch(project.workdir, branch)
       // Update all sessions using this project tree
@@ -435,7 +438,11 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
     if (!project) return res.status(404).json({ error: 'Project not found' })
     const { name, sourceBranch } = req.body
     if (!name || typeof name !== 'string') return res.status(400).json({ error: 'name is required' })
-    const { createBranch, resolveAndValidateSourceBranch, validateRef } = await import('./git/workspace.js')
+    const { createBranch, resolveAndValidateSourceBranch, validateRef, isGitRepository } =
+      await import('./git/workspace.js')
+    if (!(await isGitRepository(project.workdir))) {
+      return res.status(400).json({ error: 'Project is not a git repository' })
+    }
     try {
       await validateRef(project.workdir, name)
       let sb: string | undefined
@@ -685,6 +692,13 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
     const { target, branch, sourceBranch } = req.body
     if (!target || typeof target !== 'string') return res.status(400).json({ error: 'target is required' })
 
+    const project = sessionManager.getProject(session.projectId)
+    if (!project) return res.status(404).json({ error: 'Project not found' })
+    const { isGitRepository } = await import('./git/workspace.js')
+    if (!(await isGitRepository(project.workdir))) {
+      return res.status(400).json({ error: 'Project is not a git repository' })
+    }
+
     try {
       const updated = await sessionManager.switchWorkspace(req.params.id, target, branch, sourceBranch)
       res.json({ session: updated })
@@ -700,6 +714,13 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
 
     const { target } = req.body
     if (!target || typeof target !== 'string') return res.status(400).json({ error: 'target is required' })
+
+    const project = sessionManager.getProject(session.projectId)
+    if (!project) return res.status(404).json({ error: 'Project not found' })
+    const { isGitRepository } = await import('./git/workspace.js')
+    if (!(await isGitRepository(project.workdir))) {
+      return res.status(400).json({ error: 'Project is not a git repository' })
+    }
 
     try {
       const updated = await sessionManager.deleteWorkspace(req.params.id, target)
