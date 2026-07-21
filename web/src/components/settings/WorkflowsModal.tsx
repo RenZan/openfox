@@ -221,12 +221,6 @@ export function WorkflowsModal({ isOpen, onClose, initialEditId }: WorkflowsModa
     return isDefault ? await fetchDefaultContent(workflowId) : await fetchWorkflow(workflowId)
   }
 
-  const handleView = async (workflowId: string) => {
-    const content = await fetchWorkflowContent(workflowId)
-    if (!content) return
-    populateForm(content, { editingId: workflowId, isReadOnly: true })
-  }
-
   const handleDuplicate = async (workflowId: string) => {
     const content = await fetchWorkflowContent(workflowId)
     if (!content) return
@@ -828,9 +822,6 @@ export function WorkflowsModal({ isOpen, onClose, initialEditId }: WorkflowsModa
             items={userItems}
             renderActions={(wf) => (
               <>
-                <EditButton onClick={() => handleView(wf.id)}>
-                  <EyeIcon />
-                </EditButton>
                 <EditButton onClick={() => handleEdit(wf.id)}>
                   <span className="text-[10px]">Edit</span>
                 </EditButton>
