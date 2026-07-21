@@ -435,12 +435,15 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
     if (!project) return res.status(404).json({ error: 'Project not found' })
     const { name, sourceBranch } = req.body
     if (!name || typeof name !== 'string') return res.status(400).json({ error: 'name is required' })
-    const { createBranch, resolveAndValidateSourceBranch, validateRef } = await import('./git/workspace.js')
+    const { createBranch, resolveAndValidateSourceBranch, validateRef, getDefaultBranch } =
+      await import('./git/workspace.js')
     try {
       await validateRef(project.workdir, name)
       let sb: string | undefined
       if (sourceBranch) {
         sb = await resolveAndValidateSourceBranch(project.workdir, sourceBranch, project.workdir)
+      } else {
+        sb = await getDefaultBranch(project.workdir)
       }
       await createBranch(project.workdir, name, sb)
       // Update all sessions using this project tree
@@ -522,8 +525,10 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
         const sb = await resolveAndValidateSourceBranch(effectiveWorkdir, sourceBranch, session.workdir)
         await createBranch(effectiveWorkdir, name, sb)
       } else {
-        const { createBranch } = await import('./git/workspace.js')
-        await createBranch(effectiveWorkdir, name)
+        const { createBranch, getDefaultBranch, resolveAndValidateSourceBranch } = await import('./git/workspace.js')
+        const defaultBranch = await getDefaultBranch(session.workdir)
+        const sb = await resolveAndValidateSourceBranch(effectiveWorkdir, defaultBranch, session.workdir)
+        await createBranch(effectiveWorkdir, name, sb)
       }
       updateSessionBranch(req.params.id, name)
 

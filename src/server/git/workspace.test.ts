@@ -231,7 +231,7 @@ describe('ensureWorkspace', () => {
 })
 
 describe('getDefaultBranch', () => {
-  it('returns origin/HEAD after fetch', async () => {
+  it('returns local origin/HEAD when defined (criterion 0)', async () => {
     vi.mocked(spawn)
       .mockReturnValueOnce(makeMockProc('') as any) // git fetch (runGit)
       .mockReturnValueOnce(makeMockProc('refs/remotes/origin/main\n') as any) // git symbolic-ref
@@ -239,22 +239,37 @@ describe('getDefaultBranch', () => {
     expect(result).toBe('main')
   })
 
-  it('falls back to current branch when origin/HEAD is not set', async () => {
+  it('queries remote via ls-remote when origin/HEAD is not set locally (criterion 1)', async () => {
     vi.mocked(spawn)
       .mockReturnValueOnce(makeMockProc('') as any) // git fetch (runGit)
       .mockReturnValueOnce(makeMockProc('', '', 1) as any) // git symbolic-ref fails
-      .mockReturnValueOnce(makeMockProc('develop\n') as any) // git rev-parse (current branch)
-    const result = await getDefaultBranch(CWD)
-    expect(result).toBe('develop')
-  })
-
-  it('falls back to "main" when nothing else works', async () => {
-    vi.mocked(spawn)
-      .mockReturnValueOnce(makeMockProc('') as any) // git fetch (runGit)
-      .mockReturnValueOnce(makeMockProc('', '', 1) as any) // git symbolic-ref fails
-      .mockReturnValueOnce(makeMockProc('', '', 1) as any) // git rev-parse fails
+      .mockReturnValueOnce(makeMockProc('ref: refs/heads/main\tHEAD\nabc123\tHEAD\n') as any) // git ls-remote --symref origin HEAD
     const result = await getDefaultBranch(CWD)
     expect(result).toBe('main')
+  })
+
+  it('falls back to "main" when both origin/HEAD and ls-remote fail (criterion 2)', async () => {
+    vi.mocked(spawn)
+      .mockReturnValueOnce(makeMockProc('') as any) // git fetch (runGit)
+      .mockReturnValueOnce(makeMockProc('', '', 1) as any) // git symbolic-ref fails
+      .mockReturnValueOnce(makeMockProc('', '', 1) as any) // git ls-remote fails
+    const result = await getDefaultBranch(CWD)
+    expect(result).toBe('main')
+  })
+
+  it('never falls back to the current working directory branch (criterion 3)', async () => {
+    vi.mocked(spawn)
+      .mockReturnValueOnce(makeMockProc('') as any) // git fetch (runGit)
+      .mockReturnValueOnce(makeMockProc('', '', 1) as any) // git symbolic-ref fails
+      .mockReturnValueOnce(makeMockProc('', '', 1) as any) // git ls-remote fails
+    const result = await getDefaultBranch(CWD)
+    expect(result).toBe('main')
+    const revParseCalls = vi
+      .mocked(spawn)
+      .mock.calls.filter(
+        (call) => Array.isArray(call[1]) && call[1][0] === 'rev-parse' && call[1][1] === '--abbrev-ref',
+      )
+    expect(revParseCalls).toHaveLength(0)
   })
 })
 

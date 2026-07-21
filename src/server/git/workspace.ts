@@ -115,17 +115,23 @@ export function validateRef(cwd: string, name: string): Promise<void> {
 /**
  * Resolve the default branch for a project directory.
  * Fetches origin to ensure remote refs are up to date, then reads origin/HEAD.
- * Falls back to the current branch, then 'main'.
+ * Falls back to querying the remote HEAD via ls-remote, then 'main'.
  */
 export async function getDefaultBranch(projectDir: string): Promise<string> {
   await runGit(projectDir, ['fetch', 'origin', '--no-tags', '--quiet']).catch(() => {})
+
   const originHead = await captureStdout(projectDir, ['symbolic-ref', 'refs/remotes/origin/HEAD'])
   if (originHead) {
     const branch = originHead.trim().replace('refs/remotes/origin/', '')
     if (branch) return branch
   }
-  const current = await getGitBranch(projectDir)
-  if (current) return current
+
+  const remoteHead = await captureStdout(projectDir, ['ls-remote', '--symref', 'origin', 'HEAD'])
+  if (remoteHead) {
+    const match = remoteHead.match(/^ref: refs\/heads\/(\S+)\tHEAD$/m)
+    if (match?.[1]) return match[1]
+  }
+
   return 'main'
 }
 
