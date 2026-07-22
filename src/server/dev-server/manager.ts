@@ -38,7 +38,13 @@ export interface LogChunk {
 }
 
 export type OutputListener = (workdir: string, chunk: LogChunk) => void
-export type StateListener = (workdir: string, state: DevServerState, errorMessage: string | undefined) => void
+export type StateListener = (
+  workdir: string,
+  state: DevServerState,
+  errorMessage: string | undefined,
+  url: string | null,
+  inspectProxyPort: number | null,
+) => void
 
 interface LogEntry {
   stream: 'stdout' | 'stderr'
@@ -122,8 +128,11 @@ class DevServerManager {
 
   private emitStateChange(workdir: string, state: DevServerState, errorMessage: string | undefined) {
     const resolved = this.resolveWorkdir(workdir)
+    const instance = this.getInstance(workdir)
+    const url = instance.resolvedUrl ?? instance.config?.url ?? null
+    const inspectProxyPort = instance.inspectProxyPort
     for (const listener of this.stateListeners) {
-      listener(resolved, state, errorMessage)
+      listener(resolved, state, errorMessage, url, inspectProxyPort)
     }
   }
 

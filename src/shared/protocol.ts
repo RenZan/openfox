@@ -396,6 +396,8 @@ export interface DevServerStatePayload {
   workdir: string
   state: 'off' | 'running' | 'warning' | 'error'
   errorMessage?: string
+  url?: string | null
+  inspectProxyPort?: number | null
 }
 
 // Background process payloads

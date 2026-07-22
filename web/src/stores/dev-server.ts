@@ -174,8 +174,17 @@ export const useDevServerStore = create<DevServerStore>()((set, get) => {
                   ...state.status,
                   state: payload.state as DevServerState,
                   errorMessage: payload.errorMessage,
+                  ...(payload.url !== undefined ? { url: payload.url } : {}),
+                  ...(payload.inspectProxyPort !== undefined ? { inspectProxyPort: payload.inspectProxyPort } : {}),
                 }
-              : state.status,
+              : {
+                  state: payload.state as DevServerState,
+                  url: payload.url ?? null,
+                  hotReload: false,
+                  config: null,
+                  errorMessage: payload.errorMessage,
+                  inspectProxyPort: payload.inspectProxyPort ?? null,
+                },
           }))
           break
         }
