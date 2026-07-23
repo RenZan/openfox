@@ -285,6 +285,7 @@ export class SessionManager {
       messages: messages.map((m) => ({
         ...m,
         timestamp: typeof m.timestamp === 'string' ? new Date(m.timestamp).getTime() : m.timestamp,
+        contextWindowId: newWindowId,
       })),
       criteria: state.criteria,
       metadataEntries: state.metadataEntries,

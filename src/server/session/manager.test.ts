@@ -665,5 +665,23 @@ describe('SessionManager', () => {
       expect(forked.messages).toHaveLength(1)
       expect(manager.isWarmedUp(forked.id)).toBe(false)
     })
+
+    it('sets new contextWindowId on forked messages so LLM context building works', () => {
+      const original = manager.createSession(projectId)
+      manager.addMessage(original.id, { role: 'user', content: 'Hello', tokenCount: 10 })
+      const msg2 = manager.addMessage(original.id, { role: 'user', content: 'World', tokenCount: 10 })
+
+      const forked = manager.forkSession(original.id, msg2.id)
+
+      const eventStore = getEventStore()
+      const forkedEvents = eventStore.getEvents(forked.id)
+      const snapshotEvent = forkedEvents.find((e) => e.type === 'turn.snapshot')
+      const snapshot = snapshotEvent!.data as { currentContextWindowId: string; messages: Array<{ contextWindowId?: string }> }
+
+      // All messages in the snapshot must have the new contextWindowId
+      for (const m of snapshot.messages) {
+        expect(m.contextWindowId).toBe(snapshot.currentContextWindowId)
+      }
+    })
   })
 })
