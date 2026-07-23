@@ -38,6 +38,7 @@ function UserMessage({ message, messageId, sessionId }: UserMessageProps) {
   const [editContent, setEditContent] = useState(message.content)
   const [pending, setPending] = useState(false)
   const [forkPending, setForkPending] = useState(false)
+  const [forkError, setForkError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -61,14 +62,14 @@ function UserMessage({ message, messageId, sessionId }: UserMessageProps) {
   const handleFork = async () => {
     if (!sessionId || !messageId || forkPending) return
     setForkPending(true)
-    setError(null)
+    setForkError(null)
     const result = await forkSession(sessionId, messageId)
     setForkPending(false)
     if (result?.session) {
       const projectId = result.session.projectId
       navigate(`/p/${projectId}/s/${result.session.id}`)
     } else {
-      setError('Failed to fork session')
+      setForkError('Failed to fork session')
     }
   }
 
@@ -106,7 +107,7 @@ function UserMessage({ message, messageId, sessionId }: UserMessageProps) {
   }
 
   const actionsVisible = hovered && !editing && !pending
-  const actionsClass = `flex items-center gap-0.5 self-end transition-opacity focus-within:opacity-100 ${actionsVisible ? 'opacity-100' : 'opacity-0'}`
+  const actionsClass = `flex items-center gap-0.5 self-end transition-[visibility,opacity] focus-within:visible focus-within:opacity-100 ${actionsVisible ? 'visible opacity-100' : 'invisible opacity-0'}`
 
   return (
     <div
@@ -235,7 +236,9 @@ function UserMessage({ message, messageId, sessionId }: UserMessageProps) {
           </div>
         ) : (
           <>
-            {error && <p className="text-xs text-error mb-1">{error}</p>}
+            {(error || forkError) && (
+              <p className="text-xs text-error mb-1">{error ?? forkError}</p>
+            )}
             <div
               className={`whitespace-pre-wrap break-words text-sm ${
                 isSystemGenerated
