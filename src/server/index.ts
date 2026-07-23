@@ -1347,9 +1347,6 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
       if (message.includes('not found')) {
         return res.status(404).json({ error: message })
       }
-      if (message.includes('not completed')) {
-        return res.status(400).json({ error: message })
-      }
       return res.status(500).json({ error: message })
     }
   })

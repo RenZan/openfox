@@ -625,19 +625,6 @@ describe('SessionManager', () => {
       expect(() => manager.forkSession(original.id, 'non-existent-id')).toThrow('not found')
     })
 
-    it('throws error for incomplete message (no message.done)', () => {
-      const original = manager.createSession(projectId)
-      const eventStore = getEventStore()
-
-      // Manually emit a message.start with no corresponding message.done
-      eventStore.append(original.id, {
-        type: 'message.start',
-        data: { messageId: 'incomplete-msg', role: 'user', content: 'Incomplete' },
-      })
-
-      expect(() => manager.forkSession(original.id, 'incomplete-msg')).toThrow('not completed')
-    })
-
     it('preserves session metadata from the original', async () => {
       const { updateSessionCachedPrompt } = await import('../db/sessions.js')
       const original = manager.createSession(projectId, 'My Original Session', 'provider1', 'model1')
@@ -652,7 +639,7 @@ describe('SessionManager', () => {
       expect(forked.providerModel).toBe('model1')
     })
 
-    it('copies events to the new session via EventStore', () => {
+    it('creates a snapshot in the forked session', () => {
       const original = manager.createSession(projectId)
 
       manager.addMessage(original.id, { role: 'user', content: 'Hello', tokenCount: 10 })
@@ -660,13 +647,13 @@ describe('SessionManager', () => {
 
       const forked = manager.forkSession(original.id, msg2.id)
 
-      // Verify events were copied by checking we can get the context messages
       const eventStore = getEventStore()
       const forkedEvents = eventStore.getEvents(forked.id)
 
-      // Should have session.initialized + copied events (message.start, message.done for each)
-      const messageStarts = forkedEvents.filter((e) => e.type === 'message.start')
-      expect(messageStarts).toHaveLength(2)
+      const snapshots = forkedEvents.filter((e) => e.type === 'turn.snapshot')
+      expect(snapshots).toHaveLength(1)
+      const snapshotMessages = (snapshots[0]!.data as { messages: unknown[] }).messages
+      expect(snapshotMessages).toHaveLength(2)
     })
   })
 })
