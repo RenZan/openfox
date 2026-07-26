@@ -224,18 +224,15 @@ export function resolveVisionFallback(
       const provider = config.providers?.find((p) => p.id === providerId)
 
       if (provider) {
-        let model = provider.models?.find((m) => m.id === modelId)
-        if (model && !model.supportsVision) {
-          model = provider.models?.find((m) => m.supportsVision)
-        }
-        if (!model || !model.supportsVision) {
-          model = provider.models?.find((m) => m.supportsVision)
-        }
+        const exactModel = provider.models?.find((m) => m.id === modelId)
+        const model = exactModel?.supportsVision
+          ? exactModel
+          : provider.models?.find((m) => m.supportsVision)
 
-        if (model) {
+        if (model?.supportsVision) {
           const backend: 'ollama' | 'openai' = provider.backend === 'ollama' ? 'ollama' : 'openai'
           return {
-            baseUrl: provider.url || fallback.url,
+            baseUrl: provider.url || fallback.url || 'http://localhost:11434',
             model: model.id,
             timeout: (fallback.timeout ?? 120) * 1000,
             backend,

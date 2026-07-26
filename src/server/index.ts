@@ -2052,18 +2052,30 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
 
   // Update vision fallback config only
   app.put('/api/config/vision-fallback', async (req, res) => {
-    const updates = req.body as {
-      enabled?: boolean
-      url?: string
-      model?: string
-      timeout?: number
-      backend?: VisionBackend
-      providerModelRef?: string
+    const { z } = await import('zod')
+
+    const visionFallbackUpdateSchema = z.object({
+      enabled: z.boolean().optional(),
+      url: z.string().optional(),
+      model: z.string().optional(),
+      timeout: z.number().positive().optional(),
+      backend: z.enum(['ollama', 'openai']).optional(),
+      providerModelRef: z.string().optional(),
+    })
+
+    const parsed = visionFallbackUpdateSchema.safeParse(req.body)
+    if (!parsed.success) {
+      res.status(400).json({ success: false, error: parsed.error.issues.map((i) => i.message).join(', ') })
+      return
     }
+
+    const updates = parsed.data
 
     try {
       const { loadGlobalConfig, saveGlobalConfig } = await import('../cli/config.js')
       const globalConfig = await loadGlobalConfig(config.mode ?? 'production', config.globalConfigPath)
+
+      const filteredUpdates = Object.fromEntries(Object.entries(updates).filter(([, v]) => v !== undefined))
 
       const updatedConfig = {
         ...globalConfig,
@@ -2073,9 +2085,9 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
             url: 'http://localhost:11434',
             model: 'qwen3.5:0.8b',
             timeout: 120,
-            backend: 'ollama',
+            backend: 'ollama' as const,
           }),
-          ...updates,
+          ...filteredUpdates,
         },
       }
 
@@ -2092,13 +2104,23 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
 
   // Test vision fallback configuration
   app.post('/api/config/vision-fallback/test', async (req, res) => {
-    const testConfig = req.body as {
-      url?: string
-      model?: string
-      backend?: VisionBackend
-      providerModelRef?: string
-      timeout?: number
+    const { z } = await import('zod')
+
+    const testSchema = z.object({
+      url: z.string().optional(),
+      model: z.string().optional(),
+      backend: z.enum(['ollama', 'openai']).optional(),
+      providerModelRef: z.string().optional(),
+      timeout: z.number().positive().optional(),
+    })
+
+    const parsed = testSchema.safeParse(req.body)
+    if (!parsed.success) {
+      res.status(400).json({ success: false, error: parsed.error.issues.map((i) => i.message).join(', ') })
+      return
     }
+
+    const testConfig = parsed.data
 
     try {
       const { resolveVisionFallback } = await import('../cli/config.js')
@@ -2106,6 +2128,7 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
       const globalConfig = await loadGlobalConfig(config.mode ?? 'production', config.globalConfigPath)
 
       // Merge test config over the existing one for testing
+      const filteredTestConfig = Object.fromEntries(Object.entries(testConfig).filter(([, v]) => v !== undefined))
       const testVisionFallback = {
         ...(globalConfig.visionFallback ?? {
           enabled: true,
@@ -2114,7 +2137,7 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
           timeout: 120,
           backend: 'ollama' as const,
         }),
-        ...testConfig,
+        ...filteredTestConfig,
         enabled: true,
       }
       const testGlobalConfig = { ...globalConfig, visionFallback: testVisionFallback }

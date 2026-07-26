@@ -614,4 +614,97 @@ describe('resolveVisionFallback', () => {
     expect(result!.baseUrl).toBe('http://fallback:11434')
     expect(getVisionFallback(config).providerModelRef).toBe('deleted-provider/some-model')
   })
+
+  it('falls back to default url when provider has no url and fallback.url is undefined', () => {
+    const providerNoUrl = {
+      ...visionProvider,
+      url: '',
+      apiKey: undefined,
+    }
+    const config = makeConfig({
+      providers: [providerNoUrl],
+      visionFallback: {
+        enabled: true,
+        providerModelRef: 'vision-provider/gpt-4o-vision',
+        url: '',
+        timeout: 60,
+      },
+    })
+    const result = resolveVisionFallback(config)
+    expect(result).toBeDefined()
+    expect(result!.baseUrl).toBe('http://localhost:11434')
+    expect(result!.model).toBe('gpt-4o-vision')
+    expect(result!.timeout).toBe(60 * 1000)
+  })
+
+  it('returns legacy fallback when providerModelRef is empty string', () => {
+    const config = makeConfig({
+      visionFallback: {
+        enabled: true,
+        providerModelRef: '',
+        url: 'http://manual:11434',
+        model: 'manual-model',
+        timeout: 30,
+        backend: 'ollama' as const,
+      },
+    })
+    const result = resolveVisionFallback(config)
+    expect(result).toBeDefined()
+    expect(result!.baseUrl).toBe('http://manual:11434')
+    expect(result!.model).toBe('manual-model')
+  })
+
+  it('handles ref without slash gracefully', () => {
+    const config = makeConfig({
+      visionFallback: {
+        enabled: true,
+        providerModelRef: 'no-slash-here',
+        url: 'http://fallback:11434',
+        model: 'fallback-model',
+        timeout: 30,
+        backend: 'ollama' as const,
+      },
+    })
+    const result = resolveVisionFallback(config)
+    expect(result).toBeDefined()
+    expect(result!.baseUrl).toBe('http://fallback:11434')
+    expect(result!.model).toBe('fallback-model')
+  })
+
+  it('handles empty provider models array', () => {
+    const providerEmptyModels = {
+      ...visionProvider,
+      id: 'empty-models',
+      models: [],
+    }
+    const config = makeConfig({
+      providers: [providerEmptyModels],
+      visionFallback: {
+        enabled: true,
+        providerModelRef: 'empty-models/gpt-4o-vision',
+        url: 'http://fallback:11434',
+        model: 'fallback-model',
+        timeout: 30,
+        backend: 'ollama' as const,
+      },
+    })
+    const result = resolveVisionFallback(config)
+    expect(result).toBeDefined()
+    expect(result!.baseUrl).toBe('http://fallback:11434')
+    expect(result!.model).toBe('fallback-model')
+  })
+
+  it('returns undefined when fallback.url is undefined in legacy mode', () => {
+    const config = makeConfig({
+      visionFallback: {
+        enabled: true,
+        url: '',
+        model: 'some-model',
+        timeout: 30,
+        backend: 'ollama' as const,
+      },
+    })
+    const result = resolveVisionFallback(config)
+    expect(result).toBeUndefined()
+  })
 })
