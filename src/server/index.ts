@@ -1535,7 +1535,14 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
     const activeProvider = providerManager.getActiveProvider()
 
     let visionFallback:
-      | { enabled: boolean; url: string; model: string; timeout: number; backend: VisionBackend }
+      | {
+          enabled: boolean
+          url: string
+          model: string
+          timeout: number
+          backend: VisionBackend
+          providerModelRef?: string
+        }
       | undefined
     let globalWorkdir: string | undefined
     try {
@@ -1549,6 +1556,7 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
           model: fallback.model ?? 'qwen3.5:0.8b',
           timeout: fallback.timeout ?? 120,
           backend: fallback.backend ?? 'ollama',
+          ...(fallback.providerModelRef ? { providerModelRef: fallback.providerModelRef } : {}),
         }
       }
       globalWorkdir = globalConfig.workspace?.workdir
@@ -2007,17 +2015,28 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
   app.post('/api/init/config', async (req, res) => {
     const { workdir, visionFallback } = req.body as {
       workdir?: string
-      visionFallback?: { enabled: boolean; url: string; model: string; timeout: number; backend: VisionBackend }
+      visionFallback?: {
+        enabled: boolean
+        url?: string
+        model?: string
+        timeout?: number
+        backend?: VisionBackend
+        providerModelRef?: string
+      }
     }
 
     try {
       const { loadGlobalConfig, saveGlobalConfig } = await import('../cli/config.js')
       const globalConfig = await loadGlobalConfig(config.mode ?? 'production', config.globalConfigPath)
 
+      const updatedVf = visionFallback
+        ? { ...globalConfig.visionFallback, ...visionFallback }
+        : globalConfig.visionFallback
+
       const updatedConfig = {
         ...globalConfig,
         workspace: workdir ? { workdir } : globalConfig.workspace,
-        visionFallback: visionFallback ?? globalConfig.visionFallback,
+        visionFallback: updatedVf,
       }
 
       await saveGlobalConfig(config.mode ?? 'production', updatedConfig, config.globalConfigPath)
@@ -2028,6 +2047,89 @@ export async function createServerHandle(config: Config): Promise<ServerHandle> 
         success: false,
         error: error instanceof Error ? error.message : 'Failed to save config',
       })
+    }
+  })
+
+  // Update vision fallback config only
+  app.put('/api/config/vision-fallback', async (req, res) => {
+    const updates = req.body as {
+      enabled?: boolean
+      url?: string
+      model?: string
+      timeout?: number
+      backend?: VisionBackend
+      providerModelRef?: string
+    }
+
+    try {
+      const { loadGlobalConfig, saveGlobalConfig } = await import('../cli/config.js')
+      const globalConfig = await loadGlobalConfig(config.mode ?? 'production', config.globalConfigPath)
+
+      const updatedConfig = {
+        ...globalConfig,
+        visionFallback: {
+          ...(globalConfig.visionFallback ?? {
+            enabled: false,
+            url: 'http://localhost:11434',
+            model: 'qwen3.5:0.8b',
+            timeout: 120,
+            backend: 'ollama',
+          }),
+          ...updates,
+        },
+      }
+
+      await saveGlobalConfig(config.mode ?? 'production', updatedConfig, config.globalConfigPath)
+
+      res.json({ success: true })
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to save vision fallback config',
+      })
+    }
+  })
+
+  // Test vision fallback configuration
+  app.post('/api/config/vision-fallback/test', async (req, res) => {
+    const testConfig = req.body as {
+      url?: string
+      model?: string
+      backend?: VisionBackend
+      providerModelRef?: string
+      timeout?: number
+    }
+
+    try {
+      const { resolveVisionFallback } = await import('../cli/config.js')
+      const { loadGlobalConfig } = await import('../cli/config.js')
+      const globalConfig = await loadGlobalConfig(config.mode ?? 'production', config.globalConfigPath)
+
+      // Merge test config over the existing one for testing
+      const testVisionFallback = {
+        ...(globalConfig.visionFallback ?? {
+          enabled: true,
+          url: 'http://localhost:11434',
+          model: 'qwen3.5:0.8b',
+          timeout: 120,
+          backend: 'ollama' as const,
+        }),
+        ...testConfig,
+        enabled: true,
+      }
+      const testGlobalConfig = { ...globalConfig, visionFallback: testVisionFallback }
+      const resolved = resolveVisionFallback(testGlobalConfig)
+
+      if (resolved) {
+        res.json({
+          success: true,
+          description: `Config valid: ${resolved.model} @ ${resolved.baseUrl} (${resolved.backend})`,
+        })
+      } else {
+        res.json({ success: false, error: 'Could not resolve vision model config. Check your settings.' })
+      }
+    } catch (error) {
+      res.json({ success: false, error: error instanceof Error ? error.message : 'Test failed' })
     }
   })
 
