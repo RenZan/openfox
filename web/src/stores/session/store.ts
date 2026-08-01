@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 import { authFetch } from '../../lib/api'
 import { appUrl } from '../../lib/basePath'
-import type { SessionSummary, Message } from '@shared/types.js'
+import { consumePrefetchedSession } from '../../lib/sessionPrefetch'
+import type { SessionSummary, Message, Session, ContextState, WorkflowExecution } from '@shared/types.js'
 import type { QueuedMessage, PendingQuestionPayload } from '@shared/protocol.js'
 import { wsClient } from '../../lib/ws'
 import { useConfigStore } from '../config'
@@ -15,7 +16,19 @@ let isSubscribed = false
 let wsUnsubscribe: (() => void) | null = null
 
 const loadingSessionIds = new Set<string>()
+const loadedSessionIds = new Set<string>()
 const listingSessionsForProject = new Map<string, Promise<void>>()
+
+interface SessionLoadData {
+  session: Session
+  messages?: Message[]
+  hiddenCount?: number
+  contextState?: ContextState | null
+  queueState?: QueuedMessage[]
+  pendingConfirmations?: PendingPathConfirmation[]
+  pendingQuestions?: PendingQuestionPayload[]
+  activeWorkflowExecution?: WorkflowExecution | null
+}
 
 function applyToolOutputs(
   toolCalls: import('@shared/types.js').ToolCall[] | undefined,
@@ -186,10 +199,19 @@ export const useSessionStore = create<SessionState>((set, get) => {
         if (newStatus === 'connected') {
           get().listSessions(undefined)
           useProjectStore.getState().listProjects()
+          // Reload the active session on (re)connect only when it has not been
+          // loaded yet (first connect, or after any disconnect/reconnect which
+          // clears loadedSessionIds). The route-level useSessionLoader already
+          // covers the initial navigation, so this avoids a duplicate fetch on
+          // first load. Clearing on 'reconnecting'/'disconnected' also covers
+          // automatic WS reconnects (ws.ts), so the client re-subscribes via
+          // session.load after every connection drop.
           const currentSessionId = get().currentSession?.id
           if (currentSessionId) {
             get().loadSession(currentSessionId)
           }
+        } else if (newStatus === 'disconnected' || newStatus === 'reconnecting') {
+          loadedSessionIds.clear()
         }
       })
 
@@ -226,6 +248,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         wsUnsubscribe = null
       }
       isSubscribed = false
+      loadedSessionIds.clear()
       set({ connectionStatus: 'disconnected' })
       get().connect()
     },
@@ -237,6 +260,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         wsUnsubscribe = null
       }
       isSubscribed = false
+      loadedSessionIds.clear()
       set({ connectionStatus: 'disconnected', showPasswordModal: false })
     },
 
@@ -302,8 +326,19 @@ export const useSessionStore = create<SessionState>((set, get) => {
       }
     },
 
-    loadSession: async (sessionId) => {
-      if (loadingSessionIds.has(sessionId)) {
+    loadSession: async (sessionId, force = false) => {
+      // An explicit force reload (branch switch, workspace change, replay)
+      // bypasses both guards so it always refetches, even while a load for the
+      // same session is in flight.
+      if (!force && loadingSessionIds.has(sessionId)) {
+        return
+      }
+
+      // Sequential guard: once a session has been fully loaded, a second call
+      // for the same id (e.g. route hook + ws connect race) is a no-op unless
+      // the user explicitly navigates to another session (which clears the set)
+      // or a force reload is requested (branch switch, replay, workspace change).
+      if (!force && loadedSessionIds.has(sessionId)) {
         return
       }
 
@@ -313,6 +348,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         const currentSession = get().currentSession
 
         if (!currentSession || currentSession.id !== sessionId) {
+          loadedSessionIds.clear()
           const oldSessionId = currentSession?.id
           const oldConfirmations = get().pendingPathConfirmations
           const existingCross = get().crossSessionConfirmations
@@ -343,10 +379,28 @@ export const useSessionStore = create<SessionState>((set, get) => {
           set({ unreadSessionIds: get().unreadSessionIds.filter((id) => id !== sessionId) })
         }
 
-        const res = await authFetch(`/api/sessions/${sessionId}`)
-        if (!res.ok) return
+        // Fire both requests in parallel — background-processes does not depend
+        // on the session payload, so it must not wait for a second round-trip.
+        // The session fetch was prefetched at app boot (main.tsx) when this
+        // session is the initial URL — consume it instead of re-fetching.
+        // On prefetch failure (401, network blip, server restart) fall through
+        // to the regular fetch: the load must never abort silently.
+        const prefetched = consumePrefetchedSession(sessionId)
+        const sessionFetch: Promise<SessionLoadData | null> = prefetched
+          ? prefetched.then(async (result) => {
+              if (result.ok) return result.data as unknown as SessionLoadData
+              const res = await authFetch(`/api/sessions/${sessionId}`)
+              if (!res.ok) return null
+              return (await res.json()) as SessionLoadData
+            })
+          : authFetch(`/api/sessions/${sessionId}`).then(async (res) => {
+              if (!res.ok) return null
+              return (await res.json()) as SessionLoadData
+            })
+        const bpFetch = authFetch(`/api/sessions/${sessionId}/background-processes`)
 
-        const data = await res.json()
+        const data = await sessionFetch
+        if (!data) return
         const loadedMessages = (data.messages as Message[] | undefined) ?? []
         const crossCleanup = { ...get().crossSessionConfirmations }
         delete crossCleanup[sessionId]
@@ -367,7 +421,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         wsClient.send('session.load', { sessionId })
 
         try {
-          const bpRes = await authFetch(`/api/sessions/${sessionId}/background-processes`)
+          const bpRes = await bpFetch
           if (bpRes.ok) {
             const bpData = await bpRes.json()
             useBackgroundProcessesStore.getState().setProcesses(bpData.processes ?? [])
@@ -375,6 +429,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         } catch {
           /* empty */
         }
+        loadedSessionIds.add(sessionId)
       } catch {
         /* empty */
       } finally {
@@ -417,8 +472,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
 
           // Restore cross-session confirmation state from server
           const pendingBySession = data.pendingConfirmationsBySession as
-            | Record<string, PendingPathConfirmation[]>
-            | undefined
+            Record<string, PendingPathConfirmation[]> | undefined
           if (pendingBySession) {
             const currentSessionId = get().currentSession?.id
             const crossSessionConfirmations: Record<string, PendingPathConfirmation[]> = {}
@@ -521,6 +575,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
 
     clearSession: () => {
       cancelStreamingFlush()
+      loadedSessionIds.clear()
       set((state) => ({
         currentSession: null,
         messages: [],

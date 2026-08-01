@@ -1,4 +1,3 @@
-import { ScrollArea } from './ScrollArea'
 import { memo, useState } from 'react'
 import type { Diagnostic, EditContextRegion } from '@shared/types.js'
 import { ToolIcon } from './ToolIcon'
@@ -46,6 +45,25 @@ interface ToolCallDisplayProps {
   callId?: string
 }
 
+// Tool calls with content above this size are collapsed by default and only
+// mounted after a click — large read_file dumps or command outputs dominate
+// the initial DOM otherwise.
+const AUTO_EXPAND_THRESHOLD = 600
+
+function getContentSize(
+  result: string | undefined,
+  streamingOutput: StreamingChunk[] | undefined,
+  args: Record<string, unknown>,
+): number {
+  let size = result?.length ?? 0
+  if (streamingOutput) {
+    for (const chunk of streamingOutput) size += chunk.content.length
+  }
+  const content = args['content']
+  if (typeof content === 'string') size += content.length
+  return size
+}
+
 const statusConfig = {
   pending: {
     icon: '●',
@@ -86,8 +104,14 @@ export const ToolCallDisplay = memo(function ToolCallDisplay({
   truncated,
   callId,
 }: ToolCallDisplayProps) {
-  // Auto-expand file operations and running commands so content is immediately visible
-  const shouldAutoExpand = !forceCompact
+  // Auto-expand small outputs and running commands so content is immediately
+  // visible; large finished outputs are collapsed until the header is clicked.
+  // Note: `expanded` is intentionally frozen at mount time — the component is
+  // keyed by position (key={i}), so it remounts when the tool call changes,
+  // and forceCompact comes from a display setting stable during the message's
+  // lifetime. Changing the setting live does not re-collapse existing calls.
+  const shouldAutoExpand =
+    !forceCompact && (status === 'pending' || getContentSize(result, streamingOutput, args) < AUTO_EXPAND_THRESHOLD)
   const [expanded, setExpanded] = useState(shouldAutoExpand)
   const config = statusConfig[status]
   const remoteProtocol = detectRemoteExecution(tool, args)
@@ -222,18 +246,18 @@ export const ToolCallDisplay = memo(function ToolCallDisplay({
               <div className="text-[10px] text-accent-primary font-medium mb-1 uppercase tracking-wide">
                 {String(args.subAgentType ?? 'Sub-Agent')} Prompt
               </div>
-              <ScrollArea className="text-xs prose prose-invert prose-sm max-w-none max-h-[60vh]">
+              <div className="text-xs prose prose-invert prose-sm max-w-none max-h-[60vh] overflow-y-auto">
                 <Markdown content={String(args.prompt ?? '')} />
-              </ScrollArea>
+              </div>
             </div>
           )}
 
           {/* Specialized rendering for web_search */}
           {tool === 'web_search' && status === 'success' && (
             <div>
-              <ScrollArea className="text-xs prose prose-invert prose-sm max-w-none max-h-[60vh]">
+              <div className="text-xs prose prose-invert prose-sm max-w-none max-h-[60vh] overflow-y-auto">
                 <Markdown content={result ?? ''} />
-              </ScrollArea>
+              </div>
               {truncated && <TruncatedIndicator className="mt-1" />}
             </div>
           )}
@@ -244,9 +268,9 @@ export const ToolCallDisplay = memo(function ToolCallDisplay({
               <div className="text-[10px] text-accent-primary font-medium mb-1 uppercase tracking-wide">
                 Skill: {String(args.skillId ?? '')}
               </div>
-              <ScrollArea className="text-xs prose prose-invert prose-sm max-w-none max-h-[60vh]">
+              <div className="text-xs prose prose-invert prose-sm max-w-none max-h-[60vh] overflow-y-auto">
                 <Markdown content={result ?? ''} />
-              </ScrollArea>
+              </div>
               {truncated && <TruncatedIndicator className="mt-1" />}
             </div>
           )}
@@ -273,9 +297,9 @@ export const ToolCallDisplay = memo(function ToolCallDisplay({
                   )}
                 </div>
               )}
-              <ScrollArea className="text-xs prose prose-invert prose-sm max-w-none max-h-[60vh]">
+              <div className="text-xs prose prose-invert prose-sm max-w-none max-h-[60vh] overflow-y-auto">
                 <Markdown content={result ?? ''} />
-              </ScrollArea>
+              </div>
               {truncated && <TruncatedIndicator />}
             </div>
           )}
@@ -298,9 +322,9 @@ export const ToolCallDisplay = memo(function ToolCallDisplay({
           {/* Specialized rendering for mcp_config */}
           {tool === 'mcp_config' && status === 'success' && (
             <div>
-              <ScrollArea className="text-xs prose prose-invert prose-sm max-w-none max-h-[60vh]">
+              <div className="text-xs prose prose-invert prose-sm max-w-none max-h-[60vh] overflow-y-auto">
                 <Markdown content={result ?? ''} />
-              </ScrollArea>
+              </div>
               {truncated && <TruncatedIndicator className="mt-1" />}
             </div>
           )}
@@ -328,9 +352,9 @@ export const ToolCallDisplay = memo(function ToolCallDisplay({
                 {Object.keys(args).length > 0 && (
                   <div>
                     <div className="text-[10px] text-text-muted mb-0.5">Arguments:</div>
-                    <ScrollArea horizontal>
+                    <div className="overflow-x-auto">
                       <pre className="text-xs bg-bg-primary p-1.5 rounded break-words">{formatToolArgsFull(args)}</pre>
-                    </ScrollArea>
+                    </div>
                   </div>
                 )}
 
@@ -340,9 +364,9 @@ export const ToolCallDisplay = memo(function ToolCallDisplay({
                     <div className="text-[10px] text-text-muted mb-0.5">
                       Result{durationMs !== undefined && ` (${durationMs}ms)`}:
                     </div>
-                    <ScrollArea horizontal className="max-h-[60vh]">
+                    <div className="overflow-x-auto max-h-[60vh]">
                       <pre className="text-xs bg-bg-primary p-1.5 rounded break-words">{result || 'No output'}</pre>
-                    </ScrollArea>
+                    </div>
                     {truncated && <TruncatedIndicator className="mt-1" />}
                   </div>
                 )}

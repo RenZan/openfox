@@ -138,9 +138,7 @@ export type MessageRole = 'user' | 'assistant' | 'system' | 'tool'
 
 // Segment types for preserving streaming order
 export type MessageSegment =
-  | { type: 'text'; content: string }
-  | { type: 'thinking'; content: string }
-  | { type: 'tool_call'; toolCallId: string }
+  { type: 'text'; content: string } | { type: 'thinking'; content: string } | { type: 'tool_call'; toolCallId: string }
 
 export interface MessageStats {
   providerId: string
@@ -336,6 +334,10 @@ export interface ToolCall {
   result?: ToolResult // Attached after execution (during streaming or enriched on load)
   startedAt?: number // Timestamp when tool started (for timeout display, transient)
   streamingOutput?: Array<{ stream: 'stdout' | 'stderr'; content: string; timestamp: number }> // Real-time output (transient, run_command only)
+  // Set when streamingOutput was truncated when building a snapshot: the full
+  // live stream lives in the raw tool.output events, the snapshot only keeps
+  // the tail for display.
+  streamingOutputTruncated?: boolean
   parseError?: string // Error message if JSON parsing failed
   rawArguments?: string // The unparsed arguments string for debugging
 }
